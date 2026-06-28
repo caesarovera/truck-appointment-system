@@ -14,6 +14,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/DashboardPage.vue'),
         meta: { requiresAuth: true },
     },
+    {
+        path: '/slots',
+        name: 'slots',
+        component: () => import('@/pages/SlotAvailabilityPage.vue'),
+        meta: { requiresAuth: true },
+    },
 ];
 
 export const router = createRouter({

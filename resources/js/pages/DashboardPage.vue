@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
@@ -18,10 +18,22 @@ async function onLogout(): Promise<void> {
             <button class="text-sm text-gray-600 hover:text-gray-900" @click="onLogout">Keluar</button>
         </header>
 
-        <main class="p-6 space-y-2">
-            <p class="text-gray-900">Halo, <strong>{{ auth.user?.name }}</strong></p>
-            <p class="text-sm text-gray-600">Role: {{ auth.user?.roles.join(', ') || '—' }}</p>
-            <p class="text-sm text-gray-600">{{ auth.user?.permissions.length ?? 0 }} izin aktif</p>
+        <main class="p-6 space-y-4">
+            <div class="space-y-2">
+                <p class="text-gray-900">Halo, <strong>{{ auth.user?.name }}</strong></p>
+                <p class="text-sm text-gray-600">Role: {{ auth.user?.roles.join(', ') || '—' }}</p>
+                <p class="text-sm text-gray-600">{{ auth.user?.permissions.length ?? 0 }} izin aktif</p>
+            </div>
+
+            <nav class="flex flex-wrap gap-3">
+                <RouterLink
+                    v-if="auth.can('slot.read')"
+                    to="/slots"
+                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700"
+                >
+                    Ketersediaan Slot
+                </RouterLink>
+            </nav>
         </main>
     </div>
 </template>
