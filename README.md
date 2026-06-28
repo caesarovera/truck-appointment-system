@@ -19,18 +19,23 @@ company/user) (**57 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
 
 ## Mulai dari mana (urutan onboarding)
 
-Developer baru, baca berurutan:
+**Developer baru / junior:** mulai dari **[`docs/ONBOARDING.md`](docs/ONBOARDING.md)** —
+jalur belajar bertahap (peta mental → jalankan project → bedah golden path) lengkap dengan
+glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
+
 1. **README ini** — gambaran + cara jalankan (di bawah).
-2. [`CLAUDE.md`](CLAUDE.md) — kontrak arsitektur. **Wajib sebelum menulis kode.**
-3. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — siapkan & jalankan project langkah-demi-langkah.
-4. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
-5. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
-6. [`HANDOVER.md`](HANDOVER.md) — status terkini & langkah berikutnya. **Baca di awal tiap sesi.**
+2. [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — panduan developer baru (peta mental + tahapan).
+3. [`CLAUDE.md`](CLAUDE.md) — kontrak arsitektur. **Wajib sebelum menulis kode.**
+4. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — siapkan & jalankan project langkah-demi-langkah.
+5. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
+6. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
+7. [`HANDOVER.md`](HANDOVER.md) — status terkini & langkah berikutnya. **Baca di awal tiap sesi.**
 
 ## Peta dokumentasi (baca sesuai kebutuhan)
 
 | Dokumen | Isi | Baca saat |
 |---------|-----|-----------|
+| [`docs/ONBOARDING.md`](docs/ONBOARDING.md) | **Panduan developer baru** (peta mental, tahapan, glosarium, latihan, FAQ) | hari pertama masuk proyek |
 | [`CLAUDE.md`](CLAUDE.md) | **Kontrak arsitektur** (aturan layer, hardening, larangan) | sebelum menulis kode apa pun |
 | [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
 | [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
