@@ -10,9 +10,9 @@
 ---
 
 ## Status
-- Update terakhir: `2026-06-28` · Sesi: **Senior review + hardening rate-limit** (audit arsitektur/keamanan, slice rate limiting).
-- Branch: `-` (repo belum di-init git; lihat Jebakan).
-- Build backend: `composer test` → ✅ **94 pass / 266 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Update terakhir: `2026-06-28` · Sesi: **Backlog hardening** (version di cancel · dueForNoShow chunking · idempotency lock TTL+hash).
+- Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
+- Build backend: `composer test` → ✅ **100 pass / 289 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **7 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
@@ -41,19 +41,21 @@
 > Audit menyeluruh actions/repos/middleware/policy/migrasi/auth. Kesimpulan: foundation kuat (race handling, layering, idempotency benar). Temuan & status:
 - **[FIXED] Tidak ada rate limiting** (melanggar kontrak) → slice di atas. Login brute-forceable & booking bisa di-borong bot — kini ber-throttle.
 - **[DEFERRED — sengaja tidak diimplementasikan] Token abilities Sanctum tak ditegakkan.** Login mencetak token dgn abilities = SELURUH permission role, dan tak ada jalur token ber-scope sempit. Maka `abilities:` middleware tak pernah bisa menolak yang Policy/permission belum tolak → murni redundan + friksi (paksa semua test `actingAs` kirim `['*']`). Tegakkan NANTI saat aplikasi benar-benar menerbitkan token sempit (mis. token mobile read-only). Otorisasi saat ini tetap aman lewat Policy + FormRequest `can()`.
-- **[TODO backlog] `version` optimistic lock tak konsisten:** hanya dicek di reschedule; cancel tak cek `version`. Aman (pessimistic lock) tapi edit-barengan tak terdeteksi di cancel. Tambah saat ada UI edit konkuren.
-- **[TODO backlog] `AppointmentRepository::dueForNoShow` muat semua kandidat ke memori PHP** lalu filter. OK skala MVP; di produksi pakai `chunkById()` / dorong hitung deadline ke DB.
-- **[TODO backlog] Idempotency lock TTL 10 dtk** bisa lebih pendek dari durasi request saat beban tinggi → duplikat berpeluang lolos. Naikkan/perpanjang lock sebelum operasi berat; pertimbangkan `hash` nilai header.
+- **[FIXED] `version` optimistic lock tak konsisten:** `cancel` kini terima `version` opsional → bila dikirim, optimistic lock ditegakkan (`OptimisticLockException` 409 `version_conflict`); bila tidak, cancel tetap jalan (backward compatible). `CancelAppointmentRequest` + `CancelAppointmentAction::execute($appointment, ?int $expectedVersion)`. 4 test.
+- **[FIXED] `dueForNoShow` muat semua kandidat ke memori:** kini dipindai `chunkById` (size dari `config('tas.no_show_chunk_size')` default 500) → hanya N baris di-hydrate per iterasi; hanya yang lewat grace ditahan. Test lintas-batas chunk (size=2, 5 due).
+- **[FIXED] Idempotency lock TTL 10 dtk → 60 dtk** (`config('tas.idempotency.lock_seconds')`, ttl_hours juga) supaya lock tak kedaluwarsa di tengah request berat. Nilai header di-`hash('sha256')` jadi kunci cache (bounded lintas store, anti key-injection). 2 test (replay key panjang + contention 409).
 - **[catatan] `$fillable` memuat `status`/`version`/`company_id`:** aman sekarang (Action set eksplisit, tak ada mass-assign), tapi ranjau laten — pertimbangkan `$guarded` kolom yang hanya Action boleh ubah.
 
+- [x] **Backlog hardening (3 item dari senior review):** (1) optimistic `version` opsional di cancel, (2) `dueForNoShow` chunked scan (config `no_show_chunk_size`), (3) idempotency lock TTL 60s + key hashing (config `idempotency.lock_seconds`/`ttl_hours`). Semua via `config/tas.php` (tunable env). +8 test di `tests/Feature/{Appointments,Jobs,Hardening}`. Detail di *Senior review* (status [FIXED]).
+
 ## Sedang dikerjakan
-- (kosong) — slice hardening rate-limit selesai di checkpoint hijau.
+- (kosong) — backlog hardening selesai di checkpoint hijau (100 pass).
 
 ## Langkah berikutnya (urut)
 1. **Frontend slice berikutnya:** layout ber-auth (sidebar/nav per role via `auth.can/hasRole`) → ketersediaan slot (`GET /slots/availability`, TanStack Query) → booking → dashboard gate → jadwal driver → planner kelola window.
 2. **Wiring realtime sungguhan:** `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + `Broadcast::routes(auth:sanctum)` + sambung Laravel Echo di SPA; swap `GateEventGateway` ke TOS riil.
 3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD master data (terminal/gate/truck/driver) untuk admin.
-4. **Backlog hardening (dari senior review):** `version` di cancel · `dueForNoShow` chunk/DB · idempotency lock TTL · token abilities sempit (lihat *Senior review* di atas).
+4. **Backlog hardening sisa:** token abilities sempit (lihat *Senior review*) — ditegakkan saat aplikasi menerbitkan token ber-scope sempit. (3 item lain sudah [FIXED].)
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
@@ -76,6 +78,11 @@
 - `2026-06-28`: Token abilities Sanctum **sengaja TIDAK ditegakkan** lewat middleware (lihat *Senior
   review*). Keputusan, bukan utang diam-diam: enforcement redundan selama login hanya cetak token
   full-scope. Tak ada perubahan kode rute selain throttle.
+- `2026-06-28`: Backlog hardening (3 item) → `config/tas.php` tambah `no_show_chunk_size`=500,
+  `idempotency.lock_seconds`=60, `idempotency.ttl_hours`=24 (env `TAS_NO_SHOW_CHUNK_SIZE`/
+  `TAS_IDEMPOTENCY_LOCK_SECONDS`/`TAS_IDEMPOTENCY_TTL_HOURS`). `cancel` terima `version` opsional
+  (backward compatible). Bukan perubahan kontrak. CODE-WALKTHROUGH §S.5 ditambah; SETUP-GUIDE
+  endpoint cancel ditandai body opsional `version`.
 - `2026-06-27`: Cache ketersediaan slot pakai **explicit-key `Cache::flexible` + `Cache::forget`**
   (di `SlotRepository`), BUKAN `Cache::tags` seperti contoh CLAUDE.md. Alasan: cache dev
   (`CACHE_STORE=database`) tidak mendukung tagging; explicit-key jalan di semua store. Saat

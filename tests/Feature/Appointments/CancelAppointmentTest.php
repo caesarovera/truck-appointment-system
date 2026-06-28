@@ -82,3 +82,34 @@ it('lets a planner cancel cross-company (override)', function (): void {
 
     postJson("/api/v1/appointments/{$appointment->id}/cancel")->assertOk();
 });
+
+it('rejects cancel with a stale version (409 version_conflict) and keeps the quota', function (): void {
+    ['user' => $user, 'appointment' => $appointment, 'window' => $window] = cancelScenario();
+    Sanctum::actingAs($user);
+
+    // Klien memegang versi usang → tolak, jangan batalkan.
+    postJson("/api/v1/appointments/{$appointment->id}/cancel", ['version' => 999])
+        ->assertStatus(409)
+        ->assertJsonPath('error', 'version_conflict');
+
+    expect($appointment->fresh()->status)->toBe(AppointmentStatus::CONFIRMED)
+        ->and($window->fresh()->booked_count)->toBe(1);
+});
+
+it('cancels when the supplied version matches the current row', function (): void {
+    ['user' => $user, 'appointment' => $appointment] = cancelScenario();
+    Sanctum::actingAs($user);
+
+    postJson("/api/v1/appointments/{$appointment->id}/cancel", ['version' => $appointment->version])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'CANCELLED');
+});
+
+it('still cancels when no version is supplied (backward compatible)', function (): void {
+    ['user' => $user, 'appointment' => $appointment] = cancelScenario();
+    Sanctum::actingAs($user);
+
+    postJson("/api/v1/appointments/{$appointment->id}/cancel")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'CANCELLED');
+});
