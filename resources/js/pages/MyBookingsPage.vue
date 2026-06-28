@@ -4,9 +4,11 @@ import { RouterLink } from 'vue-router';
 import { isAxiosError } from 'axios';
 import { useMyAppointments } from '@/composables/useMyAppointments';
 import { useCancelAppointment } from '@/composables/useCancelAppointment';
+import RescheduleDialog from '@/components/RescheduleDialog.vue';
 import type { Appointment } from '@/types/api';
 
-const CANCELLABLE = ['BOOKED', 'CONFIRMED'];
+// Pra-kedatangan → boleh batal & pindah jadwal (cocok dgn AppointmentStatus).
+const MANAGEABLE = ['BOOKED', 'CONFIRMED'];
 const STATUSES = ['BOOKED', 'CONFIRMED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
 
 const status = ref('');
@@ -14,10 +16,16 @@ const { appointments, isLoading, isError } = useMyAppointments(status);
 const cancelMutation = useCancelAppointment();
 
 const confirmingId = ref<number | null>(null);
+const rescheduling = ref<Appointment | null>(null);
 const error = ref<string | null>(null);
 
-function canCancel(a: Appointment): boolean {
-    return CANCELLABLE.includes(a.status);
+function canManage(a: Appointment): boolean {
+    return MANAGEABLE.includes(a.status);
+}
+
+function onRescheduled(): void {
+    // Daftar & ketersediaan ter-invalidate oleh mutation → cukup tutup dialog.
+    rescheduling.value = null;
 }
 
 async function confirmCancel(a: Appointment): Promise<void> {
@@ -96,9 +104,9 @@ function extractError(e: unknown): string {
                         <template v-if="a.containers[0]"> · {{ a.containers[0].container_no }}</template>
                     </p>
 
-                    <div v-if="canCancel(a)" class="pt-1">
+                    <div v-if="canManage(a)" class="flex items-center gap-2 pt-1">
                         <template v-if="confirmingId === a.id">
-                            <span class="text-sm text-gray-700 mr-2">Batalkan booking ini?</span>
+                            <span class="text-sm text-gray-700 mr-1">Batalkan booking ini?</span>
                             <button
                                 type="button"
                                 :disabled="cancelMutation.isPending.value"
@@ -108,26 +116,38 @@ function extractError(e: unknown): string {
                             >
                                 {{ cancelMutation.isPending.value ? 'Memproses…' : 'Ya, batalkan' }}
                             </button>
-                            <button
-                                type="button"
-                                class="ml-2 text-sm text-gray-600 hover:text-gray-900"
-                                @click="confirmingId = null"
-                            >
+                            <button type="button" class="text-sm text-gray-600 hover:text-gray-900" @click="confirmingId = null">
                                 Tidak
                             </button>
                         </template>
-                        <button
-                            v-else
-                            type="button"
-                            class="rounded-md border border-red-300 text-red-700 px-3 py-1 text-sm hover:bg-red-50"
-                            data-testid="cancel-button"
-                            @click="confirmingId = a.id"
-                        >
-                            Batalkan
-                        </button>
+                        <template v-else>
+                            <button
+                                type="button"
+                                class="rounded-md border border-indigo-300 text-indigo-700 px-3 py-1 text-sm hover:bg-indigo-50"
+                                data-testid="reschedule-button"
+                                @click="rescheduling = a"
+                            >
+                                Pindah jadwal
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-md border border-red-300 text-red-700 px-3 py-1 text-sm hover:bg-red-50"
+                                data-testid="cancel-button"
+                                @click="confirmingId = a.id"
+                            >
+                                Batalkan
+                            </button>
+                        </template>
                     </div>
                 </li>
             </ul>
+
+            <RescheduleDialog
+                v-if="rescheduling"
+                :appointment="rescheduling"
+                @rescheduled="onRescheduled"
+                @cancel="rescheduling = null"
+            />
         </main>
     </div>
 </template>

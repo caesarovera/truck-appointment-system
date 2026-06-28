@@ -42,7 +42,8 @@ function appointment(overrides: Partial<Appointment>): Appointment {
     };
 }
 
-const mountPage = () => mount(MyBookingsPage, { global: { stubs: { RouterLink: true } } });
+const mountPage = () =>
+    mount(MyBookingsPage, { global: { stubs: { RouterLink: true, RescheduleDialog: true } } });
 
 beforeEach(() => {
     listState.appointments.value = [];
@@ -68,13 +69,26 @@ describe('MyBookingsPage', () => {
         expect(mountPage().text()).toContain('Belum ada booking');
     });
 
-    it('only offers cancel for cancellable statuses', () => {
+    it('only offers manage actions (cancel + reschedule) for cancellable statuses', () => {
         listState.appointments.value = [
             appointment({ id: 1, status: 'CONFIRMED' }),
             appointment({ id: 2, status: 'COMPLETED' }),
         ];
 
-        expect(mountPage().findAll('[data-testid="cancel-button"]')).toHaveLength(1);
+        const wrapper = mountPage();
+        expect(wrapper.findAll('[data-testid="cancel-button"]')).toHaveLength(1);
+        expect(wrapper.findAll('[data-testid="reschedule-button"]')).toHaveLength(1);
+    });
+
+    it('opens the reschedule dialog for a booking', async () => {
+        listState.appointments.value = [appointment({ id: 7, status: 'CONFIRMED' })];
+
+        const wrapper = mountPage();
+        expect(wrapper.find('reschedule-dialog-stub').exists()).toBe(false);
+
+        await wrapper.find('[data-testid="reschedule-button"]').trigger('click');
+
+        expect(wrapper.find('reschedule-dialog-stub').exists()).toBe(true);
     });
 
     it('confirms then cancels with the appointment version', async () => {

@@ -10,10 +10,10 @@
 ---
 
 ## Status
-- Update terakhir: `2026-06-28` · Sesi: **Frontend "Booking Saya"** (list `GET /me/appointments` + cancel ber-version).
+- Update terakhir: `2026-06-28` · Sesi: **Frontend reschedule** (dialog picker window → `POST .../reschedule`).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
 - Build backend: `composer test` → ✅ **114 pass / 335 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **32 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build frontend: `npm run test:js` → ✅ **37 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
 - [x] Paket wajib terpasang: Sanctum, Horizon, Reverb, Spatie Permission/ActivityLog/Data, Pest, Larastan. Config/migrasi sudah dipublish; `routes/api.php` + `channels.php` ter-wire (install:api).
@@ -32,6 +32,8 @@
 - [x] **Realtime broadcast & TOS seam:** broadcast events `SlotAvailabilityChanged` (channel `slot.{gateId}`, payload datar sisa kuota) & `GateQueueUpdated` (channel `gate.queue.{terminalId}`), keduanya `ShouldBroadcast`. Listener `BroadcastSlotAvailability` (on `AffectsSlotAvailability`, group window by gate) & `BroadcastGateQueue` (on `RecordsGateEvent`, resolve terminal dari slotWindow.gate) — auto-discovered, sejajar listener cache/TOS yang sudah ada. Channel auth di `routes/channels.php` (`slot.{gateId}`→`can('slot.read')`; `gate.queue.{terminalId}`→admin/planner/driver, gate-officer per terminal). TOS seam: contract `GateEventGateway` + `LoggingGateEventGateway` (bound di AppServiceProvider) → `ProcessGateEventJob::handle()` ganti TODO jadi `$tos->push()` (guard idempoten tetap). `phpunit.xml`: `BROADCAST_CONNECTION=null`. 7 test.
 - [x] **Endpoint pendukung:** `GET /api/v1/me/appointments/today` (driver, `TodayAppointmentsRequest::authorize`→`appointment.read.self`; repo `todayForDriver(driverId,date)` eager-load truck/driver/company/slotWindow.gate/containers; output `AppointmentResource::collection`) + `GET /api/v1/reports/utilization?gate=&date=` (planner/admin only via `UtilizationReportRequest`; repo `SlotRepository::utilization` `withCount` alias completed/no_show/cancelled/active per window; `SlotUtilizationResource` + `meta.summary` total via `->additional()`). 7 test. CATATAN: laporan utilisasi = agregat lintas-company (planner/admin); laporan company-scoped transporter belum dibuat.
 - [x] **Slot-window management (planner):** `POST /api/v1/slots` (`OpenSlotWindowAction`: repo `create` window OPEN+booked_count 0, unik `(gate_id,date,start_time)` → `DuplicateSlotWindowException` 409; event `SlotWindowOpened`) + `POST /api/v1/slots/{slotWindow}/close` (`CloseSlotWindowAction`: `DB::transaction(attempts:3)`+`lockForUpdate`, status→CLOSED bukan delete, idempoten, event `SlotWindowClosed`). Keduanya event impl `AffectsSlotAvailability` → reuse listener cache-invalidate + broadcast. Auth via FormRequest `slot.manage`. DTO `OpenSlotWindowData` (Spatie Data). Validasi: date `after_or_equal:today`, time `H:i:s` + `after:start_time`, capacity 1..1000. 12 test (termasuk verifikasi window muncul/hilang di endpoint availability).
+
+- [x] **Frontend slice 6 — reschedule:** `api/appointments.ts` tambah `rescheduleAppointment(id,slotWindowId,version)`; composable `useRescheduleAppointment` (mutation → invalidasi `['me-appointments']`+`['slots-availability']`). `components/RescheduleDialog.vue`: modal picker window target (reuse `useGates`+`useSlotAvailability`; default ke gate/tanggal window saat ini), pilih window (remaining>0) → submit kirim `slot_window_id`+`version`; map 409 `version_conflict`/`slot_unavailable`. `MyBookingsPage`: tombol "Pindah jadwal" (untuk BOOKED/CONFIRMED) buka dialog; sukses → tutup + list/availability auto-refresh. +5 test Vitest (dialog list/validasi/sukses/409 + page buka dialog). **Manajemen booking transporter lengkap** (list+cancel+reschedule).
 
 - [x] **Frontend slice 5 — "Booking Saya" (list + cancel):** `api/appointments.ts` tambah `fetchMyAppointments(status?)` & `cancelAppointment(id,version)`; composable `useMyAppointments` (query `['me-appointments',status]`) + `useCancelAppointment` (mutation → invalidasi `['me-appointments']`+`['slots-availability']`). `pages/MyBookingsPage.vue`: filter status, list (kode/status/slot/truk/sopir/kontainer), tombol **Batalkan** hanya untuk BOOKED/CONFIRMED → konfirmasi 2-langkah → kirim `version` (optimistic lock); map 409 `version_conflict`/`invalid_state`. Route `/bookings` + link Dashboard (gated `appointment.write`). Types `Appointment`/`Container`. +8 test Vitest. CATATAN: **reschedule belum** (perlu picker window target) — slice berikutnya.
 
@@ -64,8 +66,7 @@
 - (kosong) — backlog hardening selesai di checkpoint hijau (100 pass).
 
 ## Langkah berikutnya (urut)
-1. **Reschedule (lanjutan Booking Saya):** tombol reschedule di `MyBookingsPage` → picker window target (reuse pola gate+date+availability) → `POST .../reschedule` body `slot_window_id`+`version`; map 409 `version_conflict`/`slot_unavailable`; invalidasi `['me-appointments']`+`['slots-availability']`. (List+cancel ✅ slice 5.)
-2. **Jalur persona lain:** jadwal driver (`/me/appointments/today`), dashboard gate-officer (gate-in/out), planner kelola window (`POST /slots`, close).
+1. **Jalur persona lain** (manajemen booking transporter ✅ lengkap: list+cancel+reschedule): pilih salah satu — (a) **jadwal driver** (`GET /me/appointments/today`, pure FE), (b) **dashboard gate-officer** (gate-in/out — perlu endpoint list antrian per-terminal/gate dulu? cek; `POST .../gate-in|gate-out` ada), (c) **planner kelola window** (`POST /slots` + close — perlu endpoint list window planner?). Rekomendasi: driver schedule (paling murah, endpoint sudah ada).
 2. **Wiring realtime sungguhan:** `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + `Broadcast::routes(auth:sanctum)` + sambung Laravel Echo di SPA; swap `GateEventGateway` ke TOS riil.
 3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD master data (terminal/gate/truck/driver) untuk admin.
 4. **Backlog hardening sisa:** token abilities sempit (lihat *Senior review*) — ditegakkan saat aplikasi menerbitkan token ber-scope sempit. (3 item lain sudah [FIXED].)
