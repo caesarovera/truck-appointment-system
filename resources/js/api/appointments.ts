@@ -20,6 +20,20 @@ export async function cancelAppointment(id: number, version: number): Promise<Ap
     return data.data;
 }
 
+/** Pindahkan appointment ke window lain — `version` untuk optimistic lock. */
+export async function rescheduleAppointment(
+    id: number,
+    slotWindowId: number,
+    version: number,
+): Promise<Appointment> {
+    const { data } = await api.post<{ data: Appointment }>(`/appointments/${id}/reschedule`, {
+        slot_window_id: slotWindowId,
+        version,
+    });
+
+    return data.data;
+}
+
 /**
  * Booking slot — POST /appointments. Kirim Idempotency-Key (mobile/double-tap
  * sering kirim ganda → server putar ulang respons yang sama). Unwrap `data`.
