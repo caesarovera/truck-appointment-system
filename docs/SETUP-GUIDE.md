@@ -474,6 +474,7 @@ Endpoint yang sudah ada:
 | `POST` | `/api/v1/appointments/{id}/gate-out` | token | Policy `process` | gate-out (IN_PROGRESS→COMPLETED), idempoten |
 | `POST` | `/api/v1/slots` | token | `slot.manage` | planner buka window (body: `gate`, `date`, `start_time`, `end_time`, `capacity`) |
 | `POST` | `/api/v1/slots/{slotWindow}/close` | token | `slot.manage` | planner tutup window (status CLOSED, idempoten) |
+| `GET`  | `/api/v1/me/appointments?status={STATUS}` | token | `appointment.read` + punya company | daftar booking transporter (filter status opsional) |
 | `GET`  | `/api/v1/me/appointments/today` | token | `appointment.read.self` | jadwal hari-H sopir |
 | `GET`  | `/api/v1/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | planner/admin | utilisasi gate (kuota vs terpakai vs no-show) |
 

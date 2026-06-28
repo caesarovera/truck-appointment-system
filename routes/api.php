@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\CloseSlotWindowController;
 use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
 use App\Http\Controllers\Api\V1\ListGatesController;
+use App\Http\Controllers\Api\V1\MyAppointmentsController;
 use App\Http\Controllers\Api\V1\MyFleetController;
 use App\Http\Controllers\Api\V1\MyTodayAppointmentsController;
 use App\Http\Controllers\Api\V1\OpenSlotWindowController;
@@ -53,6 +54,7 @@ Route::prefix('v1')->group(function (): void {
             ->middleware(['can:process,appointment', 'idempotency']);
 
         // Endpoint pendukung
+        Route::get('me/appointments', MyAppointmentsController::class);
         Route::get('me/appointments/today', MyTodayAppointmentsController::class);
         Route::get('reports/utilization', UtilizationReportController::class);
     });

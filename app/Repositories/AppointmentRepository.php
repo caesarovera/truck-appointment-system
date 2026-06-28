@@ -147,6 +147,16 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
             ->get();
     }
 
+    public function forCompany(int $companyId, ?string $status): Collection
+    {
+        return Appointment::query()
+            ->where('company_id', $companyId)
+            ->when($status !== null, fn ($q) => $q->where('status', $status))
+            ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers'])
+            ->orderByDesc('id') // booking terbaru di atas
+            ->get();
+    }
+
     private function recordGateEvent(Appointment $appointment, GateTransactionType $type, int $processedBy): void
     {
         // Unik (appointment_id, type) di DB = jaring terakhir anti gate event ganda.

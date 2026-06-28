@@ -64,4 +64,12 @@ interface AppointmentRepositoryInterface
      * @return Collection<int, Appointment>
      */
     public function todayForDriver(int $driverId, string $date): Collection;
+
+    /**
+     * Semua appointment milik 1 company (daftar "Booking Saya" transporter),
+     * opsional disaring status. Relasi tampilan di-eager-load (anti N+1).
+     *
+     * @return Collection<int, Appointment>
+     */
+    public function forCompany(int $companyId, ?string $status): Collection;
 }
