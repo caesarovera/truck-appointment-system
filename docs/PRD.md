@@ -31,6 +31,7 @@ Sukses teknis (karena ini juga proyek skill): race condition pada booking tidak 
 
 **IN (dibangun di MVP):**
 - Auth Sanctum token + 5 role & RBAC (lihat `BUSINESS-FLOW.md §1`).
+- Admin: CRUD master data (terminal, gate, perusahaan angkutan, user/role) dengan guard hapus saat masih ada dependen (409).
 - Planner: buka/tutup slot window + atur kuota; intervensi `appointment.override` (teraudit).
 - Transporter: lihat ketersediaan, booking, reschedule, cancel; kelola truk & sopir (company sendiri).
 - Driver: lihat jadwal hari ini + kode booking/QR + status gate.

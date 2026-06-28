@@ -27,7 +27,7 @@ $this->call([
 | `budi@majulog.test` | driver | sopir Maju Logistik |
 | `andi@sinarkargo.test` | driver | sopir Sinar Kargo |
 
-**Master data**
+**Master data** (sejak admin CRUD: bisa dikelola via `/api/v1/admin/*` atau halaman `/admin` SPA — lihat `BUSINESS-FLOW.md §1` & `SETUP-GUIDE.md §10d`)
 - 1 Terminal (JICT) + 2 Gate (GATE-A, GATE-B).
 - 2 perusahaan angkutan, masing-masing 3 truk + 1–2 sopir.
 - Slot windows: kemarin (untuk data COMPLETED/NO_SHOW), **hari ini** (untuk uji gate-in/gate-out & sisa kuota), besok (untuk uji booking). 06:00–18:00 per jam, kapasitas 5/jam (sengaja kecil supaya gampang menguji kondisi penuh & race).

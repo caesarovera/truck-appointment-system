@@ -13,8 +13,19 @@ Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 
-Status: backend MVP API lengkap & ber-test; SPA mencakup UI **4 persona**
-(transporter, driver, gate-officer, planner). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
+Status: backend MVP API lengkap & ber-test (**152 Pest**); SPA mencakup UI **4 persona**
+(transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
+company/user) (**57 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
+
+## Mulai dari mana (urutan onboarding)
+
+Developer baru, baca berurutan:
+1. **README ini** — gambaran + cara jalankan (di bawah).
+2. [`CLAUDE.md`](CLAUDE.md) — kontrak arsitektur. **Wajib sebelum menulis kode.**
+3. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — siapkan & jalankan project langkah-demi-langkah.
+4. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
+5. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
+6. [`HANDOVER.md`](HANDOVER.md) — status terkini & langkah berikutnya. **Baca di awal tiap sesi.**
 
 ## Peta dokumentasi (baca sesuai kebutuhan)
 

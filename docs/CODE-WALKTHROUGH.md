@@ -3,7 +3,7 @@
 > Dokumen ini menjelaskan **setiap potongan kode** yang dibuat (foundation + seluruh
 > slice backend MVP: booking, auth, policy, reschedule/cancel, gate-in/out,
 > no-show/reminder, realtime, endpoint pendukung, slot-window management, **hardening
-> rate-limit**, **read referensi & persona**), lengkap dengan **alasan (kenapa)** dan
+> rate-limit**, **read referensi & persona**, **admin CRUD master data**), lengkap dengan **alasan (kenapa)** dan
 > **contoh**. Sasaran: kamu bisa membaca kode TAS dan paham *kenapa* ditulis begitu,
 > bukan sekadar *apa*-nya. **Kode frontend (Vue SPA) ada di `docs/FRONTEND.md`.**
 >
@@ -35,6 +35,7 @@
 - [S. Slice Hardening (rate limiting)](#s-slice-hardening-rate-limiting)
 - [T. Read Referensi (gates + fleet)](#t-slice-read-referensi-gates--fleet)
 - [U. Read endpoints persona (booking list + gate queue)](#u-read-endpoints-persona-booking-list--gate-queue)
+- [V. Admin CRUD master data (terminal/gate/company/user)](#v-admin-crud-master-data-terminalgatecompanyuser)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -1445,6 +1446,99 @@ company) lalu balikan `AppointmentResource::collection`. Filter status ber-`Rule
 
 ---
 
+## V. Admin CRUD master data (terminal/gate/company/user)
+
+CRUD master data untuk role **admin** (`BUSINESS-FLOW.md §1`). Beda dengan slice domain
+(booking/gate) yang penuh lock & state machine, ini CRUD lurus — tapi tetap **menghormati
+layer yang sama**: controller invokable tipis → Action 1-tugas → Repository ber-interface
+→ Resource keluar. Empat entitas: `Terminal`, `Gate`, `TransportCompany`, `User`.
+
+### V.1 Permission & route group
+Permission baru di `RolePermissionSeeder` (guard `api`): `terminal.manage`, `gate.manage`,
+`company.manage` (plus `user.manage` yang sudah ada). Semua masuk `admin → *`. Route
+dikelompok di bawah `admin/`:
+```php
+// routes/api.php (di dalam group auth:sanctum)
+Route::prefix('admin')->group(function (): void {
+    Route::get('terminals', ListTerminalsController::class);
+    Route::post('terminals', CreateTerminalController::class);
+    Route::get('terminals/{terminal}', ShowTerminalController::class);
+    Route::put('terminals/{terminal}', UpdateTerminalController::class);
+    Route::delete('terminals/{terminal}', DeleteTerminalController::class);
+    // pola sama untuk gates, companies, users (20 controller invokable total)
+});
+```
+Otorisasi tiap aksi ditegakkan di **FormRequest** (`UpsertTerminalRequest`, dst.) via
+`->can('terminal.manage')` — bukan di controller.
+
+### V.2 Hapus aman — `EntityInUseException` (409)
+Aturan inti CRUD ini: **jangan biarkan data yatim**. Hapus ditolak bila masih ada dependen,
+lewat exception ber-`render()` yang memetakan ke **409** (bukan cascade delete yang
+menghancurkan riwayat appointment):
+```php
+final class EntityInUseException extends RuntimeException
+{
+    public static function terminal(): self { return new self('Terminal masih memiliki gate...'); }
+    // gate(), company() serupa
+    public function render(Request $request): JsonResponse
+    {
+        return response()->json(['message' => $this->getMessage(), 'error' => 'entity_in_use'], 409);
+    }
+}
+```
+Cek dependen ada di **repository** (data layer), bukan Action:
+```php
+// TerminalRepository::delete()
+public function delete(Terminal $terminal): void
+{
+    if ($terminal->gates()->exists()) { throw EntityInUseException::terminal(); }
+    $terminal->delete();
+}
+```
+Guard per entitas: terminal←gate · gate←slot window · company←user/appointment ·
+user←diri sendiri (yang terakhir `abort(422)` di `UserRepository::delete($user, $actor)`).
+
+### V.3 User: password & role sync
+`UserData` (DTO) memuat `password` **nullable** — wajib saat create, opsional saat update:
+```php
+// UserRepository::update()
+$fields = ['name' => $data->name, 'email' => $data->email, /* terminal_id, company_id */];
+if ($data->password !== null && $data->password !== '') {
+    $fields['password'] = Hash::make($data->password);     // hanya hash bila diisi
+}
+$user->update($fields);
+$user->syncRoles([$data->role]);                            // Spatie: role tunggal
+return $user->fresh(['roles', 'terminal', 'company']) ?? $user;
+```
+- **Password hanya di-hash bila diisi** → edit user tanpa ganti password tak menimpa hash lama.
+- **`syncRoles`** (Spatie) mengganti role lama dengan yang baru.
+- **`fresh([...])`** memuat ulang relasi setelah `syncRoles` supaya Resource tak lazy-load.
+- Hapus user → cabut semua token dulu (`$user->tokens()->delete()`), lalu hapus.
+
+### V.4 PHPStan level 8 — jebakan route binding & relasi nullable
+CRUD ini memunculkan pola PHPStan yang berulang (semua diperbaiki tanpa `@phpstan-ignore`):
+- **`$this->route('terminal')` bertipe `object|string`**, bukan `Terminal` → tak punya `->id`.
+  Solusi: `$model = $this->route('terminal'); $id = $model instanceof Terminal ? $model->id : null;`
+  (dipakai di rule `unique` agar abaikan diri sendiri saat update).
+- **`$user->roles->first()?->name` gagal** (`Model` tak deklarasi `$name`) →
+  `->getAttribute('name')` di `AdminUserResource`.
+- **Relasi nullable di `whenLoaded`** (`$this->terminal->id` saat `Terminal|null`) →
+  cek eksplisit `$this->terminal === null ? null : [...]`.
+- **`->role($role, 'api')` di dalam `when()` closure** kehilangan narrowing `string|null`
+  → ganti ke `if ($role !== null) { $query->role($role, 'api'); }` eksplisit.
+
+### V.5 Test
+`tests/Feature/Admin/{Terminal,Gate,Company,User}CrudTest.php` — happy path + edge tiap
+entitas (list/create/show/update/delete, **409 saat ada dependen**, 422 self-delete,
+403 tanpa permission). Catatan Pest: di closure `function (): void { ... }` pakai
+**`$this->seed(RolePermissionSeeder::class)`** (method TestCase), bukan global `seed()`
+yang hanya tersedia di arrow function `fn () => seed(...)`.
+
+> **Frontend admin** (AdminPage 4-tab, `useAdmin` composable, invalidasi cache): di
+> `docs/FRONTEND.md §4`.
+
+---
+
 ## Frontend (Vue SPA)
 
 Penjelasan kode frontend dipisah ke **`docs/FRONTEND.md`** (arsitektur SPA, pola
@@ -1457,7 +1551,7 @@ ini fokus backend.
 
 Slice booking di atas menjadi **cetak biru** untuk seluruh slice backend (gate-in/out,
 no-show/reminder, realtime, endpoint pendukung, slot-window management, rate-limit hardening,
-read referensi, read persona):
+read referensi, read persona, admin CRUD master data):
 - **Action** (`final class`, `declare(strict_types=1)`) memanggil enum state machine
   + `DB::transaction` + `lockForUpdate`; efek samping lewat **Event** pasca-commit.
 - **DTO** (Laravel Data) untuk input, **Resource** untuk output, **FormRequest**
