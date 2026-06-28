@@ -82,6 +82,13 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-06-28`: **Dokumentasi frontend dibuat** → `docs/FRONTEND.md` baru (arsitektur SPA,
+  pola TanStack Query, tiap halaman/komponen + *kenapa*, pola test). `CODE-WALKTHROUGH.md`:
+  TOC diperbaiki (tambah S/T yang sempat hilang) + §U baru (read endpoints persona:
+  `/me/appointments` & `/gate/queue`) + pointer ke FRONTEND. `README.md`: doc-map +
+  stack frontend + langkah jalankan SPA. `SETUP-GUIDE.md §9a`: pointer FRONTEND.
+  Alasan: SPA (≈30 file) sebelumnya tak terdokumentasi; CODE-WALKTHROUGH eksplisit
+  backend-only. Tidak menyentuh CLAUDE.md/PRD/BUSINESS-FLOW/DUMMY-DATA (domain tak berubah).
 - `2026-06-27`: DemoSeeder.windows() key diubah dari string '06'..'17' → **integer** 6..17.
   Alasan: PHP menormalkan kunci string angka ('10') jadi int → array kunci campuran bikin
   PHPStan lvl 8 `offsetAccess.notFound`. Tidak ada perubahan kontrak/docs.
