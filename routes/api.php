@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\CancelAppointmentController;
 use App\Http\Controllers\Api\V1\CloseSlotWindowController;
 use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
+use App\Http\Controllers\Api\V1\GateQueueController;
 use App\Http\Controllers\Api\V1\ListGatesController;
 use App\Http\Controllers\Api\V1\MyAppointmentsController;
 use App\Http\Controllers\Api\V1\MyFleetController;
@@ -48,6 +49,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware(['can:update,appointment', 'idempotency']);
         Route::post('appointments/{appointment}/cancel', CancelAppointmentController::class)
             ->middleware(['can:cancel,appointment', 'idempotency']);
+        // Antrian gate-officer (CONFIRMED/IN_PROGRESS di terminalnya hari ini).
+        Route::get('gate/queue', GateQueueController::class);
         Route::post('appointments/{appointment}/gate-in', GateInController::class)
             ->middleware(['can:process,appointment', 'idempotency']);
         Route::post('appointments/{appointment}/gate-out', GateOutController::class)

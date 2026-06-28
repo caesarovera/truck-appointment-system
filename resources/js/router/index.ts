@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/DriverSchedulePage.vue'),
         meta: { requiresAuth: true },
     },
+    {
+        path: '/gate',
+        name: 'gate',
+        component: () => import('@/pages/GateDashboardPage.vue'),
+        meta: { requiresAuth: true },
+    },
 ];
 
 export const router = createRouter({
