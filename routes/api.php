@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\V1\CancelAppointmentController;
 use App\Http\Controllers\Api\V1\CloseSlotWindowController;
 use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
+use App\Http\Controllers\Api\V1\ListGatesController;
+use App\Http\Controllers\Api\V1\MyFleetController;
 use App\Http\Controllers\Api\V1\MyTodayAppointmentsController;
 use App\Http\Controllers\Api\V1\OpenSlotWindowController;
 use App\Http\Controllers\Api\V1\RescheduleAppointmentController;
@@ -27,6 +29,10 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
         Route::post('logout', LogoutController::class);
         Route::get('me', MeController::class);
+
+        // Referensi/master data (read) untuk dropdown & form booking.
+        Route::get('gates', ListGatesController::class);
+        Route::get('me/fleet', MyFleetController::class);
 
         Route::get('slots/availability', SlotAvailabilityController::class);
         // Planner kelola jendela slot (slot.manage) — otorisasi di FormRequest.
