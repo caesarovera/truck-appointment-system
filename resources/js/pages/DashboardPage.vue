@@ -33,6 +33,13 @@ async function onLogout(): Promise<void> {
                 >
                     Ketersediaan Slot
                 </RouterLink>
+                <RouterLink
+                    v-if="auth.can('appointment.write')"
+                    to="/bookings"
+                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                >
+                    Booking Saya
+                </RouterLink>
             </nav>
         </main>
     </div>
