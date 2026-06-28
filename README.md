@@ -27,9 +27,10 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 2. [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — panduan developer baru (peta mental + tahapan).
 3. [`CLAUDE.md`](CLAUDE.md) — kontrak arsitektur. **Wajib sebelum menulis kode.**
 4. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — siapkan & jalankan project langkah-demi-langkah.
-5. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
-6. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
-7. [`HANDOVER.md`](HANDOVER.md) — status terkini & langkah berikutnya. **Baca di awal tiap sesi.**
+5. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — pola arsitektur, peta folder, trace request antar-lapisan.
+6. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
+7. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
+8. [`HANDOVER.md`](HANDOVER.md) — status terkini & langkah berikutnya. **Baca di awal tiap sesi.**
 
 ## Peta dokumentasi (baca sesuai kebutuhan)
 
@@ -40,6 +41,8 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 | [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
 | [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
 | [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah | menyiapkan/menjalankan project |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Pola arsitektur & peta folder** + trace request antar-lapisan | memahami struktur & aliran besar |
+| [`docs/adr/`](docs/adr/) | **Architecture Decision Records** — keputusan beralasan ("kenapa dulu begini") | sebelum mengubah keputusan arsitektur |
 | [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail kode backend** + contoh | memahami "kenapa" sebuah kode backend |
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | **Penjelasan detail frontend** (Vue SPA): arsitektur, TanStack Query, tiap halaman + "kenapa" | menyentuh/memahami SPA |
 | [`docs/DUMMY-DATA.md`](docs/DUMMY-DATA.md) | Akun & data demo | butuh data uji |

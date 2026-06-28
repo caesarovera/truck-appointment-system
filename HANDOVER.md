@@ -82,6 +82,16 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-06-28`: **`docs/ARCHITECTURE.md` + log `docs/adr/` baru (P0 dari senior review arsitektur).**
+  ARCHITECTURE.md: pola (Layered = ADR + Action/Command + Repository + Ports&Adapters +
+  Event-driven), peta folder aktual, aturan aliran dependensi, trace request booking
+  antar-lapisan, ports & adapters, mirror frontend, trade-off. `docs/adr/` (format
+  Status·Context·Decision·Consequences·Kapan ditinjau ulang): 0001 package-by-layer (+ trigger
+  tinjau ulang: ≥3 sub-folder lintas lapisan & tim bertambah), 0002 repository-interface
+  (Ports&Adapters), 0003 defer-token-abilities (angkat keputusan dari Senior review jadi ADR).
+  README + ONBOARDING doc-map diupdate. Tujuan: cegah architecture drift di proyek multi-sesi.
+  Tidak menyentuh CLAUDE.md. **Sisa rekomendasi senior:** P1 `$guarded` kolom status/version/
+  company_id (ranjau mass-assignment) — lewat loop TDD, belum dikerjakan.
 - `2026-06-28`: **`docs/ONBOARDING.md` baru** — panduan developer baru/junior (peta mental
   3-lapis + analogi restoran, glosarium domain & teknis, prasyarat skill, rencana minggu
   pertama, tahapan baca + self-check, bedah golden path booking, resep baca slice, loop TDD,

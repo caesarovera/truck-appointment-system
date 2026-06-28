@@ -381,6 +381,8 @@ Semua password `password`: `admin@tas.test`, `planner@tas.test`, `gate@tas.test`
 | **`docs/ONBOARDING.md`** (ini) | Jalur belajar developer baru | hari pertama | sekali |
 | `README.md` | Gambaran + cara jalankan + peta dokumen | orientasi | sekali |
 | `CLAUDE.md` | **Kontrak arsitektur** (aturan layer, hardening, JANGAN) | sebelum menulis kode | rujuk terus |
+| `docs/ARCHITECTURE.md` | Pola arsitektur, peta folder, trace request antar-lapisan | memahami struktur besar | sekali + rujuk |
+| `docs/adr/` | Architecture Decision Records — alasan keputusan | sebelum mengubah keputusan arsitektur | rujuk |
 | `docs/SETUP-GUIDE.md` | Setup & build manual + endpoint + troubleshooting | menyiapkan/menjalankan | sekali + rujuk |
 | `docs/BUSINESS-FLOW.md` | Domain: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema | rujuk per fitur |
 | `docs/CODE-WALKTHROUGH.md` | Penjelasan detail kode **backend** + "kenapa" | memahami kode backend | rujuk per slice |
