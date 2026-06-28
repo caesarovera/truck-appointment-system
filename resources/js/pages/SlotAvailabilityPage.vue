@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
 
 function today(): string {
@@ -10,6 +11,7 @@ function today(): string {
 const gate = ref<number | null>(null);
 const date = ref<string>(today());
 
+const { gates, isLoading: gatesLoading } = useGates();
 const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability(gate, date);
 </script>
 
@@ -24,13 +26,14 @@ const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability
             <form class="flex flex-wrap items-end gap-4" @submit.prevent>
                 <label class="block space-y-1">
                     <span class="text-sm font-medium text-gray-700">Gate</span>
-                    <input
+                    <select
                         v-model.number="gate"
-                        type="number"
-                        min="1"
-                        placeholder="mis. 1"
-                        class="w-32 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+                        :disabled="gatesLoading"
+                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option :value="null" disabled>{{ gatesLoading ? 'Memuat gate…' : 'Pilih gate' }}</option>
+                        <option v-for="g in gates" :key="g.id" :value="g.id">{{ g.name }}</option>
+                    </select>
                 </label>
                 <label class="block space-y-1">
                     <span class="text-sm font-medium text-gray-700">Tanggal</span>
