@@ -1,18 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
+import BookingForm from '@/components/BookingForm.vue';
+import type { BookedAppointment, SlotWindow } from '@/types/api';
 
 function today(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
+const auth = useAuthStore();
 const gate = ref<number | null>(null);
 const date = ref<string>(today());
 
 const { gates, isLoading: gatesLoading } = useGates();
 const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability(gate, date);
+
+const canBook = computed(() => auth.can('appointment.write'));
+
+// Window yang sedang dibooking (membuka modal) + booking sukses terakhir.
+const selected = ref<SlotWindow | null>(null);
+const lastBooking = ref<BookedAppointment | null>(null);
+
+function onBooked(appointment: BookedAppointment): void {
+    lastBooking.value = appointment;
+    selected.value = null;
+}
 </script>
 
 <template>
@@ -46,7 +61,11 @@ const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability
                 <span v-if="isFetching" class="text-sm text-gray-500 pb-2">Memuat…</span>
             </form>
 
-            <p v-if="!enabled" class="text-sm text-gray-500">Masukkan nomor gate untuk melihat slot.</p>
+            <p v-if="lastBooking" role="status" class="text-sm text-green-700 bg-green-50 rounded-md p-3">
+                Booking berhasil — kode <strong>{{ lastBooking.booking_code }}</strong> ({{ lastBooking.status }}).
+            </p>
+
+            <p v-if="!enabled" class="text-sm text-gray-500">Pilih gate untuk melihat slot.</p>
 
             <p v-else-if="isLoading" class="text-sm text-gray-500">Memuat ketersediaan…</p>
 
@@ -77,8 +96,24 @@ const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability
                     <p class="text-sm text-gray-600">
                         Sisa <strong>{{ w.remaining }}</strong> dari {{ w.capacity }} slot
                     </p>
+                    <button
+                        v-if="canBook && w.remaining > 0"
+                        type="button"
+                        class="w-full rounded-md bg-indigo-600 text-white py-1.5 text-sm font-medium hover:bg-indigo-700"
+                        data-testid="book-button"
+                        @click="selected = w"
+                    >
+                        Booking
+                    </button>
                 </li>
             </ul>
+
+            <BookingForm
+                v-if="selected"
+                :slot-window="selected"
+                @booked="onBooked"
+                @cancel="selected = null"
+            />
         </main>
     </div>
 </template>
