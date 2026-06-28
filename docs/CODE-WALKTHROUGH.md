@@ -2,9 +2,10 @@
 
 > Dokumen ini menjelaskan **setiap potongan kode** yang dibuat (foundation + seluruh
 > slice backend MVP: booking, auth, policy, reschedule/cancel, gate-in/out,
-> no-show/reminder, realtime, endpoint pendukung, slot-window management), lengkap
-> dengan **alasan (kenapa)** dan **contoh**. Sasaran: kamu bisa membaca kode TAS dan
-> paham *kenapa* ditulis begitu, bukan sekadar *apa*-nya.
+> no-show/reminder, realtime, endpoint pendukung, slot-window management, **hardening
+> rate-limit**, **read referensi & persona**), lengkap dengan **alasan (kenapa)** dan
+> **contoh**. Sasaran: kamu bisa membaca kode TAS dan paham *kenapa* ditulis begitu,
+> bukan sekadar *apa*-nya. **Kode frontend (Vue SPA) ada di `docs/FRONTEND.md`.**
 >
 > Urutan baca yang disarankan: konsep dasar → enum → migrasi → model → factory →
 > seeder → provider → tooling → test. Untuk cara menjalankan, lihat
@@ -31,6 +32,10 @@
 - [P. Slice Realtime (broadcast Reverb + seam TOS)](#p-slice-realtime-broadcast-reverb--seam-tos)
 - [Q. Slice Endpoint Pendukung (me/today + utilisasi)](#q-slice-endpoint-pendukung-metoday--utilisasi)
 - [R. Slice Slot-window Management (open/close)](#r-slice-slot-window-management-openclose)
+- [S. Slice Hardening (rate limiting)](#s-slice-hardening-rate-limiting)
+- [T. Read Referensi (gates + fleet)](#t-slice-read-referensi-gates--fleet)
+- [U. Read endpoints persona (booking list + gate queue)](#u-read-endpoints-persona-booking-list--gate-queue)
+- [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
 
@@ -1402,11 +1407,57 @@ Otorisasi `slot.read` di `ListGatesRequest` (filter opsional `terminal` ber-`exi
 
 ---
 
+## U. Read endpoints persona (booking list + gate queue)
+
+Dua endpoint read ber-scope untuk meng-unblock UI persona. Pola sama: scope di
+repository (bukan controller), otorisasi di FormRequest, output via Resource.
+
+### U.1 GET /me/appointments — daftar "Booking Saya" transporter
+`AppointmentRepository::forCompany($companyId, ?$status)` → `where('company_id', …)`
++ filter status opsional, eager-load relasi tampilan, `orderByDesc('id')` (terbaru
+dulu). `MyAppointmentsController` cek `company_id` (null → 403, mis. planner tak punya
+company) lalu balikan `AppointmentResource::collection`. Filter status ber-`Rule::enum`.
+
+> **Kenapa wajib `company_id` (403 untuk planner)?** Endpoint ini *self-service*
+> transporter (mirip `/me/fleet`). Planner/admin lihat lintas-company lewat laporan
+> agregat (`/reports/utilization`), bukan daftar mentah ini.
+
+### U.2 GET /gate/queue — antrian gate-officer
+`AppointmentRepository::queueForTerminal($terminalId, $date)` → status `CONFIRMED`
+(siap gate-in) & `IN_PROGRESS` (siap gate-out), disaring ke terminal officer:
+```php
+->whereHas('slotWindow', fn ($q) => $q->whereDate('date', $date))
+->whereRelation('slotWindow.gate', 'terminal_id', $terminalId)
+```
+`GateQueueController` cek `terminal_id` (null → 403). Output `AppointmentResource`
+(+ `gateIn`/`gateOut` di-eager-load untuk jejak waktu).
+
+> **Kenapa `whereRelation('slotWindow.gate', …)` bukan nested `whereHas`?** Pada
+> PHPStan level 8, parameter closure `whereHas('gate', fn ($g) => …)` yang ber-nested
+> kehilangan tipe model (`$g` jadi `Builder<Model>` generik) → `terminal_id` dianggap
+> kolom asing. `whereRelation` dot-notation menghindari closure → tipe aman.
+>
+> **Kenapa urutan tak di-`sortBy` di repo?** `->sortBy(fn ($a) => $a->slotWindow->start_time)`
+> membuat Larastan *flip-flop* antara `nullsafe.neverNull` & `property.nonObject` (tak
+> ada bentuk yang lolos). Solusi: repo balikan tak terurut, **klien yang mengurutkan**
+> by `start_time` (konsisten dgn jadwal driver). Pelajaran: hindari sort by kolom
+> relasi di Collection saat analisis statis ketat.
+
+---
+
+## Frontend (Vue SPA)
+
+Penjelasan kode frontend dipisah ke **`docs/FRONTEND.md`** (arsitektur SPA, pola
+TanStack Query, tiap halaman/komponen + *kenapa*, pola test Vitest). CODE-WALKTHROUGH
+ini fokus backend.
+
+---
+
 ## Penutup: pola yang akan terus dipakai
 
 Slice booking di atas menjadi **cetak biru** untuk seluruh slice backend (gate-in/out,
 no-show/reminder, realtime, endpoint pendukung, slot-window management, rate-limit hardening,
-read referensi):
+read referensi, read persona):
 - **Action** (`final class`, `declare(strict_types=1)`) memanggil enum state machine
   + `DB::transaction` + `lockForUpdate`; efek samping lewat **Event** pasca-commit.
 - **DTO** (Laravel Data) untuk input, **Resource** untuk output, **FormRequest**

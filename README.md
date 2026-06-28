@@ -8,8 +8,13 @@ cegah penumpukan, audit penuh.
 Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA terpisah).
 
 ## Stack
-Laravel 12 · PHP 8.3+ · Sanctum · Redis/Horizon · Reverb (WebSocket) · Spatie
-Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
+**Backend:** Laravel 12 · PHP 8.3+ · Sanctum · Redis/Horizon · Reverb (WebSocket) ·
+Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
+**Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
+Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
+
+Status: backend MVP API lengkap & ber-test; SPA mencakup UI **4 persona**
+(transporter, driver, gate-officer, planner). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
 
 ## Peta dokumentasi (baca sesuai kebutuhan)
 
@@ -19,7 +24,8 @@ Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pi
 | [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
 | [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
 | [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah | menyiapkan/menjalankan project |
-| [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail tiap kode** yang dihasilkan + contoh | memahami "kenapa" sebuah kode |
+| [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail kode backend** + contoh | memahami "kenapa" sebuah kode backend |
+| [`docs/FRONTEND.md`](docs/FRONTEND.md) | **Penjelasan detail frontend** (Vue SPA): arsitektur, TanStack Query, tiap halaman + "kenapa" | menyentuh/memahami SPA |
 | [`docs/DUMMY-DATA.md`](docs/DUMMY-DATA.md) | Akun & data demo | butuh data uji |
 | [`HANDOVER.md`](HANDOVER.md) | Status hidup antar-sesi + langkah berikutnya | awal tiap sesi |
 
@@ -34,9 +40,16 @@ php artisan migrate:fresh --seed     # bikin skema + data demo
 composer test        # pest
 composer analyse     # phpstan level 8
 composer fix         # pint
+
+# Frontend (SPA Vue di resources/js) — buka app di http://localhost:8000
+php artisan serve    # shell + API (port 8000)
+npm install && npm run dev   # Vite HMR (di terminal lain)
+npm run test:js      # Vitest
+npm run build        # bundel produksi → public/build
 ```
 
-Detail tiap langkah, troubleshooting, dan contoh output: **[`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md)**.
+Detail tiap langkah, troubleshooting, dan contoh output: **[`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md)**
+(frontend: §9a, daftar endpoint: §10d).
 
 ## Akun demo
 Password semua `password`. Mis. `admin@tas.test`, `planner@tas.test`,

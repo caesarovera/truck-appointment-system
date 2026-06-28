@@ -388,6 +388,9 @@ Edit `.vue`/`.ts` → harus `npm run build` manual → refresh browser manual.
 browser otomatis update tanpa full refresh, state Pinia tetap. Perubahan terlihat
 dalam milidetik. `npm run dev` murni untuk kenyamanan developer, bukan keharusan fungsional.
 
+> **Penjelasan kode SPA** (arsitektur, TanStack Query, tiap halaman + *kenapa*):
+> `docs/FRONTEND.md`. Test frontend: `npm run test:js` · type-check: `npm run type-check`.
+
 ---
 
 ### 9b. Gerbang kualitas (sebelum commit)
