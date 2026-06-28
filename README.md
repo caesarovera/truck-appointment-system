@@ -1,0 +1,49 @@
+# Truck Appointment System (TAS)
+
+Sistem penjadwalan kedatangan truk ke terminal peti kemas: perusahaan angkutan
+**booking slot** gate berkuota per jendela waktu, truk datang di slotnya, petugas
+gate melakukan **gate-in → bongkar/muat → gate-out**. Tujuan: meratakan antrian,
+cegah penumpukan, audit penuh.
+
+Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA terpisah).
+
+## Stack
+Laravel 12 · PHP 8.3+ · Sanctum · Redis/Horizon · Reverb (WebSocket) · Spatie
+Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
+
+## Peta dokumentasi (baca sesuai kebutuhan)
+
+| Dokumen | Isi | Baca saat |
+|---------|-----|-----------|
+| [`CLAUDE.md`](CLAUDE.md) | **Kontrak arsitektur** (aturan layer, hardening, larangan) | sebelum menulis kode apa pun |
+| [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
+| [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
+| [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah | menyiapkan/menjalankan project |
+| [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail tiap kode** yang dihasilkan + contoh | memahami "kenapa" sebuah kode |
+| [`docs/DUMMY-DATA.md`](docs/DUMMY-DATA.md) | Akun & data demo | butuh data uji |
+| [`HANDOVER.md`](HANDOVER.md) | Status hidup antar-sesi + langkah berikutnya | awal tiap sesi |
+
+## Mulai cepat
+
+```bash
+# Prasyarat: PHP 8.3+, Composer 2.8+, driver pdo_sqlite aktif (lihat SETUP-GUIDE §1)
+cp .env.example .env
+php artisan key:generate
+php artisan migrate:fresh --seed     # bikin skema + data demo
+
+composer test        # pest
+composer analyse     # phpstan level 8
+composer fix         # pint
+```
+
+Detail tiap langkah, troubleshooting, dan contoh output: **[`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md)**.
+
+## Akun demo
+Password semua `password`. Mis. `admin@tas.test`, `planner@tas.test`,
+`gate@tas.test`, `dispatcher@majulog.test`, `budi@majulog.test`.
+Selengkapnya: [`docs/DUMMY-DATA.md`](docs/DUMMY-DATA.md).
+
+---
+
+<sub>Dibangun di atas [Laravel](https://laravel.com) (MIT). Lihat dokumentasi Laravel
+untuk referensi framework.</sub>

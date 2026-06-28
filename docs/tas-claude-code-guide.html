@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Advanced Guide — truck-appointment-system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0e12;
+    --panel:#13161d;
+    --panel-2:#171b24;
+    --ink:#e6e9ef;
+    --ink-dim:#9aa3b2;
+    --ink-faint:#646d7e;
+    --line:#262b36;
+    --amber:#ffb000;
+    --amber-soft:#3a2c08;
+    --cyan:#4fd6c2;
+    --cyan-soft:#0e2b29;
+    --rose:#ff6b6b;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --display:'Fraunces',Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;font-size:15px;
+    background-image:
+      linear-gradient(var(--line) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;
+    background-position:center top;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px 90px}
+  .veil{background:linear-gradient(180deg,rgba(12,14,18,.72),rgba(12,14,18,.94));}
+
+  /* HEADER */
+  header{padding:64px 0 38px;border-bottom:1px solid var(--line);margin-bottom:42px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--amber);margin-bottom:20px}
+  .kicker::before{content:"▍ ";color:var(--cyan)}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(34px,6vw,56px);line-height:1.02;margin:0 0 18px;letter-spacing:-.01em}
+  h1 em{font-style:italic;color:var(--amber)}
+  .lede{font-size:17px;color:var(--ink-dim);max-width:62ch;margin:0}
+  .meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:8px}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:5px 10px;border:1px solid var(--line);border-radius:3px;color:var(--ink-dim);background:var(--panel)}
+  .tag b{color:var(--cyan);font-weight:600}
+
+  /* SECTION */
+  section{margin:0 0 54px;scroll-margin-top:24px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin:0 0 8px}
+  .num{font-family:var(--mono);font-size:13px;color:var(--amber);font-weight:600;flex:none}
+  h2{font-family:var(--display);font-weight:500;font-size:27px;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--ink-faint);font-family:var(--mono);font-size:12.5px;margin:2px 0 22px 34px}
+  .body{margin-left:34px}
+  @media(max-width:600px){.body,.sub{margin-left:0}}
+  p{margin:0 0 15px}
+  a{color:var(--cyan);text-decoration:none;border-bottom:1px solid var(--cyan-soft)}
+  strong{color:#fff;font-weight:600}
+  .hot{color:var(--amber);font-weight:600}
+
+  /* CODE / PROMPT */
+  .block{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:7px;margin:0 0 18px;overflow:hidden}
+  .block .bar{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+  .block .label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+  .block.prompt .label{color:var(--amber)}
+  .block pre{margin:0;padding:15px 16px;font-family:var(--mono);font-size:13px;line-height:1.62;color:var(--ink);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .block.cmd pre{color:var(--cyan)}
+  .block pre .c{color:var(--ink-faint)}
+  .block pre .k{color:var(--amber)}
+  .copy{font-family:var(--mono);font-size:11px;color:var(--ink-dim);background:transparent;border:1px solid var(--line);border-radius:4px;padding:4px 9px;cursor:pointer;transition:.15s}
+  .copy:hover{color:var(--amber);border-color:var(--amber-soft)}
+  .copy.ok{color:var(--cyan);border-color:var(--cyan-soft)}
+
+  /* CALLOUTS */
+  .note{border-left:3px solid var(--cyan);background:linear-gradient(90deg,var(--cyan-soft),transparent);padding:13px 16px;border-radius:0 6px 6px 0;margin:0 0 18px;font-size:14px;color:var(--ink-dim)}
+  .warn{border-left:3px solid var(--rose);background:linear-gradient(90deg,#2a1414,transparent);padding:13px 16px;border-radius:0 6px 6px 0;margin:0 0 18px;font-size:14px;color:var(--ink-dim)}
+  .note b,.warn b{color:#fff}
+
+  /* STEP FLOW */
+  .flow{counter-reset:step;margin:0}
+  .step{position:relative;padding:0 0 4px 0;margin:0 0 14px}
+  .step .h{font-family:var(--mono);font-size:13px;color:#fff;font-weight:600;display:flex;gap:10px;align-items:center;margin-bottom:4px}
+  .step .dot{font-family:var(--mono);color:var(--amber);font-size:12px}
+
+  /* PILLARS GRID */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin:4px 0 18px}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:15px}
+  .card h4{font-family:var(--mono);font-size:13px;margin:0 0 7px;color:var(--amber);letter-spacing:.02em}
+  .card p{font-size:13.5px;color:var(--ink-dim);margin:0}
+  .card code{font-family:var(--mono);font-size:12px;color:var(--cyan);background:var(--cyan-soft);padding:1px 5px;border-radius:3px}
+
+  /* INLINE CODE + FILE */
+  code.f{font-family:var(--mono);font-size:13px;color:var(--cyan);background:#10171a;padding:1px 6px;border-radius:3px;border:1px solid var(--cyan-soft)}
+  code.i{font-family:var(--mono);font-size:13px;color:var(--amber);background:var(--amber-soft);padding:1px 5px;border-radius:3px}
+
+  /* TOC */
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:16px 18px;margin:0 0 46px}
+  nav.toc .t{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:11px}
+  nav.toc ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:7px 22px}
+  @media(max-width:600px){nav.toc ol{grid-template-columns:1fr}}
+  nav.toc li{font-family:var(--mono);font-size:13px}
+  nav.toc a{color:var(--ink-dim);border:none;display:flex;gap:9px}
+  nav.toc a:hover{color:var(--amber)}
+  nav.toc a span{color:var(--amber);font-weight:600}
+
+  footer{border-top:1px solid var(--line);padding-top:26px;margin-top:20px;font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+
+  /* FILE MAP */
+  .filemap{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin:0 0 36px}
+  .map-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:15px}
+  .map-t{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber)}
+  .map-leg{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .lg{display:inline-block;width:9px;height:9px;border-radius:2px;margin:0 4px 0 11px;vertical-align:middle}
+  .lg.src{background:var(--cyan)} .lg.impl{background:var(--amber)} .lg.auto{background:#8a93a3}
+  .tree{font-family:var(--mono);font-size:13px;line-height:1.95}
+  .tree .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .tree .row.dir{margin-top:7px}
+  .tree .row.ind{padding-left:6px}
+  .tree .g{color:var(--ink-faint)}
+  .tree .fn{color:#cdd3de;font-weight:500}
+  .tree .fn.src{color:var(--cyan)} .tree .fn.impl{color:var(--amber)} .tree .fn.auto{color:#eef1f6}
+  .tree .row.dir .fn{color:var(--ink-faint)}
+  .tree .rl{color:var(--ink-dim);font-family:var(--sans);font-size:13px}
+  .map-note{font-size:13px;color:var(--ink-dim);margin:15px 0 0;border-top:1px solid var(--line);padding-top:13px}
+  .map-note b{color:#fff}
+  @media(max-width:600px){.tree .rl{font-size:12px;width:100%;padding-left:24px}}
+
+  nav.toc a.active{color:var(--amber)}
+  nav.toc a.active span{color:var(--cyan)}
+
+  /* PHASES (collapsible) */
+  details.phase{border:1px solid var(--line);border-radius:6px;margin:0 0 9px;background:var(--panel);overflow:hidden}
+  details.phase[open]{border-color:var(--amber-soft)}
+  details.phase summary{cursor:pointer;list-style:none;padding:11px 14px;display:flex;align-items:baseline;gap:11px;font-family:var(--mono);font-size:13px;color:var(--ink)}
+  details.phase summary::-webkit-details-marker{display:none}
+  details.phase summary::before{content:"▸";color:var(--amber);font-size:11px;transition:.15s}
+  details.phase[open] summary::before{transform:rotate(90deg)}
+  details.phase summary .pn{color:var(--amber);font-weight:600;flex:none}
+  details.phase summary .pg{color:var(--ink-dim);font-family:var(--sans);font-size:13px;font-weight:400}
+  details.phase summary .ps{margin-left:auto;font-size:10px;letter-spacing:.06em;color:var(--cyan);border:1px solid var(--cyan-soft);border-radius:3px;padding:2px 7px;flex:none}
+  details.phase .pbody{padding:0 14px 14px}
+  details.phase .pbody .block{margin:0}
+
+  /* SKILL TABLE */
+  table.skills{width:100%;border-collapse:collapse;font-size:13.5px;margin:4px 0 16px}
+  table.skills th,table.skills td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.skills th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:500}
+  table.skills td:first-child{font-family:var(--mono);color:var(--cyan);white-space:nowrap}
+  table.skills .on{color:var(--cyan);font-family:var(--mono);font-size:12px;white-space:nowrap}
+  table.skills .off{color:var(--rose);font-family:var(--mono);font-size:12px;white-space:nowrap}
+  table.skills td:last-child{color:var(--ink-dim)}
+
+  /* CHECKLIST */
+  ul.dod{list-style:none;margin:4px 0 16px;padding:0;font-size:14px}
+  ul.dod li{padding:6px 0 6px 26px;position:relative;color:var(--ink-dim);border-bottom:1px solid var(--line)}
+  ul.dod li:last-child{border-bottom:none}
+  ul.dod li::before{content:"☐";position:absolute;left:0;top:5px;color:var(--cyan);font-family:var(--mono)}
+  ul.dod li b{color:#fff;font-weight:600}
+  footer b{color:var(--ink-dim)}
+  .div{height:1px;background:var(--line);margin:0 0 22px;margin-left:34px}
+  @media(max-width:600px){.div{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="veil">
+<div class="wrap">
+
+<header>
+  <div class="kicker">Claude Code · Advanced Execution Guide</div>
+  <h1>Mengeksekusi <em>agent</em><br>dari CLAUDE.md</h1>
+  <p class="lede">Satu panduan lengkap untuk mengubah architecture contract <strong>truck-appointment-system</strong> menjadi kode jalan — rencana 11 fase dengan prompt siap-copy, skill yang harus diaktifkan, dan cara menjaga Claude Code tetap patuh pada aturan hardening. Disesuaikan dengan <code class="f">CLAUDE.md</code>, <code class="f">BUSINESS-FLOW.md</code>, <code class="f">DUMMY-DATA.md</code>, dan <code class="f">HANDOVER.md</code>.</p>
+  <div class="meta">
+    <span class="tag">stack <b>Laravel 12 · Vue 3 · Reverb</b></span>
+    <span class="tag">workflow <b>mobile → laptop</b></span>
+    <span class="tag">skills <b>laravel-specialist · tdd · security-audit</b></span>
+  </div>
+</header>
+
+<section class="filemap">
+  <div class="map-head">
+    <span class="map-t">▍ Peta artefak — 7 file, 7 peran</span>
+    <span class="map-leg"><i class="lg src"></i>sumber kebenaran<i class="lg impl"></i>implementasi<i class="lg auto"></i>auto-load</span>
+  </div>
+  <div class="tree">
+    <div class="row"><span class="fn auto">CLAUDE.md</span><span class="rl">konstitusi — aturan tetap, layer, hardening (di-load tiap sesi)</span></div>
+    <div class="row"><span class="fn auto">HANDOVER.md</span><span class="rl">jurnal — keadaan terkini & changelog antar sesi</span></div>
+    <div class="row dir"><span class="fn">docs/</span></div>
+    <div class="row ind"><span class="g">├─</span><span class="fn src">PRD.md</span><span class="rl">kenapa & batas scope MVP (IN vs OUT)</span></div>
+    <div class="row ind"><span class="g">├─</span><span class="fn src">BUSINESS-FLOW.md</span><span class="rl">§1 RBAC · §2 state machine · §3 proses · §4 ERD</span></div>
+    <div class="row ind"><span class="g">└─</span><span class="fn">DUMMY-DATA.md</span><span class="rl">spesifikasi dataset demo</span></div>
+    <div class="row dir"><span class="fn">database/seeders/</span></div>
+    <div class="row ind"><span class="g">├─</span><span class="fn impl">RolePermissionSeeder.php</span><span class="rl">implementasi RBAC (§1) — wajib cocok</span></div>
+    <div class="row ind"><span class="g">└─</span><span class="fn impl">DemoSeeder.php</span><span class="rl">implementasi ERD (§4) + semua status (§2)</span></div>
+  </div>
+  <p class="map-note">Hierarki: <code class="i">PRD.md</code> (kenapa/scope) → <code class="i">BUSINESS-FLOW.md</code> (apa) → <code class="i">CLAUDE.md</code> (bagaimana) → <code class="i">DUMMY-DATA.md</code> (data uji) → <code class="i">HANDOVER.md</code> (status). <b>Sumber kebenaran</b> berubah lebih dulu, <b>implementasi</b> menyusul — lihat §11.</p>
+</section>
+
+<nav class="toc">
+  <div class="t">Isi</div>
+  <ol>
+    <li><a href="#m1"><span>01</span> Model mental: CLAUDE.md = konstitusi</a></li>
+    <li><a href="#m2"><span>02</span> Setup repo & .claude/</a></li>
+    <li><a href="#m3"><span>03</span> Jembatan & HANDOVER.md</a></li>
+    <li><a href="#m4"><span>04</span> Rencana build — 11 fase + prompt</a></li>
+    <li><a href="#m5"><span>05</span> Pola prompt: Plan dulu, eksekusi kemudian</a></li>
+    <li><a href="#m6"><span>06</span> Subagent untuk truck-appointment-system</a></li>
+    <li><a href="#m7"><span>07</span> Skill: aktifkan & buat</a></li>
+    <li><a href="#m8"><span>08</span> Menegakkan hardening</a></li>
+    <li><a href="#m9"><span>09</span> Loop verifikasi tiap PR</a></li>
+    <li><a href="#m10"><span>10</span> Jebakan umum</a></li>
+    <li><a href="#m11"><span>11</span> Sinkronisasi saat ada perubahan</a></li>
+  </ol>
+</nav>
+
+<!-- 01 -->
+<section id="m1">
+  <div class="sec-head"><span class="num">01</span><h2>Model mental: CLAUDE.md = konstitusi</h2></div>
+  <div class="sub">// kenapa file ini lebih penting dari prompt mana pun</div>
+  <div class="body">
+    <p>Claude Code menarik <code class="f">CLAUDE.md</code> ke konteks <strong>otomatis di setiap sesi</strong> — ia jadi sumber kebenaran tentang cara repo-mu bekerja, tanpa kamu menjelaskan ulang. Inilah alasan kontacmu harus ramping: tiap baris memakan context window yang sama dengan kode.</p>
+    <p>Konsekuensi praktis: kamu <strong>tidak perlu</strong> menempel aturan layer atau hardening ke tiap prompt. Cukup rujuk: <em>"ikuti kontrak"</em>. Yang kamu ketik di terminal adalah <span class="hot">tugas</span>, bukan <span class="hot">aturan</span> — aturan sudah hidup di file.</p>
+    <div class="warn"><b>Tips dari praktik:</b> aturan bergaya <code class="i">"Jangan ..."</code> kadang terlewat. Kalau Claude Code mulai mengabaikan satu larangan, ubah jadi bentuk <code class="i">"Lebih baik X daripada Y"</code>. Mis. ganti <em>"Jangan query di controller"</em> → <em>"Controller hanya memanggil Action lalu kembalikan Resource"</em> (kontrakmu sudah pakai gaya ini — pertahankan).</p></div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section id="m2">
+  <div class="sec-head"><span class="num">02</span><h2>Setup repo & struktur <code class="f">.claude/</code></h2></div>
+  <div class="sub">// taruh file di tempat yang benar sekali saja</div>
+  <div class="body">
+    <p>Letakkan <strong>semua</strong> file sesuai path-nya. Label <strong>🔵 KUSTOM</strong> = file yang kita buat, tidak ada di Laravel bawaan. <strong>⚪ BAWAAN</strong> = sudah ada setelah <code class="i">laravel new</code>:</p>
+    <div class="block cmd">
+      <div class="bar"><span class="label">struktur repo · semua file non-Laravel ditandai 🔵</span><button class="copy">copy</button></div>
+<pre>truck-appointment-system/
+│
+├─ <span class="k">CLAUDE.md</span>                          <span class="c">🔵 KUSTOM · konstitusi, auto-load tiap sesi</span>
+├─ <span class="k">HANDOVER.md</span>                        <span class="c">🔵 KUSTOM · jurnal state antar-sesi</span>
+│
+├─ <span class="k">docs/</span>                              <span class="c">🔵 KUSTOM · seluruh folder ini tidak ada di Laravel</span>
+│   ├─ PRD.md                          <span class="c">         kenapa & batas scope MVP (IN vs OUT)</span>
+│   ├─ BUSINESS-FLOW.md                <span class="c">         §1 RBAC · §2 state machine · §3 proses · §4 ERD</span>
+│   ├─ DUMMY-DATA.md                   <span class="c">         spesifikasi dataset demo</span>
+│   └─ tas-claude-code-guide.html      <span class="c">         panduan ini · referensi MANUSIA, tidak dibaca agent</span>
+│
+├─ database/                           <span class="c">⚪ BAWAAN Laravel (folder sudah ada)</span>
+│   └─ seeders/
+│       ├─ DatabaseSeeder.php          <span class="c">⚪ BAWAAN · tinggal isi (lihat blok di bawah)</span>
+│       ├─ RolePermissionSeeder.php    <span class="c">🔵 KUSTOM · implementasi RBAC (BUSINESS-FLOW §1)</span>
+│       └─ DemoSeeder.php              <span class="c">🔵 KUSTOM · implementasi ERD §4 + semua status §2</span>
+│
+└─ <span class="k">.claude/</span>                           <span class="c">🔵 KUSTOM · folder Claude Code, wajib di-commit ke git</span>
+    ├─ agents/
+    │   └─ security-reviewer.md        <span class="c">         subagent audit keamanan tiap PR (sec.06)</span>
+    └─ skills/
+        └─ slice/
+            └─ SKILL.md               <span class="c">         custom /slice slash-command (sec.07)</span></pre>
+    </div>
+    <div class="note"><b>Yang perlu diingat:</b> <code class="i">docs/</code> dan <code class="i">.claude/</code> tidak ada di Laravel — kamu buat sendiri. <code class="i">.claude/</code> wajib di-commit (jangan masuk <code class="i">.gitignore</code>) supaya agent dan skill tersedia di semua perangkat. <code class="i">docs/</code> aman di root repo karena Laravel hanya serve <code class="i">public/</code> ke internet — pastikan web server menunjuk ke <code class="i">public/</code>, bukan root repo.</div>
+    <p><code class="f">DatabaseSeeder.php</code> sudah ada setelah <code class="i">laravel new</code> — tinggal isi, jangan buat ulang. Urutan pemanggilan wajib RolePermission dulu:</p>
+    <div class="block prompt">
+      <div class="bar"><span class="label">database/seeders/DatabaseSeeder.php · isi ini</span><button class="copy">copy</button></div>
+<pre>public function run(): void
+{
+    $this->call([
+        RolePermissionSeeder::class, <span class="c">// role & permission harus ada duluan</span>
+        DemoSeeder::class,           <span class="c">// assign role ke user butuh RolePermission jalan dulu</span>
+    ]);
+}</pre>
+    </div>
+    <p>Setelah file di tempatnya, inisialisasi sesi di root repo:</p>
+    <div class="block cmd">
+      <div class="bar"><span class="label">terminal</span><button class="copy">copy</button></div>
+<pre><span class="k">claude</span>                 <span class="c"># mulai sesi di folder proyek</span>
+<span class="k">/init</span>                  <span class="c"># scan repo & lengkapi CLAUDE.md bila perlu</span>
+<span class="k">/context</span>               <span class="c"># cek berapa context dimakan kontrak</span></pre>
+    </div>
+    <div class="note"><b>Catatan akurasi:</b> nama & perilaku slash-command Claude Code berkembang cepat. Untuk yang terbaru, cek <a href="https://docs.claude.com/en/docs/claude-code/overview">docs.claude.com/claude-code</a>. Yang dijelaskan di sini adalah konsep yang stabil, bukan janji versi tertentu.</div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section id="m3">
+  <div class="sec-head"><span class="num">03</span><h2>Jembatan &amp; HANDOVER.md</h2></div>
+  <div class="sub">// kontinuitas antar perangkat & antar sesi — file yang bicara, bukan ingatan</div>
+  <div class="body">
+    <p>Alur yang kamu pakai sudah benar: rancang & debat arsitektur di chat (HP), lalu bawa hasilnya ke Claude Code (laptop). Yang membuat ini mulus adalah <strong>file sebagai jembatan</strong> — bukan menyalin percakapan.</p>
+    <div class="grid">
+      <div class="card"><h4>Di HP (claude.ai)</h4><p>Putuskan kontrak & alur. Output = <code>CLAUDE.md</code> + <code>docs/*</code>. Tidak ada kode dieksekusi — murni keputusan desain.</p></div>
+      <div class="card"><h4>Di laptop (Claude Code)</h4><p>Commit file itu. Claude Code membaca kontrak, lalu kamu kasih tugas per layer. Eksekusi & test di sini.</p></div>
+    </div>
+    <p>Tapi menjembatani <em>perangkat</em> saja tidak cukup — kamu juga menjembatani <em>sesi</em>. Sesi Claude Code berikutnya tidak ingat apa pun. Di sinilah <strong>HANDOVER.md</strong> bekerja: <code class="f">CLAUDE.md</code> menjawab <em>"bagaimana repo ini bekerja"</em> (jarang berubah); <code class="f">HANDOVER.md</code> menjawab <em>"kita sedang di mana"</em> (berubah tiap sesi). Sesi/perangkat baru membaca HANDOVER.md <strong>setelah</strong> CLAUDE.md untuk langsung nyambung.</p>
+    <div class="block">
+      <div class="bar"><span class="label">HANDOVER.md · template</span><button class="copy">copy</button></div>
+<pre><span class="c"># HANDOVER.md — truck-appointment-system</span>
+<span class="c"># Status hidup antar-sesi. Update di AKHIR tiap sesi.</span>
+<span class="c"># Baca ini SETELAH CLAUDE.md saat mulai sesi/perangkat baru.</span>
+
+<span class="k">## Status</span>
+- Update: 2026-06-07 · Branch: feature/booking-flow
+- Build: migrate:fresh --seed OK · test 24 passed · analyse clean
+
+<span class="k">## Sudah selesai</span>
+- [x] Skema + model (BUSINESS-FLOW §4)
+- [x] RolePermissionSeeder + DemoSeeder jalan
+- [x] BookAppointmentAction + test race condition (hijau)
+
+<span class="k">## Sedang dikerjakan</span>
+- [ ] GateInAction — test gate-in di luar window belum dibuat
+
+<span class="k">## Langkah berikutnya (urut)</span>
+1. GateInAction + GateOutAction
+2. NoShowSweepJob (WithoutOverlapping) + balikin kuota
+3. Reschedule (optimistic lock version)
+
+<span class="k">## Changelog kontrak/dokumen/seeder</span>
+- 2026-06-07: +kolom grace_minutes di slot_windows. Migrasi baru,
+  BUSINESS-FLOW §2 diupdate, DemoSeeder set 30. Alasan: toleransi no-show.
+
+<span class="k">## Jebakan / catatan</span>
+- Reverb belum di CI → test broadcast pakai Event::fake().
+- Akun demo & password: lihat docs/DUMMY-DATA.md.</pre>
+    </div>
+    <p><strong>Kapan diupdate:</strong> (a) di <span class="hot">akhir tiap sesi</span> — status & langkah berikutnya; (b) <span class="hot">setiap kali</span> kontrak, dokumen, atau seeder berubah — tulis di bagian <em>Changelog</em>: apa & kenapa. Bagian changelog inilah yang menyambung ke disiplin sinkronisasi di §11.</p>
+    <div class="note"><b>Tiga file, tiga peran — jangan dicampur:</b> <code class="f">CLAUDE.md</code> = konstitusi (aturan tetap). <code class="f">docs/*</code> = detail rujukan. <code class="f">HANDOVER.md</code> = jurnal (keadaan + keputusan terbaru). Aturan tetap jangan masuk HANDOVER; keadaan sementara jangan masuk CLAUDE.md — kalau tercampur, keduanya cepat membusuk.</div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section id="m4">
+  <div class="sec-head"><span class="num">04</span><h2>Rencana build — 11 fase + prompt siap-tempel</h2></div>
+  <div class="sub">// bangun dari data ke atas · satu fase = satu sesi · tiap prompt bisa di-copy</div>
+  <div class="body">
+    <p>Kontrak mengunci tiga layer: <strong>Data → Business → HTTP</strong>. Bangun mengikuti arah itu, <strong>satu fase sampai test hijau</strong> sebelum lanjut. Jangan minta "buatkan semua endpoint" sekaligus — konteks meledak, hardening terlewat. Tiap prompt di bawah mengasumsikan <code class="f">CLAUDE.md</code> sudah ke-load; tap untuk buka & copy.</p>
+
+    <details class="phase"><summary><span class="pn">Fase 0</span><span class="pg">Scaffold proyek</span><span class="ps">setup</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Setup proyek baru sesuai Stack di CLAUDE.md: Laravel 12, PHP 8.3
+strict_types, Sanctum, Redis+Horizon, Reverb, Spatie Permission +
+Activity Log + Laravel Data, Pest, PHPStan level 8, Pint, Docker
+Compose, CI GitHub Actions. KONFIRMASI dulu daftar package yang akan
+masuk composer.json sebelum install (aturan JANGAN). Belum ada fitur
+— hanya kerangka.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 1</span><span class="pg">Skema, model, factory, enum</span><span class="ps">data</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Buat migrasi + model + factory untuk semua entitas di
+docs/BUSINESS-FLOW.md §4. Tambah kolom version (integer, default 1)
+di appointments (optimistic lock) dan booked_count di slot_windows.
+Buat enum: AppointmentStatus, MoveType, SlotWindowStatus,
+GateTransactionType. Unique constraint (slot_window_id, container_no)
+untuk appointment aktif. Belum ada business logic. Pakai skill
+laravel-specialist + php-modernization.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 2</span><span class="pg">RBAC + Auth + Seeder jalan</span><span class="ps">data</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Implement Sanctum token auth (login/logout, issue token + abilities
+per scope di docs/BUSINESS-FLOW.md §1). Pasang RolePermissionSeeder &
+DemoSeeder (database/seeders) ke DatabaseSeeder. Buat Policy:
+AppointmentPolicy (transporter hanya company_id sendiri; driver hanya
+driver_id sendiri; planner reschedule/cancel hanya via
+appointment.override + teraudit), Gate untuk gate-officer per
+terminal_id. migrate:fresh --seed harus sukses. Pest test tiap aturan
+Policy, termasuk override planner.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 3</span><span class="pg">Slot management (Planner)</span><span class="ps">slice</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Fitur Planner buka/tutup slot. OpenSlotWindowAction +
+CloseSlotWindowAction (set status, BUKAN delete). GET
+/api/v1/slots/availability pakai Cache::flexible([10,30]) +
+Cache::tags(['slot',"gate:{id}"]). Event SlotWindowOpened →
+invalidate cache + broadcast. Test: availability benar, cache
+ter-invalidate saat window berubah.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 4</span><span class="pg">Booking — INTI, test-first</span><span class="ps">rawan</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>TEST DULU: Pest test race condition — 2 booking paralel ke slot
+terakhir (capacity-1 terisi), pastikan hanya 1 sukses & 1 dapat 409
+(DB::transaction + lockForUpdate). Lalu test Idempotency-Key (2
+request key sama = 1 appointment). Setelah test MERAH, implement
+BookAppointmentAction sesuai §3.2: lockForUpdate slot, cek
+booked_count<capacity, buat appointment + booked_count++, commit,
+baru Event AppointmentBooked (reminder job, broadcast, notif).
+Idempotency-Key middleware di route booking.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 5</span><span class="pg">Reschedule / Cancel (optimistic lock)</span><span class="ps">rawan</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>RescheduleAppointmentAction: terima version, lock window lama+baru
+dalam SATU transaksi, cek version cocok (kalau tidak → 409), pindah
+kuota, version++. CancelAppointmentAction: hanya sebelum ARRIVED,
+kembalikan kuota. Path planner via appointment.override (teraudit).
+Hormati state machine §2. Test: version basi ditolak; kuota balik
+benar saat cancel; override planner tercatat di Activity Log.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 6</span><span class="pg">Gate-in / Gate-out (Officer)</span><span class="ps">rawan</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>GateInAction & GateOutAction sesuai §3.5–3.6. Cek state machine +
+terminal cocok + toleransi early/late dari config. Idempotency-Key di
+endpoint gate. Event TruckGatedIn/Out → ProcessGateEventJob
+(WithoutOverlapping per appointment, cek isGatedIn dulu) + broadcast
+antrian. Test: gate-in pada status salah ditolak; gate event
+idempoten.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 7</span><span class="pg">Jobs terjadwal</span><span class="ps">business</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>AppointmentReminderJob (H-2 jam, ShouldBeUnique uniqueId=appointment
+id, set tries/backoff/failed). NoShowSweepJob (cron tiap 5 menit,
+WithoutOverlapping, tandai NO_SHOW setelah window.end+grace,
+kembalikan kuota dalam transaksi). Daftarkan di scheduler. Test pakai
+time travel + Queue::fake.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 8</span><span class="pg">Realtime (Reverb + Echo)</span><span class="ps">business</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Reverb + Echo. Channel slot.{gateId} (sisa kuota live),
+gate.queue.{terminalId} (antrian). Broadcast dari LISTENER event,
+bukan dari Action. Private channel + otorisasi per role/company.</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 9</span><span class="pg">Report + audit</span><span class="ps">http</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Endpoint utilisasi (Planner): kuota vs terpakai vs no-show per
+gate/tanggal. Pastikan Spatie Activity Log mencatat semua transisi
+status, gate event, dan override planner. Transporter hanya lihat log
+company sendiri (Policy).</pre></div></div>
+    </details>
+
+    <details class="phase"><summary><span class="pn">Fase 10</span><span class="pg">Frontend SPA (Vue 3)</span><span class="ps">frontend</span></summary>
+      <div class="pbody"><div class="block prompt"><div class="bar"><span class="label">prompt</span><button class="copy">copy</button></div>
+<pre>Vue 3 Composition API + TS + Pinia + Vue Router + TanStack Query +
+Axios + Echo. JANGAN Inertia, JANGAN Wayfinder (matikan skill itu —
+lihat §07). View per role sesuai matriks §1: dispatcher
+(availability+booking board), driver (jadwal hari ini + QR), gate
+officer (scan + antrian), planner (slot config + utilisasi + override).
+Vitest untuk komponen kritikal.</pre></div></div>
+    </details>
+
+    <div class="note"><b>Aturan emas tiap fase:</b> untuk Fase 4–6 (uang/kuota/konkurensi) <strong>test merah dulu, baru implementasi</strong> (§05). Tutup tiap fase dengan Definition of Done di §09 sebelum lanjut. Commit kecil per fase agar gampang rollback kalau melenceng.</div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section id="m5">
+  <div class="sec-head"><span class="num">05</span><h2>Pola prompt: Plan dulu, eksekusi kemudian</h2></div>
+  <div class="sub">// plan mode mencegah agent menulis kode yang melanggar kontrak</div>
+  <div class="body">
+    <p>Untuk tugas non-sepele, masuk <strong>plan mode</strong> dulu (toggle <code class="i">Shift+Tab</code>). Agent menyusun rencana tanpa menulis file — kamu review dulu apakah sesuai kontrak, baru setujui eksekusi. Ini titik kontrol terpentingmu.</p>
+    <div class="block prompt">
+      <div class="bar"><span class="label">prompt · plan mode — skema</span><button class="copy">copy</button></div>
+<pre>Baca CLAUDE.md dan docs/BUSINESS-FLOW.md.
+
+Susun rencana migrasi + model Eloquent untuk seluruh entitas
+di §4, beserta relasi. Pastikan slot_windows punya kolom
+capacity, booked_count, status; appointments punya version,
+status, booking_code. Tampilkan rencana dulu — jangan tulis
+file sampai saya setujui.</pre>
+    </div>
+    <p>Setelah rencana oke, baru perintah eksekusi yang spesifik & ber-test:</p>
+    <div class="block prompt">
+      <div class="bar"><span class="label">prompt · eksekusi — Action inti (TDD)</span><button class="copy">copy</button></div>
+<pre>Implementasikan BookAppointmentAction sesuai kontrak.
+
+Wajib:
+- Pest test DULU: simulasikan 2 booking pada slot dengan
+  sisa kuota 1 → tepat 1 berhasil, 1 dapat 409.
+- SlotWindow::lockForUpdate() dalam DB::transaction(attempts: 3).
+- booked_count++ di transaksi yang sama. Tolak bila penuh /
+  status != OPEN.
+- Side-effect lewat event AppointmentBooked, BUKAN di Action.
+- Idempotency-Key sudah ditangani middleware; jangan
+  duplikasi di sini.
+
+Jalankan composer test sampai hijau.</pre>
+    </div>
+    <p>Pola promptnya selalu sama: <span class="hot">rujuk kontrak</span> → <span class="hot">sebut invariannya</span> (kuota, lock, version) → <span class="hot">minta test sebagai bukti</span>. Jangan biarkan agent memutuskan sendiri apakah perlu lock.</p>
+  </div>
+</section>
+
+<!-- 06 -->
+<section id="m6">
+  <div class="sec-head"><span class="num">06</span><h2>Subagent untuk truck-appointment-system</h2></div>
+  <div class="sub">// isolasi konteks — main thread tetap ramping di tugas panjang</div>
+  <div class="body">
+    <p>Subagent = instance Claude terpisah dengan konteks & izin tool sendiri; ia hanya mengembalikan hasil akhir, menjaga sesi utamamu bersih. Ada tipe bawaan — <strong>Explore</strong> (baca-saja, telusuri repo), <strong>Plan</strong> (merancang tanpa eksekusi), dan general-purpose — plus yang kamu definisikan di <code class="f">.claude/agents/</code>.</p>
+    <div class="grid">
+      <div class="card"><h4>Explore</h4><p>"Telusuri semua Action & Repository yang menyentuh <code>slot_windows</code>" — tanpa membebani konteks utama dengan isi file.</p></div>
+      <div class="card"><h4>Plan</h4><p>Pasangan plan mode untuk fitur besar (mis. seluruh flow Reschedule lintas dua window).</p></div>
+    </div>
+    <p>Subagent kustom yang berharga untuk TAS — manfaatkan skill yang <strong>sudah ada di environment-mu</strong>:</p>
+    <div class="block">
+      <div class="bar"><span class="label">.claude/agents/security-reviewer.md</span><button class="copy">copy</button></div>
+<pre><span class="c">---</span>
+<span class="k">name:</span> security-reviewer
+<span class="k">description:</span> Audit tiap PR truck-appointment-system sebelum merge. Fokus auth
+  Sanctum scope, Policy company_id/driver_id, mass-assignment,
+  kebocoran data antar-tenant.
+<span class="k">tools:</span> Read, Grep, Glob
+<span class="c">---</span>
+Gunakan skill laravel-security-audit. Periksa diff terhadap
+OWASP & aturan RBAC di docs/BUSINESS-FLOW.md §1. Laporkan
+temuan + lokasi file. Jangan ubah kode — review saja.</pre>
+    </div>
+    <div class="note"><b>Trade-off nyata:</b> subagent menyembunyikan konteks dari thread utama. Pakai saat isolasi memang berguna (review, eksplorasi paralel, test runner) — bukan untuk semua hal. Hingga beberapa subagent bisa jalan paralel; jangan over-pakai.</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section id="m7">
+  <div class="sec-head"><span class="num">07</span><h2>Skill: aktifkan yang benar, buat yang perlu</h2></div>
+  <div class="sub">// salah skill aktif = arsitektur melenceng diam-diam</div>
+  <div class="body">
+    <p>TAS = <strong>API-first decoupled + Sanctum token</strong>. Jangan nyalakan semua skill — beberapa konsepnya <strong>bentrok</strong> dengan kontrak dan akan menyeret Claude Code ke arah monolith Inertia tanpa kamu sadari.</p>
+    <table class="skills">
+      <thead><tr><th>Skill</th><th>Status</th><th>Alasan</th></tr></thead>
+      <tbody>
+        <tr><td>laravel-specialist</td><td class="on">✅ aktif</td><td>Eloquent, Sanctum, Horizon, queue, API resource</td></tr>
+        <tr><td>laravel-api</td><td class="on">✅ aktif</td><td>invokable controller, Form Request, Action, versioned <code class="i">/api/v1</code> — persis kontrak</td></tr>
+        <tr><td>laravel-tdd</td><td class="on">✅ aktif</td><td>Pest, factory, database test</td></tr>
+        <tr><td>php-modernization</td><td class="on">✅ aktif</td><td>PHP 8.3 strict types, enum, readonly DTO</td></tr>
+        <tr><td>laravel-security-audit</td><td class="on">✅ aktif</td><td>jalankan sebelum tiap PR (OWASP, cek hardening)</td></tr>
+        <tr><td>fortify-inertia-auth</td><td class="off">❌ matikan</td><td>Fortify+Inertia = monolith. TAS pakai Sanctum token, SPA terpisah</td></tr>
+        <tr><td>wayfinder-vue-inertia</td><td class="off">❌ matikan</td><td>routing untuk Inertia. TAS pakai Axios + TanStack Query</td></tr>
+      </tbody>
+    </table>
+    <div class="warn"><b>Sinyal skill salah aktif:</b> kalau Claude Code mulai menyebut Inertia, <code class="i">useForm</code> Inertia, atau Fortify actions saat mengerjakan TAS — stop & koreksi, jangan ikut.</div>
+    <p>Buat enum ini di awal (dipakai semua fase): <code class="i">AppointmentStatus</code>, <code class="i">MoveType</code>, <code class="i">SlotWindowStatus</code>, <code class="i">GateTransactionType</code>.</p>
+
+    <p>Selain skill bawaan, buat <strong>custom skill</strong> yang melekat ke kontrak TAS — mis. generator vertical-slice. Di Claude Code terkini, custom slash-command menyatu ke skills: <code class="f">.claude/skills/&lt;nama&gt;/SKILL.md</code> bisa dipanggil <code class="i">/nama</code> sekaligus dipakai otomatis (format lama <code class="f">.claude/commands/</code> masih jalan).</p>
+    <div class="block">
+      <div class="bar"><span class="label">.claude/skills/slice/SKILL.md</span><button class="copy">copy</button></div>
+<pre><span class="c">---</span>
+<span class="k">name:</span> slice
+<span class="k">description:</span> Bangun satu fitur truck-appointment-system lengkap lintas layer
+  sesuai CLAUDE.md, dengan test. Argumen = nama fitur.
+<span class="c">---</span>
+Untuk fitur "$ARGUMENTS", buat secara berurutan & uji tiap
+langkah: Action(+Pest) → Event/Listener → Form Request +
+DTO → Controller invokable → Resource → Policy → route
+/api/v1. Tegakkan semua aturan hardening yang relevan dari
+CLAUDE.md. Jalankan composer test & analyse di akhir.</pre>
+    </div>
+    <div class="block cmd">
+      <div class="bar"><span class="label">terminal</span><button class="copy">copy</button></div>
+<pre><span class="k">/slice</span> gate-in
+<span class="k">/slice</span> reschedule-appointment</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 08 -->
+<section id="m8">
+  <div class="sec-head"><span class="num">08</span><h2>Menegakkan hardening (bukan sekadar berharap)</h2></div>
+  <div class="sub">// jadikan tiap aturan kontrak sebagai test yang gagal kalau dilanggar</div>
+  <div class="body">
+    <p>Aturan di kontrak hanya nyata kalau ada <strong>test yang merah saat dilanggar</strong>. Untuk TAS, empat invarian ini wajib punya test eksplisit — minta Claude Code menuliskannya sebagai bagian dari Definition of Done.</p>
+    <div class="grid">
+      <div class="card"><h4>Race condition</h4><p>2 booking konkuren ke slot sisa-1 → tepat 1 sukses. Tanpa test ini, <code>lockForUpdate</code> gampang "hilang" saat refactor.</p></div>
+      <div class="card"><h4>Idempotency</h4><p>2 POST dengan <code>Idempotency-Key</code> sama → 1 appointment, bukan 2.</p></div>
+      <div class="card"><h4>Optimistic lock</h4><p>Reschedule dengan <code>version</code> basi → 409, tidak menimpa perubahan orang lain.</p></div>
+      <div class="card"><h4>Isolasi tenant</h4><p>Transporter A akses appointment company B → 403. Driver lihat appointment bukan miliknya → 403.</p></div>
+    </div>
+    <div class="block prompt">
+      <div class="bar"><span class="label">prompt · guardrail test</span><button class="copy">copy</button></div>
+<pre>Sebelum menandai fitur selesai, pastikan ada Pest test untuk
+keempat invarian hardening yang relevan (race, idempotency,
+optimistic lock, isolasi tenant). Tunjukkan test-nya, lalu
+buktikan dengan composer test --parallel hijau.</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 09 -->
+<section id="m9">
+  <div class="sec-head"><span class="num">09</span><h2>Loop verifikasi tiap PR</h2></div>
+  <div class="sub">// tiga perintah dari kontrakmu = gerbang kualitas</div>
+  <div class="body">
+    <p>Kontrakmu sudah mendefinisikan perintahnya. Jadikan ini ritual penutup tiap slice — minta agent menjalankannya dan memperbaiki sampai bersih, bukan kamu yang mengejar.</p>
+    <div class="block cmd">
+      <div class="bar"><span class="label">terminal · gerbang sebelum commit</span><button class="copy">copy</button></div>
+<pre><span class="k">composer test</span>      <span class="c"># pest --parallel</span>
+<span class="k">composer analyse</span>   <span class="c"># phpstan level 8</span>
+<span class="k">composer fix</span>       <span class="c"># pint</span></pre>
+    </div>
+    <p>Lalu lepas <code class="i">security-reviewer</code> (sec. 06) pada diff. Hanya setelah keempatnya hijau, baru rujuk balik ke <code class="f">CLAUDE.md</code> bila ada keputusan baru yang perlu dicatat.</p>
+    <p><strong>Definition of Done</strong> — sebuah fitur belum selesai sampai semua ini terpenuhi:</p>
+    <ul class="dod">
+      <li>Tidak ada query/logika di controller (invokable → panggil Action → balik Resource).</li>
+      <li>Input lewat Form Request + DTO; output lewat Resource. <b>Tidak ada</b> <code class="i">Model::create($request-&gt;all())</code>.</li>
+      <li>Endpoint di bawah <code class="i">/api/v1/</code>; side-effect lewat Event/Listener, bukan di dalam Action.</li>
+      <li>Fitur kuota/gate: ada test <b>race condition + idempotency</b> yang hijau.</li>
+      <li><code class="i">composer test</code> hijau · <code class="i">analyse</code> (PHPStan 8) bersih · <code class="i">fix</code> jalan · <code class="i">security-audit</code> lewat.</li>
+      <li>Policy ditegakkan & ada test-nya (cross-company / driver-self / gate-terminal / override-planner).</li>
+      <li>Activity Log mencatat perubahan status; <code class="f">CLAUDE.md</code> masih ramping (detail baru → <code class="f">docs/</code>).</li>
+    </ul>
+    <div class="note"><b>Disiplin context:</b> antar fitur besar, jalankan <code class="i">/clear</code> untuk reset konteks percakapan. Kontrak tetap ter-load otomatis — yang dibuang hanya histori sesi yang sudah tak relevan, supaya kualitas tak menurun.</div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section id="m10">
+  <div class="sec-head"><span class="num">10</span><h2>Jebakan umum</h2></div>
+  <div class="sub">// hal yang bikin agent diam-diam melanggar kontrak</div>
+  <div class="body">
+    <div class="div"></div>
+    <div class="step"><div class="h"><span class="dot">✕</span> "Buatkan semua endpoint sekaligus"</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Konteks meledak, kualitas turun, hardening terlewat. → Satu vertical slice sampai test hijau, ulangi.</p></div>
+    <div class="step"><div class="h"><span class="dot">✕</span> Dispatch job di dalam <code class="i">DB::transaction()</code></div><p style="margin:0;color:var(--ink-dim);font-size:14px">Job bisa jalan sebelum commit → baca state basi. Kontrak sudah melarang; tegaskan di prompt Event/Listener.</p></div>
+    <div class="step"><div class="h"><span class="dot">✕</span> Menambah package diam-diam</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Agent suka menarik library. Kontrakmu mewajibkan konfirmasi — pertahankan, dan cek <code class="f">composer.json</code> di diff.</p></div>
+    <div class="step"><div class="h"><span class="dot">✕</span> CLAUDE.md membengkak</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Detail panjang ke <code class="f">docs/</code>. Bila kontrak lewat ~200 baris, ia mulai memakan konteks yang seharusnya untuk kode.</p></div>
+    <div class="step"><div class="h"><span class="dot">✕</span> Status appointment diubah lewat <code class="i">update()</code> bebas</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Lewati state machine = bug audit. Semua transisi lewat Action sesuai <code class="f">docs/BUSINESS-FLOW.md §2</code>.</p></div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section id="m11">
+  <div class="sec-head"><span class="num">11</span><h2>Sinkronisasi saat ada perubahan</h2></div>
+  <div class="sub">// satu fakta hidup di satu tempat — sisanya mengikuti, tanpa drift</div>
+  <div class="body">
+    <p>Lima artefakmu — <code class="f">CLAUDE.md</code>, <code class="f">BUSINESS-FLOW.md</code>, <code class="f">DUMMY-DATA.md</code>, <code class="f">DemoSeeder.php</code>, <code class="f">RolePermissionSeeder.php</code> — saling bergantung. Kalau satu berubah sendirian, sisanya jadi bohong; dan seeder paling cepat ketahuan: <code class="i">migrate:fresh --seed</code> langsung pecah. Aturan inti: <strong>tiap fakta punya satu sumber kebenaran</strong>, artefak lain hanya implementasinya.</p>
+
+    <div class="grid">
+      <div class="card"><h4>Aturan &amp; hardening</h4><p>Sumber → <code>CLAUDE.md</code>. Implementasi → kode + test guardrail.</p></div>
+      <div class="card"><h4>RBAC (role/akses)</h4><p>Sumber → <code>BUSINESS-FLOW §1</code>. Implementasi → RolePermissionSeeder + Policy + Sanctum scope.</p></div>
+      <div class="card"><h4>Skema / ERD</h4><p>Sumber → <code>BUSINESS-FLOW §4</code>. Implementasi → migrasi + model + DemoSeeder.</p></div>
+      <div class="card"><h4>State machine</h4><p>Sumber → <code>BUSINESS-FLOW §2</code>. Implementasi → Action + status di DemoSeeder.</p></div>
+      <div class="card"><h4>Scope MVP (kenapa)</h4><p>Sumber → <code>PRD.md §3</code>. Implementasi → fitur yang dibangun; di luar daftar IN = tunda.</p></div>
+    </div>
+
+    <p>Peta propagasi — <strong>kalau yang berubah ini, maka wajib ikut update</strong>:</p>
+    <div class="flow">
+      <div class="step"><div class="h"><span class="dot">▸</span> Role / permission</div><p style="margin:0;color:var(--ink-dim);font-size:14px">BUSINESS-FLOW §1 (matriks + scope) → <code class="i">CLAUDE.md</code> (Sanctum scope) → <code class="i">RolePermissionSeeder</code> → Policy (<code class="i">company_id</code>/<code class="i">driver_id</code>) → test isolasi tenant.</p></div>
+      <div class="step"><div class="h"><span class="dot">▸</span> Entitas / kolom baru</div><p style="margin:0;color:var(--ink-dim);font-size:14px">BUSINESS-FLOW §4 → migrasi <strong>baru</strong> (jangan edit yang lama) → model → <code class="i">DemoSeeder</code> → <code class="i">DUMMY-DATA.md</code> → Resource + Repository (eager-load).</p></div>
+      <div class="step"><div class="h"><span class="dot">▸</span> Status / transisi baru</div><p style="margin:0;color:var(--ink-dim);font-size:14px">BUSINESS-FLOW §2 (state machine) → Action penegak transisi → <code class="i">DemoSeeder</code> (tambah contoh appointment status itu) → <code class="i">DUMMY-DATA.md</code>.</p></div>
+      <div class="step"><div class="h"><span class="dot">▸</span> Aturan hardening baru</div><p style="margin:0;color:var(--ink-dim);font-size:14px"><code class="i">CLAUDE.md</code> → test guardrail yang <strong>merah</strong> saat aturan dilanggar.</p></div>
+      <div class="step"><div class="h"><span class="dot">▸</span> Endpoint / fitur baru</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Cek <code class="i">PRD.md §3</code> dulu (in-scope?) → daftar Action di <code class="i">CLAUDE.md</code> → proses di BUSINESS-FLOW → route <code class="i">/api/v1</code> → eksekusi via <code class="i">/slice</code>. Kalau di luar scope, perbarui PRD lebih dulu.</p></div>
+    </div>
+
+    <p>Alur perubahan yang benar — <strong>dokumen dulu, kode mengikuti</strong>:</p>
+    <div class="flow">
+      <div class="step"><div class="h"><span class="dot">01</span> Ubah dokumen sumber kebenaran dulu</div><p style="margin:0;color:var(--ink-dim);font-size:14px">CLAUDE.md / BUSINESS-FLOW.md / DUMMY-DATA.md — <em>bukan</em> kode. Ini yang akan dibaca plan mode.</p></div>
+      <div class="step"><div class="h"><span class="dot">02</span> Catat di HANDOVER.md › Changelog</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Apa yang berubah & <strong>kenapa</strong>. Satu baris cukup, tapi wajib.</p></div>
+      <div class="step"><div class="h"><span class="dot">03</span> Plan mode: minta rencana propagasi</div><p style="margin:0;color:var(--ink-dim);font-size:14px">"Baca dokumen terbaru, susun rencana update kode + seeder agar selaras." Review sebelum eksekusi.</p></div>
+      <div class="step"><div class="h"><span class="dot">04</span> Eksekusi — migrasi append-only</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Skema berubah = migrasi <strong>baru</strong>, jangan sentuh migrasi lama (aturan kontrak).</p></div>
+      <div class="step"><div class="h"><span class="dot">05</span> <code class="i">migrate:fresh --seed</code></div><p style="margin:0;color:var(--ink-dim);font-size:14px">Seeder = detektor drift. Kalau pecah, skema & seeder belum sinkron — perbaiki dulu sebelum lanjut.</p></div>
+      <div class="step"><div class="h"><span class="dot">06</span> <code class="i">composer test / analyse / fix</code></div><p style="margin:0;color:var(--ink-dim);font-size:14px">Sampai hijau & bersih (§09).</p></div>
+      <div class="step"><div class="h"><span class="dot">07</span> Commit ATOMIK + update status HANDOVER</div><p style="margin:0;color:var(--ink-dim);font-size:14px">Dokumen + kode + seeder + HANDOVER dalam <strong>satu</strong> PR. Jangan pernah merge perubahan skema tanpa seeder-nya.</p></div>
+    </div>
+
+    <p>Sebelum PR besar, lepas prompt deteksi-drift ini:</p>
+    <div class="block prompt">
+      <div class="bar"><span class="label">prompt · consistency check</span><button class="copy">copy</button></div>
+<pre>Cek konsistensi sebelum commit, JANGAN perbaiki dulu — laporkan
+drift sebagai daftar:
+ 1) RolePermissionSeeder.php & Policy  vs  matriks RBAC
+    di docs/BUSINESS-FLOW.md §1
+ 2) DemoSeeder.php  vs  entitas §4 dan status §2
+ 3) docs/DUMMY-DATA.md  vs  data yang benar-benar dibuat DemoSeeder
+Lalu jalankan migrate:fresh --seed dan composer test.</pre>
+    </div>
+
+    <div class="warn"><b>Best practice anti-drift:</b> (1) satu sumber kebenaran per fakta — jangan tulis matriks RBAC di dua tempat lalu lupa salah satunya. (2) PR atomik — dokumen, kode, seeder bergerak bersama. (3) Jaga <code class="i">migrate:fresh --seed</code> selalu hijau di CI — itu menjadikan seeder sebagai test skema gratis. (4) Migrasi append-only di luar dev. (5) DemoSeeder harus selalu menyentuh <strong>semua</strong> status — kalau ada status baru di §2 tanpa contohnya di seeder, itu drift.</div>
+  </div>
+</section>
+
+<footer>
+  <b>truck-appointment-system</b> — panduan eksekusi Claude Code.<br>
+  Selaras dengan PRD.md, CLAUDE.md, docs/BUSINESS-FLOW.md, docs/DUMMY-DATA.md, HANDOVER.md sesi ini.<br>
+  Fitur Claude Code berubah cepat — verifikasi perintah terbaru di docs.claude.com/claude-code.
+</footer>
+
+</div>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pre=btn.closest('.block').querySelector('pre');
+      const text=pre.innerText;
+      const done=()=>{const o=btn.textContent;btn.textContent='✓ copied';btn.classList.add('ok');setTimeout(()=>{btn.textContent=o;btn.classList.remove('ok');},1400);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(()=>{fallback(text);done();});
+      }else{fallback(text);done();}
+    });
+  });
+  function fallback(text){
+    const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);
+  }
+
+  // scrollspy: tandai entri TOC untuk section yang sedang terlihat
+  const links=[...document.querySelectorAll('nav.toc a')];
+  const byId=Object.fromEntries(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const spy=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        links.forEach(a=>a.classList.remove('active'));
+        const a=byId[e.target.id];
+        if(a)a.classList.add('active');
+      }
+    });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>spy.observe(s));
+</script>
+</body>
+</html>

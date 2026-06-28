@@ -1,0 +1,16 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+
+    paths:
+        - app
+        - database
+        - routes
+
+    # Eloquent magic + dynamic relations are understood by larastan; keep the
+    # surface clean otherwise.
+    checkModelProperties: true
+
+    ignoreErrors: []

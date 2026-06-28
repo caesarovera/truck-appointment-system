@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./vendor/bin/pest)",
+      "Bash(./vendor/bin/phpstan analyse *)",
+      "Bash(./vendor/bin/pint)",
+      "Bash(./vendor/bin/pint --test)",
+      "Bash(php artisan *)",
+      "Bash(./vendor/bin/pest tests/Feature/Auth)",
+      "Bash(./vendor/bin/pest tests/Feature/Appointments)",
+      "Bash(php -v)",
+      "Bash(./vendor/bin/pest tests/Feature/Hardening)"
+    ]
+  }
+}
