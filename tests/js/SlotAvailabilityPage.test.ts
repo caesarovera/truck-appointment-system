@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
-import type { SlotWindow } from '@/types/api';
+import type { Gate, SlotWindow } from '@/types/api';
 
 // Komponen diuji terisolasi: composable (TanStack Query) di-mock jadi ref terkontrol,
 // persis pola LoginPage (mock store). Tak perlu QueryClient/jaringan.
@@ -13,8 +13,18 @@ const state = {
     enabled: ref(true),
 };
 
+const gatesState = {
+    gates: ref<Gate[]>([]),
+    isLoading: ref(false),
+    isError: ref(false),
+};
+
 vi.mock('@/composables/useSlotAvailability', () => ({
     useSlotAvailability: () => state,
+}));
+
+vi.mock('@/composables/useGates', () => ({
+    useGates: () => gatesState,
 }));
 
 import SlotAvailabilityPage from '@/pages/SlotAvailabilityPage.vue';
@@ -42,9 +52,26 @@ beforeEach(() => {
     state.isFetching.value = false;
     state.isError.value = false;
     state.enabled.value = true;
+    gatesState.gates.value = [];
+    gatesState.isLoading.value = false;
 });
 
 describe('SlotAvailabilityPage', () => {
+    it('renders an option per gate in the selector', () => {
+        gatesState.gates.value = [
+            { id: 1, terminal_id: 1, code: 'GATE-A', name: 'Gate A' },
+            { id: 2, terminal_id: 1, code: 'GATE-B', name: 'Gate B' },
+        ];
+
+        const wrapper = mountPage();
+        const options = wrapper.findAll('select option');
+
+        // 1 placeholder ("Pilih gate") + 2 gate.
+        expect(options).toHaveLength(3);
+        expect(wrapper.text()).toContain('Gate A');
+        expect(wrapper.text()).toContain('Gate B');
+    });
+
     it('prompts for a gate while the query is disabled', () => {
         state.enabled.value = false;
 

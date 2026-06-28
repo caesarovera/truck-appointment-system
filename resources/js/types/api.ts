@@ -20,6 +20,14 @@ export interface MeResponse {
     data: AuthUser;
 }
 
+/** Gate dari GET /gates (GateResource). */
+export interface Gate {
+    id: number;
+    terminal_id: number;
+    code: string;
+    name: string;
+}
+
 export type SlotWindowStatus = 'OPEN' | 'CLOSED';
 
 /** Satu jendela slot dari GET /slots/availability (SlotWindowResource). */
