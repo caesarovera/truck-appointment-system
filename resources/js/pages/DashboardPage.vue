@@ -61,6 +61,13 @@ async function onLogout(): Promise<void> {
                 >
                     Kelola Slot
                 </RouterLink>
+                <RouterLink
+                    v-if="auth.can('terminal.manage')"
+                    to="/admin"
+                    class="rounded-md bg-white border border-gray-600 text-gray-700 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                >
+                    Master Data
+                </RouterLink>
             </nav>
         </main>
     </div>

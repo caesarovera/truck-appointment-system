@@ -132,6 +132,69 @@ export interface Container {
     size: number | null;
 }
 
+// ─── Admin master data ───────────────────────────────────────────────────────
+
+export interface AdminTerminal {
+    id: number;
+    code: string;
+    name: string;
+    gates_count?: number;
+    created_at: string | null;
+}
+
+export interface AdminGate {
+    id: number;
+    terminal_id: number;
+    terminal?: { id: number; name: string } | null;
+    code: string;
+    name: string;
+}
+
+export interface AdminCompany {
+    id: number;
+    code: string;
+    name: string;
+    users_count?: number;
+    trucks_count?: number;
+    created_at: string | null;
+}
+
+export interface AdminUser {
+    id: number;
+    name: string;
+    email: string;
+    role: string | null;
+    terminal_id: number | null;
+    terminal?: { id: number; name: string } | null;
+    company_id: number | null;
+    company?: { id: number; name: string } | null;
+    created_at: string | null;
+}
+
+export type AdminRole = 'admin' | 'planner' | 'gate-officer' | 'transporter' | 'driver';
+
+export interface CreateTerminalPayload { code: string; name: string }
+export interface CreateGatePayload { terminal_id: number; code: string; name: string }
+export interface CreateCompanyPayload { code: string; name: string }
+export interface CreateUserPayload {
+    name: string;
+    email: string;
+    password: string;
+    role: AdminRole;
+    terminal_id?: number | null;
+    company_id?: number | null;
+}
+export interface UpdateUserPayload {
+    name: string;
+    email: string;
+    password?: string;
+    role: AdminRole;
+    terminal_id?: number | null;
+    company_id?: number | null;
+}
+
+// ─── Appointments ────────────────────────────────────────────────────────────
+
 /** Appointment lengkap dari GET /me/appointments (AppointmentResource). */
 export interface Appointment {
     id: number;
