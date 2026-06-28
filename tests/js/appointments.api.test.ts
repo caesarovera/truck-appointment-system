@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { api } from '@/api/client';
-import { bookAppointment, cancelAppointment, fetchMyAppointments } from '@/api/appointments';
+import {
+    bookAppointment,
+    cancelAppointment,
+    fetchMyAppointments,
+    fetchTodaySchedule,
+    rescheduleAppointment,
+} from '@/api/appointments';
 import type { BookAppointmentPayload } from '@/types/api';
 
 vi.mock('@/api/client', () => ({ api: { post: vi.fn(), get: vi.fn() } }));
@@ -57,5 +63,29 @@ describe('cancelAppointment', () => {
 
         expect(api.post).toHaveBeenCalledWith('/appointments/3/cancel', { version: 2 });
         expect(result.status).toBe('CANCELLED');
+    });
+});
+
+describe('rescheduleAppointment', () => {
+    it('posts slot_window_id + version and unwraps data', async () => {
+        (api.post as Mock).mockResolvedValue({ data: { data: { id: 3, status: 'CONFIRMED' } } });
+
+        await rescheduleAppointment(3, 11, 2);
+
+        expect(api.post).toHaveBeenCalledWith('/appointments/3/reschedule', {
+            slot_window_id: 11,
+            version: 2,
+        });
+    });
+});
+
+describe('fetchTodaySchedule', () => {
+    it('unwraps the data array', async () => {
+        (api.get as Mock).mockResolvedValue({ data: { data: [{ id: 1 }] } });
+
+        const result = await fetchTodaySchedule();
+
+        expect(api.get).toHaveBeenCalledWith('/me/appointments/today');
+        expect(result).toEqual([{ id: 1 }]);
     });
 });

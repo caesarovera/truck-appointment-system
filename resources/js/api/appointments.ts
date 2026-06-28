@@ -1,6 +1,13 @@
 import { api } from '@/api/client';
 import type { Appointment, BookAppointmentPayload, BookedAppointment } from '@/types/api';
 
+/** Jadwal hari-H sopir — GET /me/appointments/today. */
+export async function fetchTodaySchedule(): Promise<Appointment[]> {
+    const { data } = await api.get<{ data: Appointment[] }>('/me/appointments/today');
+
+    return data.data;
+}
+
 /** Daftar booking milik transporter — GET /me/appointments (filter status opsional). */
 export async function fetchMyAppointments(status?: string): Promise<Appointment[]> {
     const params: Record<string, string> = {};

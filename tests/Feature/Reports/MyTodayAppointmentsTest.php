@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Appointment;
+use App\Models\Gate;
 use App\Models\SlotWindow;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -17,7 +18,8 @@ it('returns only the driver own appointments scheduled for today', function (): 
     $driver = User::factory()->create();
     $driver->assignRole('driver');
 
-    $todayWindow = SlotWindow::factory()->create(['date' => now()->toDateString()]);
+    $gate = Gate::factory()->create(['name' => 'Gate A']);
+    $todayWindow = SlotWindow::factory()->create(['date' => now()->toDateString(), 'gate_id' => $gate->id]);
     $mine = Appointment::factory()->create(['driver_id' => $driver->id, 'slot_window_id' => $todayWindow->id]);
 
     // Noise: someone else's appointment today, and my own appointment tomorrow.
@@ -31,7 +33,9 @@ it('returns only the driver own appointments scheduled for today', function (): 
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.id', $mine->id)
-        ->assertJsonPath('data.0.booking_code', $mine->booking_code);
+        ->assertJsonPath('data.0.booking_code', $mine->booking_code)
+        // Gate di-eager-load → driver tahu gate tujuan.
+        ->assertJsonPath('data.0.slot_window.gate.name', 'Gate A');
 });
 
 it('forbids a user without the self-read scope (transporter) — 403', function (): void {
