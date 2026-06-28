@@ -19,12 +19,17 @@ Password semua akun demo: `password`.
 ### Sanctum scope per role
 > Ini sumber kebenaran RBAC. `RolePermissionSeeder` & Policy **wajib** mencerminkan daftar ini persis.
 ```
-admin        → * (semua permission)
+admin        → * (semua permission, termasuk master data di bawah)
 planner      → slot.manage, slot.read, appointment.read, appointment.override, report.read, audit.read
 gate-officer → gate.process, appointment.read, slot.read
 transporter  → appointment.write, appointment.read, fleet.manage, slot.read, report.read, audit.read
 driver       → appointment.read.self
 ```
+> **Permission master data (admin-only).** CRUD master data ditegakkan oleh permission
+> khusus: `user.manage`, `terminal.manage`, `gate.manage`, `company.manage`. Keempatnya
+> hanya dimiliki `admin` (lewat `admin → *`). Endpoint `/api/v1/admin/*` mengeceknya di
+> FormRequest. Hapus entitas ditolak **409** bila masih ada dependen (terminal→gate,
+> gate→slot window, company→user/appointment, user→diri sendiri).
 > Catatan: untuk **transporter**, `appointment.read`/`report.read`/`audit.read` dibatasi ke company sendiri lewat **Policy**, bukan lewat scope.
 > **Self-service vs override:** `appointment.write` (transporter) = booking/reschedule/cancel atas nama company sendiri. `appointment.override` (planner/admin) = intervensi administratif reschedule/cancel — mis. saat window ditutup mendadak — **selalu dicatat Activity Log** dan boleh lintas-company. Keduanya memakai Action yang sama (`RescheduleAppointmentAction`/`CancelAppointmentAction`); yang membedakan hanya otorisasi di Policy.
 
@@ -33,6 +38,7 @@ driver       → appointment.read.self
 | Kemampuan | Admin | Planner | Gate | Transporter | Driver |
 |-----------|:--:|:--:|:--:|:--:|:--:|
 | Kelola user & role | ✅ | — | — | — | — |
+| CRUD master data (terminal/gate/company) | ✅ | — | — | — | — |
 | Buka/tutup slot window & set kuota | ✅ | ✅ | — | — | — |
 | Lihat ketersediaan slot | ✅ | ✅ | ✅ | ✅ (read) | — |
 | Booking appointment | ✅ | — | — | ✅ (company sendiri) | — |

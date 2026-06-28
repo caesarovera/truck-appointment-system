@@ -129,6 +129,35 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/today` | `pages/DriverSchedulePage.vue` | `appointment.read.self` | jadwal hari-H sopir, urut jam, nama gate |
 | `/gate` | `pages/GateDashboardPage.vue` | `gate.process` | antrian (`GET /gate/queue`); **Gate In** (CONFIRMED) / **Gate Out** (IN_PROGRESS) |
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
+| `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **4-tab** master data (terminal/gate/company/user); form inline create/edit + hapus dgn konfirmasi |
+
+### Admin master data — `useAdmin` + `AdminPage` (4 tab)
+
+`AdminPage.vue` adalah satu halaman dengan **4 tab** (terminal · gate · company · user),
+masing-masing CRUD lengkap inline (tanpa modal terpisah). Logikanya di
+`composables/useAdmin.ts`: `useTerminals`, `useAdminGates`, `useCompanies`, `useUsers`
+— tiap composable membungkus `useQuery` + tiga `useMutation` (create/update/remove).
+
+```ts
+// pola tiap entitas — query + mutation yang invalidasi key-nya sendiri
+export function useTerminals() {
+    const query = useQuery({ queryKey: ['admin-terminals'], queryFn: fetchTerminals, staleTime: 0 })
+    const client = useQueryClient()
+    const create = useMutation({
+        mutationFn: createTerminal,
+        onSuccess: () => client.invalidateQueries({ queryKey: ['admin-terminals'] }),
+    })
+    // update, remove serupa
+    return { ...query, create, update, remove }
+}
+```
+- **`staleTime: 0`** → master data selalu re-fetch saat dibuka (jarang berubah tapi harus
+  akurat setelah edit); kontras dengan `useGates`/`useFleet` (5 mnt).
+- **`useAdminRefs`** mengumpulkan terminal+company (`staleTime: 30_000`) untuk dropdown di
+  form user, plus helper `roleNeedsTerminal`/`roleNeedsCompany` (gate-officer butuh terminal;
+  transporter/driver butuh company) → form menampilkan field kondisional sesuai role.
+- **Map error 409 `entity_in_use`** ke pesan "masih dipakai, hapus dependennya dulu".
+- **Map 422 self-delete** (`/admin/users/{id}` diri sendiri) ke pesan larangan.
 
 Catatan lintas-halaman:
 - **Idempotency-Key** dikirim pada aksi mutasi rawan double-tap (booking, gate-in/out) —
@@ -177,7 +206,7 @@ Jebakan yang sudah ditemukan & dicatat:
 ## 6. Peta rute & navigasi
 
 Rute (semua `requiresAuth` kecuali `/login`): `/login`, `/` (dashboard), `/slots`,
-`/bookings`, `/today`, `/gate`, `/planner`.
+`/bookings`, `/today`, `/gate`, `/planner`, `/admin`.
 
 Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 `auth.can(perm)`:
@@ -189,6 +218,7 @@ Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 | Jadwal Hari Ini | `appointment.read.self` | driver |
 | Dashboard Gate | `gate.process` | gate-officer |
 | Kelola Slot | `slot.manage` | planner |
+| Master Data | `terminal.manage` | admin |
 
 > **Belum ada layout/nav bersama** (sidebar) — kandidat polish berikutnya. Realtime
 > (Laravel Echo) juga belum disambung: query masih di-invalidate manual lewat mutation;

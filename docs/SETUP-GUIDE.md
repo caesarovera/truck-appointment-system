@@ -414,7 +414,8 @@ Contoh output sehat:
 # composer test
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
-  Tests:    8 passed (31 assertions)
+  ...
+  Tests:    152 passed (416 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -481,6 +482,16 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/me/appointments/today` | token | `appointment.read.self` | jadwal hari-H sopir |
 | `GET`  | `/api/v1/gate/queue?date=YYYY-MM-DD` | token | `gate.process` + punya terminal | antrian gate-officer (CONFIRMED/IN_PROGRESS di terminalnya, default hari ini) |
 | `GET`  | `/api/v1/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | planner/admin | utilisasi gate (kuota vs terpakai vs no-show) |
+
+**Admin — master data CRUD** (semua di bawah `/api/v1/admin`, butuh permission manage terkait;
+hapus → **409 `entity_in_use`** bila masih ada dependen):
+
+| Method | Endpoint | Permission | Guna |
+|--------|----------|------------|------|
+| `GET` · `POST` | `/admin/terminals` · `/admin/terminals/{id}` (GET/PUT/DELETE) | `terminal.manage` | CRUD terminal (`code`, `name`); hapus ditolak bila punya gate |
+| `GET` · `POST` | `/admin/gates` · `/admin/gates/{id}` (GET/PUT/DELETE) | `gate.manage` | CRUD gate (`terminal_id`, `code`, `name`); hapus ditolak bila punya slot window |
+| `GET` · `POST` | `/admin/companies` · `/admin/companies/{id}` (GET/PUT/DELETE) | `company.manage` | CRUD perusahaan angkutan; hapus ditolak bila punya user/appointment |
+| `GET` · `POST` | `/admin/users` · `/admin/users/{id}` (GET/PUT/DELETE) | `user.manage` | CRUD user (`name`, `email`, `role`, `password?`, `terminal_id?`, `company_id?`); password di-hash saat dibuat & hanya diubah bila diisi; tak bisa hapus diri sendiri (422) |
 
 Jalankan server: `php artisan serve` (default `http://127.0.0.1:8000`), pastikan data
 demo ada (`php artisan migrate:fresh --seed`).
@@ -606,7 +617,14 @@ app/
                     GateTransactionType, TruckStatus
   Models/           User(updated), Terminal, Gate, TransportCompany, Truck,
                     SlotWindow, Appointment, Container, GateTransaction
-  Providers/        AppServiceProvider (preventLazyLoading)
+  Actions/          Book/Reschedule/Cancel/GateIn/GateOut/MarkNoShow/
+                    Open|CloseSlotWindow + Admin/ (CRUD terminal/gate/company/user)
+  Contracts/        Slot/Appointment/Gate/Fleet/Terminal/Company/User repo interfaces
+  Repositories/     impl Eloquent dari tiap interface (bound di AppServiceProvider)
+  Http/Controllers/Api/V1/  invokable controllers + Admin/ (20 controller CRUD)
+  Exceptions/       SlotUnavailable, Duplicate*, OptimisticLock,
+                    InvalidAppointmentState, EntityInUse (409 cascade-delete guard)
+  Providers/        AppServiceProvider (preventLazyLoading + repo bindings + rate limiters)
 database/
   migrations/       8 migrasi domain + users(updated) + (publish: sanctum,
                     permission, activitylog)
@@ -628,12 +646,18 @@ composer.json       scripts: test / analyse / fix / lint
 ---
 
 ### Status & langkah berikutnya
-**Backend MVP API sudah lengkap & hijau** (lihat `HANDOVER.md` untuk status hidup):
-data layer → booking (anti-race) → auth Sanctum + Policy → reschedule/cancel →
-gate-in/out → job no-show/reminder → realtime broadcast (+ seam TOS) → endpoint
-pendukung (me/today + utilisasi) → slot-window open/close. Penjelasan tiap slice:
-`docs/CODE-WALKTHROUGH.md` (§J–§R).
+**Backend MVP API + SPA 4 persona + admin CRUD sudah lengkap & hijau** (status hidup:
+`HANDOVER.md`). Backend: data layer → booking (anti-race) → auth Sanctum + Policy →
+reschedule/cancel → gate-in/out → job no-show/reminder → realtime broadcast (+ seam TOS)
+→ endpoint pendukung (me/today + utilisasi) → slot-window open/close → rate-limit
+hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, driver,
+gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
+(§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
-Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **Frontend Vue 3**
-(+ sambung Laravel Echo) → wiring realtime sungguhan (Reverb server +
-`Broadcast::routes` auth:sanctum + swap `GateEventGateway` ke TOS riil).
+Gerbang kualitas terakhir: `composer test` → **152 pass (416 assertions)** ·
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **57 pass**.
+
+Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **wiring realtime
+sungguhan** (Reverb server + `Broadcast::routes` auth:sanctum + Laravel Echo di SPA +
+swap `GateEventGateway` ke TOS riil); polish layout/nav bersama; laporan utilisasi
+company-scoped transporter.

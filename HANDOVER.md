@@ -10,12 +10,13 @@
 ---
 
 ## Status
-- Update terakhir: `2026-06-28` · Sesi: **Planner kelola window** (utilisasi + buka/tutup). **4 persona lengkap.**
+- Update terakhir: `2026-06-28` · Sesi: **Admin CRUD master data** (terminal/gate/company/user) + **dokumentasi diselaraskan**. **4 persona + admin lengkap.**
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **118 pass / 343 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **152 pass / 416 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **57 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
+- [x] **Admin CRUD master data (commit `0507d86`):** CRUD penuh `Terminal`/`Gate`/`TransportCompany`/`User`. BE: 12 Action (`Admin/`), 3 repo baru (`Terminal/Company/User` + extend `Gate`) ber-interface + bound di `AppServiceProvider`, 20 controller invokable (`Http/Controllers/Api/V1/Admin/`), 10 FormRequest (otorisasi `*.manage` + route-binding `instanceof`-safe utk PHPStan), 4 Resource. `EntityInUseException` (409 `entity_in_use`) guard hapus saat ada dependen (terminal←gate, gate←slot window, company←user/appointment, user←diri sendiri 422). `UserRepository`: filter role (Spatie `role()`), password hash-on-change, `fresh([...])` reload relasi setelah `syncRoles`. Permission baru `terminal.manage`/`gate.manage`/`company.manage` di `RolePermissionSeeder` (admin `→ *`). Route group `/api/v1/admin/*`. FE: `types/api.ts` (Admin* types), `api/admin.ts` (16 fn), `composables/useAdmin.ts` (`useTerminals`/`useAdminGates`/`useCompanies`/`useUsers`/`useAdminRefs`, invalidasi `['admin-*']`), `pages/AdminPage.vue` (4-tab), route `/admin`, kartu Dashboard "Master Data" gated `terminal.manage`. 34 test Admin (Pest) + verifikasi Vitest. CATATAN Pest: `$this->seed(...)` di closure `function(): void` (global `seed()` cuma di arrow-fn). Detail kode: `docs/CODE-WALKTHROUGH.md §V` (BE) + `docs/FRONTEND.md §4` (FE).
 - [x] Paket wajib terpasang: Sanctum, Horizon, Reverb, Spatie Permission/ActivityLog/Data, Pest, Larastan. Config/migrasi sudah dipublish; `routes/api.php` + `channels.php` ter-wire (install:api).
 - [x] Skema + model (BUSINESS-FLOW §4): 8 migrasi domain + kolom `terminal_id`/`company_id` di users. Model + relasi + casts + 5 Enum (`AppointmentStatus` memuat state machine). Factory untuk semua model.
 - [x] RolePermissionSeeder + DemoSeeder jalan (`migrate:fresh --seed` hijau).
@@ -69,19 +70,27 @@
 - [x] **Backlog hardening (3 item dari senior review):** (1) optimistic `version` opsional di cancel, (2) `dueForNoShow` chunked scan (config `no_show_chunk_size`), (3) idempotency lock TTL 60s + key hashing (config `idempotency.lock_seconds`/`ttl_hours`). Semua via `config/tas.php` (tunable env). +8 test di `tests/Feature/{Appointments,Jobs,Hardening}`. Detail di *Senior review* (status [FIXED]).
 
 ## Sedang dikerjakan
-- (kosong) — backlog hardening selesai di checkpoint hijau (100 pass).
+- (kosong) — Admin CRUD + penyelarasan dokumentasi selesai di checkpoint hijau (152 Pest / 57 Vitest).
 
 ## Langkah berikutnya (urut)
-**Semua 4 persona UI selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window). Berikutnya:
+**Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
 1. **Wiring realtime (Reverb + Echo)** — paling berdampak: kuota & antrian live. Server sudah ber-event/ber-test (`SlotAvailabilityChanged`, `GateQueueUpdated`). Perlu: `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` + sambung Laravel Echo di SPA → ganti polling/invalidasi manual dgn push (invalidate query saat event masuk). Lihat Jebakan.
-2. **Polish & lainnya:** layout/nav bersama (saat ini link di Dashboard saja), loading skeleton, laporan utilisasi company-scoped transporter, CRUD master data admin (terminal/gate/truck/driver), e2e happy-path.
-2. **Wiring realtime sungguhan:** `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + `Broadcast::routes(auth:sanctum)` + sambung Laravel Echo di SPA; swap `GateEventGateway` ke TOS riil.
-3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD master data (terminal/gate/truck/driver) untuk admin.
+2. **Polish UI:** layout/nav bersama (saat ini link di Dashboard saja), loading skeleton, e2e happy-path.
+3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada); swap `GateEventGateway` ke TOS riil.
 4. **Backlog hardening sisa:** token abilities sempit (lihat *Senior review*) — ditegakkan saat aplikasi menerbitkan token ber-scope sempit. (3 item lain sudah [FIXED].)
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-06-28`: **Admin CRUD + dokumentasi diselaraskan** (commit `0507d86` + sesi docs).
+  Kode: lihat *Sudah selesai* → Admin CRUD. Docs yang diupdate agar konsisten jadi handbook:
+  `PRD §3` (admin master-data CRUD → IN scope), `BUSINESS-FLOW §1` (permission `*.manage`
+  admin-only + baris matriks CRUD master data), `SETUP-GUIDE §10d` (tabel 20 endpoint
+  `/admin/*` + §13 peta file + status akhir 152/57), `CODE-WALKTHROUGH` (§V baru: admin CRUD,
+  `EntityInUseException`, password/role sync, jebakan PHPStan route-binding), `FRONTEND §4`
+  (AdminPage 4-tab + `useAdmin`/`useAdminRefs`), `README` (onboarding order + status + 152/57),
+  `HANDOVER` (status + langkah berikutnya). Hitungan test diselaraskan ke **152 Pest / 57
+  Vitest** (sebelumnya tercatat 118 di HANDOVER). Tidak menyentuh CLAUDE.md (kontrak tetap).
 - `2026-06-28`: **Dokumentasi frontend dibuat** → `docs/FRONTEND.md` baru (arsitektur SPA,
   pola TanStack Query, tiap halaman/komponen + *kenapa*, pola test). `CODE-WALKTHROUGH.md`:
   TOC diperbaiki (tambah S/T yang sempat hilang) + §U baru (read endpoints persona:
