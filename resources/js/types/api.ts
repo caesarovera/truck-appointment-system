@@ -87,3 +87,26 @@ export interface BookedAppointment {
     status: string;
     move_type: MoveType;
 }
+
+/** Kontainer (ContainerResource). */
+export interface Container {
+    id: number;
+    container_no: string;
+    iso_type: string | null;
+    size: number | null;
+}
+
+/** Appointment lengkap dari GET /me/appointments (AppointmentResource). */
+export interface Appointment {
+    id: number;
+    booking_code: string;
+    status: string;
+    move_type: MoveType;
+    version: number;
+    company_id: number;
+    slot_window: SlotWindow | null;
+    truck: Truck | null;
+    driver: Driver | null;
+    containers: Container[];
+    created_at: string | null;
+}
