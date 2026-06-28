@@ -12,6 +12,7 @@ use App\Models\Appointment;
 use App\Models\Container;
 use App\Models\GateTransaction;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -103,25 +104,38 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
         // Saring kasar di DB (status pra-kedatangan + tanggal window <= hari ini),
         // lalu refine presisi di PHP — kombinasi date+time portabel lintas driver
         // (sqlite dev & mysql) tanpa ekspresi tanggal database-spesifik.
-        return Appointment::query()
+        //
+        // Dipindai chunkById: hanya N baris di-hydrate per iterasi → memori
+        // terbatas walau appointment pra-kedatangan menumpuk. Hanya yang benar2
+        // lewat grace yang ditahan di hasil.
+        $chunkSize = (int) config('tas.no_show_chunk_size', 500);
+
+        /** @var Collection<int, Appointment> $due */
+        $due = new Collection;
+
+        Appointment::query()
             ->whereIn('status', [AppointmentStatus::BOOKED, AppointmentStatus::CONFIRMED])
             ->whereHas('slotWindow', fn ($q) => $q->whereDate('date', '<=', $now->toDateString()))
             ->with('slotWindow')
-            ->get()
-            ->filter(function (Appointment $appointment) use ($now, $graceMinutes): bool {
-                $window = $appointment->slotWindow;
+            ->chunkById($chunkSize, function (EloquentCollection $chunk) use ($now, $graceMinutes, $due): void {
+                foreach ($chunk as $appointment) {
+                    $window = $appointment->slotWindow;
 
-                if ($window === null) {
-                    return false;
+                    if ($window === null) {
+                        continue;
+                    }
+
+                    $deadline = $window->date->copy()
+                        ->setTimeFromTimeString($window->end_time)
+                        ->addMinutes($graceMinutes);
+
+                    if ($deadline->lessThan($now)) {
+                        $due->push($appointment);
+                    }
                 }
+            });
 
-                $deadline = $window->date->copy()
-                    ->setTimeFromTimeString($window->end_time)
-                    ->addMinutes($graceMinutes);
-
-                return $deadline->lessThan($now);
-            })
-            ->values();
+        return $due->values();
     }
 
     public function todayForDriver(int $driverId, string $date): Collection

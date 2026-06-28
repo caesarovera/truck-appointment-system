@@ -86,6 +86,22 @@ it('leaves appointments still inside the grace period untouched', function (): v
     Event::assertNotDispatched(AppointmentNoShow::class);
 });
 
+it('sweeps every due appointment across chunk boundaries (chunked scan)', function (): void {
+    config(['tas.no_show_grace_minutes' => 30, 'tas.no_show_chunk_size' => 2]);
+
+    // 5 kandidat lewat grace → harus tersapu walau chunk hanya muat 2 (3 iterasi).
+    $due = collect(range(1, 5))->map(
+        fn (): Appointment => noShowScenario('CONFIRMED', now()->subDay(), '07:00:00')['appointment'],
+    );
+    // 1 di dalam grace → harus tetap aman meski ikut ter-scan antar chunk.
+    $safe = noShowScenario('CONFIRMED', now(), now()->subMinutes(10)->format('H:i:s'))['appointment'];
+
+    NoShowSweepJob::dispatchSync();
+
+    $due->each(fn (Appointment $a) => expect($a->fresh()->status)->toBe(AppointmentStatus::NO_SHOW));
+    expect($safe->fresh()->status)->toBe(AppointmentStatus::CONFIRMED);
+});
+
 it('never touches arrived, in-progress, completed or cancelled appointments', function (string $status): void {
     config(['tas.no_show_grace_minutes' => 30]);
     ['appointment' => $appointment] = noShowScenario($status, now()->subDay(), '07:00:00');

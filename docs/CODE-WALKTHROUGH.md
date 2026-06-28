@@ -1341,6 +1341,41 @@ FormRequest `can()` — ia tak pernah bisa menolak yang otorisasi role belum tol
 nanti saat aplikasi benar-benar menerbitkan token sempit (mis. token mobile read-only).
 Lihat `HANDOVER.md` → *Senior review (2026-06-28)*.
 
+### S.5 Backlog hardening (3 fix dari review)
+
+**1. Optimistic `version` di cancel (opsional, backward compatible).** `reschedule` sudah
+cek `version`; `cancel` dulu tidak → edit konkuren tak terdeteksi. Sekarang:
+```php
+// CancelAppointmentRequest: 'version' => ['nullable','integer','min:1']
+// CancelAppointmentAction::execute(Appointment $a, ?int $expectedVersion = null)
+if ($expectedVersion !== null && $locked->version !== $expectedVersion) {
+    throw new OptimisticLockException;   // 409 version_conflict
+}
+```
+Tanpa `version` → cancel tetap jalan (klien lama aman). Dengan `version` usang → 409.
+
+**2. `dueForNoShow` dipindai chunked (memori terbatas).** Dulu `->get()` seluruh kandidat
+ke memori lalu filter. Sekarang `chunkById` — hanya N baris di-hydrate per iterasi:
+```php
+$chunkSize = (int) config('tas.no_show_chunk_size', 500);   // tunable
+Appointment::query()->whereIn('status', [...])->whereHas('slotWindow', ...)->with('slotWindow')
+    ->chunkById($chunkSize, function (EloquentCollection $chunk) use (...): void {
+        foreach ($chunk as $a) { /* hitung window.end + grace; push bila lewat */ }
+    });
+```
+Aman: `dueForNoShow` hanya **membaca** (mutasi status terjadi belakangan di job), jadi
+tak ada konflik chunk-while-mutating. Test menyetel `no_show_chunk_size=2` + 5 due →
+membuktikan benar lintas-batas chunk.
+
+**3. Idempotency: lock TTL 10→60 dtk + hash key.** Lock 10 dtk bisa lebih pendek dari
+durasi handler berat (booking + broadcast) → kedaluwarsa di tengah → duplikat menyelinap.
+```php
+$lockSeconds = (int) config('tas.idempotency.lock_seconds', 60);   // > worst-case handler
+$cacheKey = 'idem:'.$scope.':'.hash('sha256', $key);   // bounded lintas store, anti injeksi
+```
+Test: replay tetap benar walau Idempotency-Key panjang/berkarakter aneh (buah hashing);
+request kembar saat lock ditahan → 409.
+
 ---
 
 ## Penutup: pola yang akan terus dipakai
