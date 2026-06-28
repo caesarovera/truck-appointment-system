@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/GateDashboardPage.vue'),
         meta: { requiresAuth: true },
     },
+    {
+        path: '/planner',
+        name: 'planner',
+        component: () => import('@/pages/PlannerWindowsPage.vue'),
+        meta: { requiresAuth: true },
+    },
 ];
 
 export const router = createRouter({
