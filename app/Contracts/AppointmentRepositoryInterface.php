@@ -72,4 +72,13 @@ interface AppointmentRepositoryInterface
      * @return Collection<int, Appointment>
      */
     public function forCompany(int $companyId, ?string $status): Collection;
+
+    /**
+     * Antrian gate-officer: appointment CONFIRMED (siap gate-in) & IN_PROGRESS
+     * (siap gate-out) di terminal tertentu pada $date. Relasi + jejak gate
+     * di-eager-load (anti N+1), urut jam.
+     *
+     * @return Collection<int, Appointment>
+     */
+    public function queueForTerminal(int $terminalId, string $date): Collection;
 }

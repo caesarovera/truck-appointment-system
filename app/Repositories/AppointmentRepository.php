@@ -157,6 +157,18 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
             ->get();
     }
 
+    public function queueForTerminal(int $terminalId, string $date): Collection
+    {
+        // Urutan kronologis diserahkan ke klien (lihat dashboard gate), konsisten
+        // dgn jadwal driver — hindari sort by kolom relasi di sini.
+        return Appointment::query()
+            ->whereIn('status', [AppointmentStatus::CONFIRMED, AppointmentStatus::IN_PROGRESS])
+            ->whereHas('slotWindow', fn ($q) => $q->whereDate('date', $date))
+            ->whereRelation('slotWindow.gate', 'terminal_id', $terminalId)
+            ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers', 'gateIn', 'gateOut'])
+            ->get();
+    }
+
     private function recordGateEvent(Appointment $appointment, GateTransactionType $type, int $processedBy): void
     {
         // Unik (appointment_id, type) di DB = jaring terakhir anti gate event ganda.
