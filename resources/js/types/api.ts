@@ -47,3 +47,43 @@ export interface SlotWindow {
 export interface SlotAvailabilityResponse {
     data: SlotWindow[];
 }
+
+export type MoveType = 'DELIVERY' | 'RECEIVAL';
+
+/** Truk (TruckResource) dari GET /me/fleet. */
+export interface Truck {
+    id: number;
+    plate_no: string;
+    status: string;
+}
+
+/** Sopir (DriverResource) dari GET /me/fleet. */
+export interface Driver {
+    id: number;
+    name: string;
+}
+
+/** Armada transporter (GET /me/fleet → data.{trucks,drivers}). */
+export interface Fleet {
+    trucks: Truck[];
+    drivers: Driver[];
+}
+
+/** Body POST /appointments (lihat BookAppointmentRequest). */
+export interface BookAppointmentPayload {
+    slot_window_id: number;
+    truck_id: number;
+    driver_id: number;
+    move_type: MoveType;
+    container_no: string;
+    iso_type?: string;
+    size?: number;
+}
+
+/** Subset AppointmentResource yang dipakai UI setelah booking sukses. */
+export interface BookedAppointment {
+    id: number;
+    booking_code: string;
+    status: string;
+    move_type: MoveType;
+}

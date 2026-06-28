@@ -27,9 +27,15 @@ vi.mock('@/composables/useGates', () => ({
     useGates: () => gatesState,
 }));
 
+let canPermissions: string[] = [];
+vi.mock('@/stores/auth', () => ({
+    useAuthStore: () => ({ can: (p: string) => canPermissions.includes(p) }),
+}));
+
 import SlotAvailabilityPage from '@/pages/SlotAvailabilityPage.vue';
 
-const mountPage = () => mount(SlotAvailabilityPage, { global: { stubs: { RouterLink: true } } });
+const mountPage = () =>
+    mount(SlotAvailabilityPage, { global: { stubs: { RouterLink: true, BookingForm: true } } });
 
 function window(overrides: Partial<SlotWindow>): SlotWindow {
     return {
@@ -54,6 +60,7 @@ beforeEach(() => {
     state.enabled.value = true;
     gatesState.gates.value = [];
     gatesState.isLoading.value = false;
+    canPermissions = [];
 });
 
 describe('SlotAvailabilityPage', () => {
@@ -77,7 +84,7 @@ describe('SlotAvailabilityPage', () => {
 
         const wrapper = mountPage();
 
-        expect(wrapper.text()).toContain('Masukkan nomor gate');
+        expect(wrapper.text()).toContain('Pilih gate untuk melihat slot');
         expect(wrapper.find('[data-testid="slot-list"]').exists()).toBe(false);
     });
 
@@ -107,5 +114,24 @@ describe('SlotAvailabilityPage', () => {
         const wrapper = mountPage();
 
         expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+    });
+
+    it('shows a Booking button on available windows when the user can book', () => {
+        canPermissions = ['appointment.write'];
+        state.windows.value = [
+            window({ id: 1, remaining: 7 }),
+            window({ id: 2, remaining: 0 }), // penuh → tak ada tombol
+        ];
+
+        const buttons = mountPage().findAll('[data-testid="book-button"]');
+
+        expect(buttons).toHaveLength(1);
+    });
+
+    it('hides the Booking button when the user lacks appointment.write', () => {
+        canPermissions = []; // mis. planner/driver
+        state.windows.value = [window({ id: 1, remaining: 7 })];
+
+        expect(mountPage().find('[data-testid="book-button"]').exists()).toBe(false);
     });
 });
