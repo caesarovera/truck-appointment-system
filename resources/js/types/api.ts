@@ -50,6 +50,40 @@ export interface SlotAvailabilityResponse {
     data: SlotWindow[];
 }
 
+/** Satu window dari GET /reports/utilization (SlotUtilizationResource). */
+export interface SlotUtilization {
+    id: number;
+    start_time: string;
+    end_time: string;
+    status: SlotWindowStatus;
+    capacity: number;
+    booked_count: number;
+    remaining: number;
+    completed?: number;
+    no_show?: number;
+    cancelled?: number;
+    active?: number;
+}
+
+/** Ringkasan agregat utilisasi (meta.summary). */
+export interface UtilizationSummary {
+    capacity: number;
+    booked: number;
+    completed: number;
+    no_show: number;
+    cancelled: number;
+    active: number;
+}
+
+/** Body POST /slots (OpenSlotWindowRequest). */
+export interface OpenWindowPayload {
+    gate: number;
+    date: string; // Y-m-d
+    start_time: string; // H:i:s
+    end_time: string; // H:i:s
+    capacity: number;
+}
+
 export type MoveType = 'DELIVERY' | 'RECEIVAL';
 
 /** Truk (TruckResource) dari GET /me/fleet. */
