@@ -41,6 +41,8 @@ export interface SlotWindow {
     booked_count: number;
     remaining: number;
     status: SlotWindowStatus;
+    // Hanya hadir saat relasi gate di-eager-load (mis. jadwal driver).
+    gate?: Gate | null;
 }
 
 /** Respons GET /slots/availability (koleksi resource → terbungkus `data`). */
