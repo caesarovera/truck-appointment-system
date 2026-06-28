@@ -44,6 +44,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/PlannerWindowsPage.vue'),
         meta: { requiresAuth: true },
     },
+    {
+        path: '/admin',
+        name: 'admin',
+        component: () => import('@/pages/AdminPage.vue'),
+        meta: { requiresAuth: true },
+    },
 ];
 
 export const router = createRouter({

@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\V1;
 
-use App\Models\Gate;
+use App\Models\TransportCompany;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin Gate */
-final class GateResource extends JsonResource
+/** @mixin TransportCompany */
+final class CompanyResource extends JsonResource
 {
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'terminal_id' => $this->terminal_id,
-            'terminal' => $this->whenLoaded('terminal', fn () => $this->terminal === null ? null : [
-                'id' => $this->terminal->id,
-                'name' => $this->terminal->name,
-            ]),
             'code' => $this->code,
             'name' => $this->name,
+            'users_count' => $this->whenCounted('users'),
+            'trucks_count' => $this->whenCounted('trucks'),
+            'created_at' => $this->created_at?->toDateTimeString(),
         ];
     }
 }

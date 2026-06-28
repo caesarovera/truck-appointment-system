@@ -2,6 +2,26 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Admin\CreateCompanyController;
+use App\Http\Controllers\Api\V1\Admin\CreateGateController;
+use App\Http\Controllers\Api\V1\Admin\CreateTerminalController;
+use App\Http\Controllers\Api\V1\Admin\CreateUserController;
+use App\Http\Controllers\Api\V1\Admin\DeleteCompanyController;
+use App\Http\Controllers\Api\V1\Admin\DeleteGateController;
+use App\Http\Controllers\Api\V1\Admin\DeleteTerminalController;
+use App\Http\Controllers\Api\V1\Admin\DeleteUserController;
+use App\Http\Controllers\Api\V1\Admin\ListAdminGatesController;
+use App\Http\Controllers\Api\V1\Admin\ListCompaniesController;
+use App\Http\Controllers\Api\V1\Admin\ListTerminalsController;
+use App\Http\Controllers\Api\V1\Admin\ListUsersController;
+use App\Http\Controllers\Api\V1\Admin\ShowCompanyController;
+use App\Http\Controllers\Api\V1\Admin\ShowGateController;
+use App\Http\Controllers\Api\V1\Admin\ShowTerminalController;
+use App\Http\Controllers\Api\V1\Admin\ShowUserController;
+use App\Http\Controllers\Api\V1\Admin\UpdateCompanyController;
+use App\Http\Controllers\Api\V1\Admin\UpdateGateController;
+use App\Http\Controllers\Api\V1\Admin\UpdateTerminalController;
+use App\Http\Controllers\Api\V1\Admin\UpdateUserController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
@@ -60,5 +80,36 @@ Route::prefix('v1')->group(function (): void {
         Route::get('me/appointments', MyAppointmentsController::class);
         Route::get('me/appointments/today', MyTodayAppointmentsController::class);
         Route::get('reports/utilization', UtilizationReportController::class);
+
+        // Admin CRUD — otorisasi per-permission di setiap FormRequest.
+        Route::prefix('admin')->group(function (): void {
+            // Terminals
+            Route::get('terminals', ListTerminalsController::class);
+            Route::post('terminals', CreateTerminalController::class);
+            Route::get('terminals/{terminal}', ShowTerminalController::class);
+            Route::put('terminals/{terminal}', UpdateTerminalController::class);
+            Route::delete('terminals/{terminal}', DeleteTerminalController::class);
+
+            // Gates (admin view: with terminal, not just for dropdown)
+            Route::get('gates', ListAdminGatesController::class);
+            Route::post('gates', CreateGateController::class);
+            Route::get('gates/{gate}', ShowGateController::class);
+            Route::put('gates/{gate}', UpdateGateController::class);
+            Route::delete('gates/{gate}', DeleteGateController::class);
+
+            // Transport companies
+            Route::get('companies', ListCompaniesController::class);
+            Route::post('companies', CreateCompanyController::class);
+            Route::get('companies/{transportCompany}', ShowCompanyController::class);
+            Route::put('companies/{transportCompany}', UpdateCompanyController::class);
+            Route::delete('companies/{transportCompany}', DeleteCompanyController::class);
+
+            // Users
+            Route::get('users', ListUsersController::class);
+            Route::post('users', CreateUserController::class);
+            Route::get('users/{user}', ShowUserController::class);
+            Route::put('users/{user}', UpdateUserController::class);
+            Route::delete('users/{user}', DeleteUserController::class);
+        });
     });
 });
