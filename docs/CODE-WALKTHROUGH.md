@@ -1378,10 +1378,35 @@ request kembar saat lock ditahan → 409.
 
 ---
 
+## T. Slice Read Referensi (gates + fleet)
+
+Master data read untuk frontend (dropdown gate, form booking). Tetap menghormati
+layer: **tanpa query di controller** → lewat repository ber-interface.
+
+### T.1 GET /gates
+`GateRepositoryInterface::all(?int $terminalId)` (impl `GateRepository`, di-bind di
+`AppServiceProvider`) → `Gate::query()->when($terminalId, ...)->orderBy(...)`.
+Controller invokable `ListGatesController` panggil repo, balikan `GateResource::collection`.
+Otorisasi `slot.read` di `ListGatesRequest` (filter opsional `terminal` ber-`exists`).
+
+### T.2 GET /me/fleet
+`FleetRepositoryInterface`: `trucksForCompany($id)` + `driversForCompany($id)`
+(sopir = `User::query()->where('company_id',$id)->role('driver','api')` — Spatie scope).
+`MyFleetController` ambil `company_id` dari user (null → 403), balikan
+`{data:{trucks:TruckResource[], drivers:DriverResource[]}}`. Otorisasi `fleet.manage`
+(`FleetRequest`). Reuse `TruckResource`/`DriverResource` yang sudah ada.
+
+> **Kenapa repository untuk read sederhana?** Konsistensi: semua akses data lewat
+> repo ber-interface (mudah di-mock/swap), dan kontrak melarang query di controller.
+> Beda dengan Slot/Appointment repo, ini read murni (tanpa lock/transaksi).
+
+---
+
 ## Penutup: pola yang akan terus dipakai
 
 Slice booking di atas menjadi **cetak biru** untuk seluruh slice backend (gate-in/out,
-no-show/reminder, realtime, endpoint pendukung, slot-window management, rate-limit hardening):
+no-show/reminder, realtime, endpoint pendukung, slot-window management, rate-limit hardening,
+read referensi):
 - **Action** (`final class`, `declare(strict_types=1)`) memanggil enum state machine
   + `DB::transaction` + `lockForUpdate`; efek samping lewat **Event** pasca-commit.
 - **DTO** (Laravel Data) untuk input, **Resource** untuk output, **FormRequest**

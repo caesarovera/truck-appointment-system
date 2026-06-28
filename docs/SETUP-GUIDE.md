@@ -463,6 +463,8 @@ Endpoint yang sudah ada:
 | `POST` | `/api/v1/login` | publik | — | tukar email+password → token |
 | `POST` | `/api/v1/logout` | token | — | cabut token saat ini |
 | `GET`  | `/api/v1/me` | token | — | profil + role + permission |
+| `GET`  | `/api/v1/gates?terminal={id}` | token | `slot.read` | daftar gate (dropdown); `terminal` opsional |
+| `GET`  | `/api/v1/me/fleet` | token | `fleet.manage` | truk & sopir milik company transporter (form booking) |
 | `GET`  | `/api/v1/slots/availability?gate={id}&date=YYYY-MM-DD` | token | `slot.read` | sisa kuota slot |
 | `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`) |
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |

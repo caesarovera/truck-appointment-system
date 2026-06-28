@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\AppointmentRepositoryInterface;
+use App\Contracts\FleetRepositoryInterface;
 use App\Contracts\GateEventGateway;
+use App\Contracts\GateRepositoryInterface;
 use App\Contracts\SlotRepositoryInterface;
 use App\Repositories\AppointmentRepository;
+use App\Repositories\FleetRepository;
+use App\Repositories\GateRepository;
 use App\Repositories\SlotRepository;
 use App\Services\LoggingGateEventGateway;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -23,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
         // Data layer: Contracts → Eloquent impl.
         $this->app->bind(SlotRepositoryInterface::class, SlotRepository::class);
         $this->app->bind(AppointmentRepositoryInterface::class, AppointmentRepository::class);
+        $this->app->bind(GateRepositoryInterface::class, GateRepository::class);
+        $this->app->bind(FleetRepositoryInterface::class, FleetRepository::class);
 
         // TOS seam: default log; swap saat integrasi TOS riil.
         $this->app->bind(GateEventGateway::class, LoggingGateEventGateway::class);
