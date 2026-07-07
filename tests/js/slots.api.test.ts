@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { api } from '@/api/client';
-import { closeSlotWindow, fetchAvailability, fetchUtilization, openSlotWindow } from '@/api/slots';
+import { closeSlotWindow, fetchAvailability, fetchMyUtilization, fetchUtilization, openSlotWindow } from '@/api/slots';
 import type { OpenWindowPayload } from '@/types/api';
 
 // Isolasi dari jaringan: hanya verifikasi kontrak request + unwrap respons.
@@ -40,6 +40,20 @@ describe('fetchUtilization', () => {
         expect(api.get).toHaveBeenCalledWith('/reports/utilization', { params: { gate: 1, date: '2026-06-28' } });
         expect(result.windows).toEqual([{ id: 1 }]);
         expect(result.summary).toEqual({ capacity: 10, booked: 3 });
+    });
+});
+
+describe('fetchMyUtilization', () => {
+    it('hits the company-scoped endpoint and unwraps windows + summary', async () => {
+        (api.get as Mock).mockResolvedValue({
+            data: { data: [{ id: 7 }], meta: { summary: { completed: 1, no_show: 0 } } },
+        });
+
+        const result = await fetchMyUtilization(2, '2026-07-08');
+
+        expect(api.get).toHaveBeenCalledWith('/me/reports/utilization', { params: { gate: 2, date: '2026-07-08' } });
+        expect(result.windows).toEqual([{ id: 7 }]);
+        expect(result.summary).toEqual({ completed: 1, no_show: 0 });
     });
 });
 

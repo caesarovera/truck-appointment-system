@@ -38,6 +38,24 @@ export async function fetchUtilization(
     return { windows: data.data, summary: data.meta.summary };
 }
 
+/**
+ * Utilisasi milik company sendiri (transporter) — GET /me/reports/utilization.
+ * Bentuk respons sama dengan fetchUtilization, tapi hitungan per status hanya
+ * appointment company si pemanggil (server-side scoping; angka company lain
+ * tidak pernah dikirim).
+ */
+export async function fetchMyUtilization(
+    gate: number,
+    date: string,
+): Promise<{ windows: SlotUtilization[]; summary: UtilizationSummary }> {
+    const { data } = await api.get<{ data: SlotUtilization[]; meta: { summary: UtilizationSummary } }>(
+        '/me/reports/utilization',
+        { params: { gate, date } },
+    );
+
+    return { windows: data.data, summary: data.meta.summary };
+}
+
 /** Buka window baru (planner) — POST /slots. */
 export async function openSlotWindow(payload: OpenWindowPayload): Promise<SlotWindow> {
     const { data } = await api.post<{ data: SlotWindow }>('/slots', payload);

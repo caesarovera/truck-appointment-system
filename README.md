@@ -15,7 +15,7 @@ Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)
 
 Status: backend MVP API lengkap & ber-test (**169 Pest**); SPA mencakup UI **4 persona**
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
-company/user) (**57 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
+company/user) (**63 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
 
 ## Mulai dari mana (urutan onboarding)
 

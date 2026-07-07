@@ -129,6 +129,7 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/today` | `pages/DriverSchedulePage.vue` | `appointment.read.self` | jadwal hari-H sopir, urut jam, nama gate |
 | `/gate` | `pages/GateDashboardPage.vue` | `gate.process` | antrian (`GET /gate/queue`); **Gate In** (CONFIRMED) / **Gate Out** (IN_PROGRESS) |
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
+| `/reports` | `pages/MyUtilizationPage.vue` | `report.read` **+ punya company** | laporan company sendiri (`GET /me/reports/utilization`): selesai/no-show/batal/aktif per window + ringkasan; read-only (`useMyUtilization`, key `['my-utilization']` sengaja terpisah dari `['utilization']` planner — beda scope, tak boleh saling menimpa cache) |
 | `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **4-tab** master data (terminal/gate/company/user); form inline create/edit + hapus dgn konfirmasi |
 
 ### Admin master data — `useAdmin` + `AdminPage` (4 tab)
