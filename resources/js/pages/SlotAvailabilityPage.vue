@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+
 import { useAuthStore } from '@/stores/auth';
 import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
@@ -34,7 +34,6 @@ function onBooked(appointment: BookedAppointment): void {
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
             <h1 class="font-semibold text-gray-900">Ketersediaan Slot</h1>
-            <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
         </header>
 
         <main class="p-6 space-y-6">

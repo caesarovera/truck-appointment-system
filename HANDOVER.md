@@ -10,12 +10,13 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004) + tolak booking ke window berakhir + Sanctum token TTL.
+- Update terakhir: `2026-07-08` · Sesi: **Senior review ronde 2 + kelanjutan** — fix idempotency per-endpoint · ADR-0004 mass-assignment · tolak window berakhir · Sanctum TTL · utilisasi company-scoped (BE+FE `/reports`) · nav/layout bersama.
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
 - Build backend: `composer test` → ✅ **169 pass / 452 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **63 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build frontend: `npm run test:js` → ✅ **67 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
+- [x] **FE: nav/layout bersama (2026-07-08):** `components/AppNav.vue` (navbar: brand → `/`, link ber-gate **permission** — bukan nama role, cermin otorisasi server; `/reports` juga cek `company_id`; nama user + tombol Keluar) + `components/AppLayout.vue` (`AppNav` + `RouterView`) sebagai **parent route** semua halaman ber-auth di `router/index.ts`. `requiresAuth` cukup di parent (Vue Router menggabungkan meta parent→child) → halaman baru otomatis terlindungi tanpa mengulang meta. Dashboard disederhanakan (header+logout pindah ke navbar; kartu pintu-masuk dipertahankan); link "← Dashboard" di 6 halaman dihapus (redundan dgn navbar). 4 test `tests/js/AppNav.test.ts` (gating transporter, `/reports` tersembunyi utk planner tanpa company, logout→redirect, nama user) → **67 Vitest**. CATATAN test: stub `RouterLink: true` TIDAK merender slot — pakai `RouterLinkStub` dari `@vue/test-utils` bila perlu assert teks link.
 - [x] **FE: halaman Laporan Perusahaan `/reports` (2026-07-08):** UI untuk `GET /me/reports/utilization` (slice BE di bawah). `api/slots.ts` `fetchMyUtilization` (unwrap `data`+`meta.summary`, bentuk sama dgn `fetchUtilization`); `composables/useMyUtilization.ts` (useQuery key `['my-utilization',gate,date]` — **sengaja terpisah** dari `['utilization']` planner: beda scope, tak boleh saling menimpa cache; read-only → tanpa mutation/invalidation); `pages/MyUtilizationPage.vue` (dropdown gate `useGates` + tanggal; state prompt/loading/error/empty; per window "Milik Anda: selesai/no-show/batal/aktif" + konteks gate "terisi X/kapasitas" dipisah visual supaya angka global tak terbaca sebagai milik company; ringkasan `meta.summary`); route `/reports`; link Dashboard "Laporan Perusahaan" gated `can('report.read') && company_id != null` (planner/admin punya `report.read` tapi tanpa company → link tak muncul, mereka pakai `/planner`). +6 Vitest (5 page states + 1 api unwrap) → **63 Vitest**; vue-tsc & build hijau.
 - [x] **Utilisasi company-scoped transporter (2026-07-08):** `GET /api/v1/me/reports/utilization?gate=&date=` — menutup janji matriks RBAC §1 ("Laporan utilisasi → transporter: company sendiri") yang selama ini baru desain. `SlotRepository::utilization()` dapat param opsional `?int $companyId` — filter `where('company_id')` diterapkan ke **semua** subquery `withCount` supaya angka company lain tak pernah bocor; `capacity`/`booked_count` tetap global (konteks gate, sudah terbuka via availability). `MyUtilizationReportController` + `MyUtilizationReportRequest` (`can('report.read')`; 403 tanpa `company_id` — pola `/me/appointments`); reuse `SlotUtilizationResource`; `meta.company_id` di respons. Endpoint agregat planner/admin tak berubah. 4 test `tests/Feature/Reports/MyUtilizationReportTest.php` (scoping benar, planner tanpa company 403, driver tanpa `report.read` 403, gate wajib 422). UI-nya: entri FE `/reports` di atas.
 - [x] **Hardening: Sanctum token TTL + prune (2026-07-07):** `sanctum.expiration` = env `SANCTUM_EXPIRATION` default **720 menit (12 jam ≈ 1 shift)** — sebelumnya `null` = token bocor valid **selamanya** (logout cuma mencabut satu token). Lewat TTL → 401 → SPA redirect login (handler sudah ada di `api/client.ts`). `sanctum:prune-expired --hours=24` dijadwalkan harian (`routes/console.php`; grace 24 jam supaya token mati masih bisa ditelusuri saat investigasi insiden, dan tabel `personal_access_tokens` tidak tumbuh tanpa batas). 4 test `tests/Feature/Hardening/TokenExpirationTest.php` (expired→401, dalam-TTL→200, prune hapus baris, schedule terdaftar).
@@ -106,18 +107,25 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — Senior review ronde 2 + guard window-berakhir selesai di checkpoint hijau (169 Pest / 63 Vitest).
+- (kosong) — checkpoint hijau (169 Pest / 67 Vitest); terakhir: nav/layout bersama.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
 1. **Wiring realtime (Reverb + Echo)** — paling berdampak: kuota & antrian live. Server sudah ber-event/ber-test (`SlotAvailabilityChanged`, `GateQueueUpdated`). Perlu: `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` + sambung Laravel Echo di SPA → ganti polling/invalidasi manual dgn push (invalidate query saat event masuk). Lihat Jebakan.
-2. **Polish UI:** layout/nav bersama (saat ini link di Dashboard saja), loading skeleton, e2e happy-path.
+2. **Polish UI:** loading skeleton, e2e happy-path. (Layout/nav bersama DONE 2026-07-08 — `AppNav`/`AppLayout`.)
 3. **Opsional backend:** CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada); swap `GateEventGateway` ke TOS riil. (Utilisasi company-scoped transporter DONE 2026-07-08 — UI-nya belum, kandidat saat polish FE.)
 4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit). Temuan `$fillable` [FIXED → ADR-0004]; tolak booking ke window lewat [FIXED 2026-07-07].
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-08`: **Nav/layout bersama FE (`AppNav`+`AppLayout` parent route).** Kode:
+  2 komponen baru, `router/index.ts` restrukturisasi nested (meta `requiresAuth` di parent),
+  Dashboard disederhanakan, link "← Dashboard" dihapus dari 6 halaman. Docs: `FRONTEND.md`
+  (§2 router+layout, catatan layout di §5), hitungan Vitest → **67**. Alasan: navigasi
+  lintas-halaman tanpa bolak-balik Dashboard; satu sumber daftar link (anti-drift saat
+  nambah halaman); meta di parent = halaman baru otomatis terlindungi guard. Tidak
+  menyentuh CLAUDE.md/BE.
 - `2026-07-08`: **Halaman FE `/reports` (Laporan Perusahaan, transporter).** Kode:
   `fetchMyUtilization` (api/slots.ts), `useMyUtilization` (key terpisah `['my-utilization']`),
   `MyUtilizationPage.vue`, route `/reports`, link Dashboard gated `report.read` + `company_id`.

@@ -656,7 +656,7 @@ gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTH
 (§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
 Gerbang kualitas terakhir: `composer test` → **169 pass (452 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **63 pass**.
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **67 pass**.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **wiring realtime
 sungguhan** (Reverb server + `Broadcast::routes` auth:sanctum + Laravel Echo di SPA +

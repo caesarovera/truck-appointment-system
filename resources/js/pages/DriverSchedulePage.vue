@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink } from 'vue-router';
+
 import { useTodaySchedule } from '@/composables/useTodaySchedule';
 
 const { appointments, isLoading, isError } = useTodaySchedule();
@@ -19,7 +19,6 @@ const today = new Date().toISOString().slice(0, 10);
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
             <h1 class="font-semibold text-gray-900">Jadwal Hari Ini <span class="text-gray-400 font-normal">· {{ today }}</span></h1>
-            <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
         </header>
 
         <main class="p-6 space-y-4">

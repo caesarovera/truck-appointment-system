@@ -70,10 +70,18 @@ roles`. Bentuk respons berbeda ditangani: `/login` **datar** (`{token,user}`),
 > pengganti otorisasi server — server tetap menegakkan; UI hanya menyembunyikan yang
 > pasti ditolak (UX).
 
-### `router/index.ts` — guard
+### `router/index.ts` — guard + layout bersama
 `beforeEach`: bila ada token tapi user belum dimuat → `auth.restore()` (ambil /me);
 rute `requiresAuth` tanpa auth → lempar ke `/login?redirect=`; rute `guestOnly` saat
 sudah login → ke dashboard. Komponen halaman di-`import()` lazy (code-split per rute).
+
+Semua halaman ber-auth adalah **children** dari satu parent route `/` ber-komponen
+`components/AppLayout.vue` (= `AppNav` + `RouterView`). `requiresAuth` cukup ditaruh
+di parent — Vue Router **menggabungkan meta parent ke child**, jadi tiap halaman baru
+otomatis terlindungi tanpa mengulang meta. `AppNav` = satu-satunya sumber daftar link
+(gating per **permission**, bukan nama role — cermin otorisasi server; link `/reports`
+juga cek `company_id`, cermin aturan 403-nya). Halaman tidak lagi punya link
+"← Dashboard" sendiri.
 
 ### `app.ts` — bootstrap
 Pasang Pinia, Router, **VueQueryPlugin**, lalu wiring hook 401 (`setUnauthorizedHandler`
@@ -221,7 +229,9 @@ Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 | Kelola Slot | `slot.manage` | planner |
 | Master Data | `terminal.manage` | admin |
 
-> **Belum ada layout/nav bersama** (sidebar) — kandidat polish berikutnya. Realtime
-> (Laravel Echo) juga belum disambung: query masih di-invalidate manual lewat mutation;
-> saat Reverb di-wire, event broadcast akan memicu invalidasi yang sama secara *live*
+> **Layout/nav bersama sudah ada** (2026-07-08): `AppLayout` + `AppNav` sebagai parent
+> route — lihat §2 router. Kartu-kartu Dashboard tetap dipertahankan sebagai pintu masuk
+> besar; navbar menjadi navigasi lintas-halaman. Realtime (Laravel Echo) masih belum
+> disambung: query di-invalidate manual lewat mutation; saat Reverb di-wire, event
+> broadcast akan memicu invalidasi yang sama secara *live*
 > (lihat `HANDOVER.md` → Jebakan & Langkah berikutnya).

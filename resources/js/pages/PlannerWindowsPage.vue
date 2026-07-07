@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { RouterLink } from 'vue-router';
+
 import { isAxiosError } from 'axios';
 import { useGates } from '@/composables/useGates';
 import { useUtilization, useOpenSlotWindow, useCloseSlotWindow } from '@/composables/usePlannerWindows';
@@ -79,7 +79,6 @@ function extractError(e: unknown): string {
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
             <h1 class="font-semibold text-gray-900">Kelola Slot Window</h1>
-            <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
         </header>
 
         <main class="p-6 space-y-6">

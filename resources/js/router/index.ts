@@ -9,52 +9,53 @@ const routes: RouteRecordRaw[] = [
         meta: { guestOnly: true },
     },
     {
+        // Layout bersama (navbar) untuk semua halaman ber-auth. requiresAuth
+        // cukup di sini: Vue Router menggabungkan meta parent ke tiap child.
         path: '/',
-        name: 'dashboard',
-        component: () => import('@/pages/DashboardPage.vue'),
+        component: () => import('@/components/AppLayout.vue'),
         meta: { requiresAuth: true },
-    },
-    {
-        path: '/slots',
-        name: 'slots',
-        component: () => import('@/pages/SlotAvailabilityPage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/bookings',
-        name: 'bookings',
-        component: () => import('@/pages/MyBookingsPage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/today',
-        name: 'today',
-        component: () => import('@/pages/DriverSchedulePage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/gate',
-        name: 'gate',
-        component: () => import('@/pages/GateDashboardPage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/planner',
-        name: 'planner',
-        component: () => import('@/pages/PlannerWindowsPage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/reports',
-        name: 'reports',
-        component: () => import('@/pages/MyUtilizationPage.vue'),
-        meta: { requiresAuth: true },
-    },
-    {
-        path: '/admin',
-        name: 'admin',
-        component: () => import('@/pages/AdminPage.vue'),
-        meta: { requiresAuth: true },
+        children: [
+            {
+                path: '',
+                name: 'dashboard',
+                component: () => import('@/pages/DashboardPage.vue'),
+            },
+            {
+                path: 'slots',
+                name: 'slots',
+                component: () => import('@/pages/SlotAvailabilityPage.vue'),
+            },
+            {
+                path: 'bookings',
+                name: 'bookings',
+                component: () => import('@/pages/MyBookingsPage.vue'),
+            },
+            {
+                path: 'today',
+                name: 'today',
+                component: () => import('@/pages/DriverSchedulePage.vue'),
+            },
+            {
+                path: 'gate',
+                name: 'gate',
+                component: () => import('@/pages/GateDashboardPage.vue'),
+            },
+            {
+                path: 'planner',
+                name: 'planner',
+                component: () => import('@/pages/PlannerWindowsPage.vue'),
+            },
+            {
+                path: 'reports',
+                name: 'reports',
+                component: () => import('@/pages/MyUtilizationPage.vue'),
+            },
+            {
+                path: 'admin',
+                name: 'admin',
+                component: () => import('@/pages/AdminPage.vue'),
+            },
+        ],
     },
 ];
 

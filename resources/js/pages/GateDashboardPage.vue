@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+
 import { isAxiosError } from 'axios';
 import { useGateQueue, useGateIn, useGateOut } from '@/composables/useGateQueue';
 import type { Appointment } from '@/types/api';
@@ -52,7 +52,6 @@ const busy = computed(() => gateInMutation.isPending.value || gateOutMutation.is
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
             <h1 class="font-semibold text-gray-900">Dashboard Gate</h1>
-            <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
         </header>
 
         <main class="p-6 space-y-4">

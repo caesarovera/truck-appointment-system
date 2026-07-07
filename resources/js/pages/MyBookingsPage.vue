@@ -55,7 +55,6 @@ function extractError(e: unknown): string {
             <h1 class="font-semibold text-gray-900">Booking Saya</h1>
             <div class="flex items-center gap-4 text-sm">
                 <RouterLink to="/slots" class="text-indigo-600 hover:text-indigo-800">+ Booking baru</RouterLink>
-                <RouterLink to="/" class="text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
             </div>
         </header>
 

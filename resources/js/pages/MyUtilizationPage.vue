@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { RouterLink } from 'vue-router';
+
 import { useGates } from '@/composables/useGates';
 import { useMyUtilization } from '@/composables/useMyUtilization';
 
@@ -19,7 +19,6 @@ const { windows, summary, isLoading, isError, enabled } = useMyUtilization(gate,
     <div class="min-h-screen bg-gray-50">
         <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
             <h1 class="font-semibold text-gray-900">Laporan Booking Perusahaan</h1>
-            <RouterLink to="/" class="text-sm text-gray-600 hover:text-gray-900">← Dashboard</RouterLink>
         </header>
 
         <main class="p-6 space-y-6">

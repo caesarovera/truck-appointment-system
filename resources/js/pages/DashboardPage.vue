@@ -1,24 +1,13 @@
 <script setup lang="ts">
-import { RouterLink, useRouter } from 'vue-router';
+import { RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
+// Header (brand + logout) kini milik AppNav di layout bersama.
 const auth = useAuthStore();
-const router = useRouter();
-
-async function onLogout(): Promise<void> {
-    await auth.logout();
-    await router.push({ name: 'login' });
-}
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">TAS — Dashboard</h1>
-            <button class="text-sm text-gray-600 hover:text-gray-900" @click="onLogout">Keluar</button>
-        </header>
-
-        <main class="p-6 space-y-4">
+    <main class="p-6 space-y-4">
             <div class="space-y-2">
                 <p class="text-gray-900">Halo, <strong>{{ auth.user?.name }}</strong></p>
                 <p class="text-sm text-gray-600">Role: {{ auth.user?.roles.join(', ') || '—' }}</p>
@@ -77,6 +66,5 @@ async function onLogout(): Promise<void> {
                     Master Data
                 </RouterLink>
             </nav>
-        </main>
-    </div>
+    </main>
 </template>
