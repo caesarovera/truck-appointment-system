@@ -49,15 +49,33 @@ it('replays the stored response for an arbitrarily long Idempotency-Key (hashed 
         ->and(SlotWindow::query()->count())->toBe(1);
 });
 
+it('does not replay a response across different endpoints with the same key', function (): void {
+    ['user' => $user, 'payload' => $payload] = idempotencyContext();
+    Sanctum::actingAs($user);
+
+    // Kunci sama, endpoint beda: replay booking di gate-in = bug. Scope per
+    // method+path menjamin tiap operasi punya ruang idempotency sendiri.
+    $headers = ['Idempotency-Key' => 'shared-key-across-endpoints'];
+
+    $created = postJson('/api/v1/slots', $payload, $headers)->assertCreated();
+    $windowId = $created->json('data.id');
+
+    $close = postJson("/api/v1/slots/{$windowId}/close", [], $headers);
+
+    $close->assertOk();
+    $close->assertHeaderMissing('Idempotent-Replayed');
+    expect($close->json('data.status'))->toBe('CLOSED');
+});
+
 it('returns 409 when a twin request is still in flight (lock held)', function (): void {
     ['user' => $user, 'payload' => $payload] = idempotencyContext();
     Sanctum::actingAs($user);
 
     $key = 'in-flight-key';
 
-    // Tiru kunci yang dipakai middleware (scope user id + sha256 nilai header) dan
-    // tahan lock-nya → simulasikan request kembar yang masih diproses.
-    $cacheKey = 'idem:'.$user->id.':'.hash('sha256', $key);
+    // Tiru kunci yang dipakai middleware (scope user id + sha256 method|path|header)
+    // dan tahan lock-nya → simulasikan request kembar yang masih diproses.
+    $cacheKey = 'idem:'.$user->id.':'.hash('sha256', 'POST|api/v1/slots|'.$key);
     $lock = Cache::lock("{$cacheKey}:lock", 60);
     expect($lock->get())->toBeTrue();
 

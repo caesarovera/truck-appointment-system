@@ -64,12 +64,17 @@ final class IdempotencyKey
         }
     }
 
-    /** Kunci cache ber-scope user/ip + hash nilai header (bounded & aman). */
+    /**
+     * Kunci cache ber-scope user/ip + endpoint + hash nilai header (bounded & aman).
+     * Endpoint (method+path) ikut di-hash: key sama yang dipakai ulang di endpoint
+     * berbeda (mis. booking lalu gate-in) TIDAK boleh memutar ulang respons endpoint
+     * lain — idempotency berlaku per operasi, bukan per nilai header global.
+     */
     private function cacheKey(Request $request, string $key): string
     {
         $scope = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
 
-        return 'idem:'.$scope.':'.hash('sha256', $key);
+        return 'idem:'.$scope.':'.hash('sha256', $request->method().'|'.$request->path().'|'.$key);
     }
 
     private function replay(string $cacheKey): ?JsonResponse
