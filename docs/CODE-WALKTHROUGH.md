@@ -1255,13 +1255,14 @@ Otorisasi lewat `TodayAppointmentsRequest::authorize()` → scope `appointment.r
 
 ### Q.2 Laporan utilisasi — agregat via `withCount`
 ```php
-// SlotRepository::utilization(int $gateId, string $date)
+// SlotRepository::utilization(int $gateId, string $date, ?int $companyId = null)
+$scoped = fn ($q) => $companyId === null ? $q : $q->where('company_id', $companyId);
 return SlotWindow::query()->where('gate_id', $gateId)->whereDate('date', $date)
     ->withCount([
-        'appointments as completed_count' => fn ($q) => $q->where('status', AppointmentStatus::COMPLETED->value),
-        'appointments as no_show_count'   => fn ($q) => $q->where('status', AppointmentStatus::NO_SHOW->value),
-        'appointments as cancelled_count' => fn ($q) => $q->where('status', AppointmentStatus::CANCELLED->value),
-        'appointments as active_count'    => fn ($q) => $q->whereIn('status', $active),
+        'appointments as completed_count' => fn ($q) => $scoped($q->where('status', AppointmentStatus::COMPLETED->value)),
+        'appointments as no_show_count'   => fn ($q) => $scoped($q->where('status', AppointmentStatus::NO_SHOW->value)),
+        'appointments as cancelled_count' => fn ($q) => $scoped($q->where('status', AppointmentStatus::CANCELLED->value)),
+        'appointments as active_count'    => fn ($q) => $scoped($q->whereIn('status', $active)),
     ])->orderBy('start_time')->get();
 ```
 - **`withCount` dengan alias + closure:** satu query menghasilkan beberapa hitungan
@@ -1269,8 +1270,13 @@ return SlotWindow::query()->where('gate_id', $gateId)->whereDate('date', $date)
 - Resource pakai `whenCounted('completed')` (baca atribut `completed_count`).
 - Controller menambah ringkasan total via `->additional(['meta' => ['summary' => ...]])`
   pada `AnonymousResourceCollection` → output tetap lewat Resource.
-- Otorisasi `UtilizationReportRequest`: **planner/admin saja** (agregat lintas-company);
-  laporan company-scoped transporter terpisah/menyusul.
+- Otorisasi `UtilizationReportRequest`: **planner/admin saja** (agregat lintas-company).
+- **Varian company-scoped transporter:** `GET /me/reports/utilization` →
+  `MyUtilizationReportController` + `MyUtilizationReportRequest` (`can('report.read')`,
+  403 tanpa `company_id` — pola `/me/appointments`). `$companyId` diterapkan ke **semua**
+  subquery hitungan supaya angka company lain tak pernah bocor; `capacity`/`booked_count`
+  tetap konteks gate global (informasi yang sama sudah terbuka via availability).
+  Reuse `SlotUtilizationResource`; `meta.company_id` ikut di respons.
 
 ---
 

@@ -133,6 +133,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 
 ### 3.7 Monitoring & audit
 - Planner: `GET /api/v1/reports/utilization?gate=&date=` → kuota vs terpakai vs no-show.
+- Transporter: `GET /api/v1/me/reports/utilization?gate=&date=` → sama, tapi hitungan per status hanya milik company sendiri (angka company lain tidak bocor; lihat matriks §1).
 - Semua perubahan status & gate event tercatat lewat **Spatie Activity Log** (sumber kebenaran audit trail). Transporter hanya lihat log company sendiri.
 
 ---

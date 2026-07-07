@@ -415,7 +415,7 @@ Contoh output sehat:
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
   ...
-  Tests:    165 passed (439 assertions)
+  Tests:    169 passed (452 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -482,6 +482,7 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/me/appointments/today` | token | `appointment.read.self` | jadwal hari-H sopir |
 | `GET`  | `/api/v1/gate/queue?date=YYYY-MM-DD` | token | `gate.process` + punya terminal | antrian gate-officer (CONFIRMED/IN_PROGRESS di terminalnya, default hari ini) |
 | `GET`  | `/api/v1/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | planner/admin | utilisasi gate (kuota vs terpakai vs no-show) |
+| `GET`  | `/api/v1/me/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | `report.read` + punya company | utilisasi company sendiri per window (angka company lain tak bocor) |
 
 **Admin — master data CRUD** (semua di bawah `/api/v1/admin`, butuh permission manage terkait;
 hapus → **409 `entity_in_use`** bila masih ada dependen):
@@ -654,7 +655,7 @@ hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, drive
 gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
 (§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
-Gerbang kualitas terakhir: `composer test` → **165 pass (439 assertions)** ·
+Gerbang kualitas terakhir: `composer test` → **169 pass (452 assertions)** ·
 `composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **57 pass**.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **wiring realtime

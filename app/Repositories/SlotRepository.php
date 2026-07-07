@@ -73,21 +73,26 @@ final class SlotRepository implements SlotRepositoryInterface
         Cache::forget($this->availabilityKey($gateId, $date));
     }
 
-    public function utilization(int $gateId, string $date): Collection
+    public function utilization(int $gateId, string $date, ?int $companyId = null): Collection
     {
         $active = array_map(
             fn (AppointmentStatus $s): string => $s->value,
             [AppointmentStatus::BOOKED, AppointmentStatus::CONFIRMED, AppointmentStatus::ARRIVED, AppointmentStatus::IN_PROGRESS],
         );
 
+        // Saring per-company (laporan transporter): diterapkan ke SEMUA subquery
+        // hitungan supaya angka company lain tak pernah bocor. capacity/booked_count
+        // tidak disaring — itu properti window (konteks gate global).
+        $scoped = fn ($q) => $companyId === null ? $q : $q->where('company_id', $companyId);
+
         return SlotWindow::query()
             ->where('gate_id', $gateId)
             ->whereDate('date', $date)
             ->withCount([
-                'appointments as completed_count' => fn ($q) => $q->where('status', AppointmentStatus::COMPLETED->value),
-                'appointments as no_show_count' => fn ($q) => $q->where('status', AppointmentStatus::NO_SHOW->value),
-                'appointments as cancelled_count' => fn ($q) => $q->where('status', AppointmentStatus::CANCELLED->value),
-                'appointments as active_count' => fn ($q) => $q->whereIn('status', $active),
+                'appointments as completed_count' => fn ($q) => $scoped($q->where('status', AppointmentStatus::COMPLETED->value)),
+                'appointments as no_show_count' => fn ($q) => $scoped($q->where('status', AppointmentStatus::NO_SHOW->value)),
+                'appointments as cancelled_count' => fn ($q) => $scoped($q->where('status', AppointmentStatus::CANCELLED->value)),
+                'appointments as active_count' => fn ($q) => $scoped($q->whereIn('status', $active)),
             ])
             ->orderBy('start_time')
             ->get();

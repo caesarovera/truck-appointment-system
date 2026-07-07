@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\V1\ListGatesController;
 use App\Http\Controllers\Api\V1\MyAppointmentsController;
 use App\Http\Controllers\Api\V1\MyFleetController;
 use App\Http\Controllers\Api\V1\MyTodayAppointmentsController;
+use App\Http\Controllers\Api\V1\MyUtilizationReportController;
 use App\Http\Controllers\Api\V1\OpenSlotWindowController;
 use App\Http\Controllers\Api\V1\RescheduleAppointmentController;
 use App\Http\Controllers\Api\V1\ShowAppointmentController;
@@ -79,7 +80,9 @@ Route::prefix('v1')->group(function (): void {
         // Endpoint pendukung
         Route::get('me/appointments', MyAppointmentsController::class);
         Route::get('me/appointments/today', MyTodayAppointmentsController::class);
+        // Agregat lintas-company (planner/admin) vs scoped milik sendiri (transporter).
         Route::get('reports/utilization', UtilizationReportController::class);
+        Route::get('me/reports/utilization', MyUtilizationReportController::class);
 
         // Admin CRUD — otorisasi per-permission di setiap FormRequest.
         Route::prefix('admin')->group(function (): void {

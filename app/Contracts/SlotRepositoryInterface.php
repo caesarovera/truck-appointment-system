@@ -44,7 +44,11 @@ interface SlotRepositoryInterface
      * Utilisasi satu gate + tanggal: tiap window membawa hitungan appointment per
      * status (completed/no_show/cancelled/active) via withCount (BUSINESS-FLOW §3.7).
      *
+     * $companyId null = agregat lintas-company (planner/admin). Diisi = hitungan
+     * disaring ke satu company (laporan transporter /me — angka company lain
+     * tidak boleh bocor); capacity/booked_count tetap milik window (global).
+     *
      * @return Collection<int, SlotWindow>
      */
-    public function utilization(int $gateId, string $date): Collection;
+    public function utilization(int $gateId, string $date, ?int $companyId = null): Collection;
 }
