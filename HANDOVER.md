@@ -10,12 +10,13 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004) + tolak booking ke window yang sudah berakhir.
+- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004) + tolak booking ke window berakhir + Sanctum token TTL.
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **161 pass / 434 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **165 pass / 439 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **57 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
+- [x] **Hardening: Sanctum token TTL + prune (2026-07-07):** `sanctum.expiration` = env `SANCTUM_EXPIRATION` default **720 menit (12 jam ≈ 1 shift)** — sebelumnya `null` = token bocor valid **selamanya** (logout cuma mencabut satu token). Lewat TTL → 401 → SPA redirect login (handler sudah ada di `api/client.ts`). `sanctum:prune-expired --hours=24` dijadwalkan harian (`routes/console.php`; grace 24 jam supaya token mati masih bisa ditelusuri saat investigasi insiden, dan tabel `personal_access_tokens` tidak tumbuh tanpa batas). 4 test `tests/Feature/Hardening/TokenExpirationTest.php` (expired→401, dalam-TTL→200, prune hapus baris, schedule terdaftar).
 - [x] **Admin CRUD master data (commit `0507d86`):** CRUD penuh `Terminal`/`Gate`/`TransportCompany`/`User`. BE: 12 Action (`Admin/`), 3 repo baru (`Terminal/Company/User` + extend `Gate`) ber-interface + bound di `AppServiceProvider`, 20 controller invokable (`Http/Controllers/Api/V1/Admin/`), 10 FormRequest (otorisasi `*.manage` + route-binding `instanceof`-safe utk PHPStan), 4 Resource. `EntityInUseException` (409 `entity_in_use`) guard hapus saat ada dependen (terminal←gate, gate←slot window, company←user/appointment, user←diri sendiri 422). `UserRepository`: filter role (Spatie `role()`), password hash-on-change, `fresh([...])` reload relasi setelah `syncRoles`. Permission baru `terminal.manage`/`gate.manage`/`company.manage` di `RolePermissionSeeder` (admin `→ *`). Route group `/api/v1/admin/*`. FE: `types/api.ts` (Admin* types), `api/admin.ts` (16 fn), `composables/useAdmin.ts` (`useTerminals`/`useAdminGates`/`useCompanies`/`useUsers`/`useAdminRefs`, invalidasi `['admin-*']`), `pages/AdminPage.vue` (4-tab), route `/admin`, kartu Dashboard "Master Data" gated `terminal.manage`. 34 test Admin (Pest) + verifikasi Vitest. CATATAN Pest: `$this->seed(...)` di closure `function(): void` (global `seed()` cuma di arrow-fn). Detail kode: `docs/CODE-WALKTHROUGH.md §V` (BE) + `docs/FRONTEND.md §4` (FE).
 - [x] Paket wajib terpasang: Sanctum, Horizon, Reverb, Spatie Permission/ActivityLog/Data, Pest, Larastan. Config/migrasi sudah dipublish; `routes/api.php` + `channels.php` ter-wire (install:api).
 - [x] Skema + model (BUSINESS-FLOW §4): 8 migrasi domain + kolom `terminal_id`/`company_id` di users. Model + relasi + casts + 5 Enum (`AppointmentStatus` memuat state machine). Factory untuk semua model.
@@ -103,7 +104,7 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — Senior review ronde 2 + guard window-berakhir selesai di checkpoint hijau (161 Pest / 57 Vitest).
+- (kosong) — Senior review ronde 2 + guard window-berakhir selesai di checkpoint hijau (165 Pest / 57 Vitest).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
@@ -115,6 +116,13 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-07`: **Sanctum token TTL (12 jam) + prune harian.** Kode: `config/sanctum.php`
+  (`expiration` env-tunable, sebelumnya `null`), `routes/console.php` (+`sanctum:prune-expired
+  --hours=24` daily). Docs: `CODE-WALKTHROUGH §K` (bullet TTL), hitungan test → **165 Pest /
+  439 assert**. Alasan: token abadi = blast-radius kebocoran tak terbatas; 12 jam ≈ 1 shift
+  kerja gate/planner jadi re-login harian wajar; TTL juga jadi jaring pengaman selagi token
+  abilities ditunda (ADR-0003). Grace prune 24 jam untuk jejak investigasi. Tidak menyentuh
+  CLAUDE.md/seeder.
 - `2026-07-07`: **Guard "window sudah berakhir" (409) + default `SlotWindowFactory` → besok.**
   Kode: `SlotWindow::endsAt()/hasEnded()`, `SlotUnavailableException::expired()`, guard di
   `Book/RescheduleAppointmentAction`, `dueForNoShow` reuse `endsAt()`. Factory default

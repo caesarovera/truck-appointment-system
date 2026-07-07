@@ -48,9 +48,15 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | TAS: WAJIB terbatas (default 720 menit = 12 jam ≈ 1 shift kerja).
+    | Token tanpa TTL yang bocor (XSS localStorage, perangkat hilang) valid
+    | selamanya — logout hanya mencabut satu token. SPA menangani 401 →
+    | redirect login, jadi kedaluwarsa terdegradasi mulus. Baris token mati
+    | dibersihkan `sanctum:prune-expired` harian (routes/console.php).
+    |
     */
 
-    'expiration' => null,
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 720),
 
     /*
     |--------------------------------------------------------------------------

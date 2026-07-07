@@ -845,6 +845,12 @@ $token = $user->createToken($request->deviceName(), $abilities)->plainTextToken;
 - **`createToken($name, $abilities)`** menerbitkan token Sanctum. `$abilities` =
   daftar permission dari role user → "scope per role" (`BUSINESS-FLOW.md §1`) ikut
   melekat di token. `plainTextToken` hanya muncul **sekali** (hanya hash-nya disimpan).
+- **Token ber-TTL** (`config/sanctum.php` `expiration` = env `SANCTUM_EXPIRATION`,
+  default 720 menit = 12 jam ≈ 1 shift). Tanpa TTL, token yang bocor valid selamanya —
+  logout hanya mencabut satu token. Lewat TTL → 401; SPA menangkapnya dan redirect ke
+  login. Baris token kedaluwarsa dibersihkan `sanctum:prune-expired --hours=24` harian
+  (`routes/console.php`; grace 24 jam agar masih bisa ditelusuri saat investigasi).
+  Test: `tests/Feature/Hardening/TokenExpirationTest.php`.
 
 **Logout** — cabut token yang sedang dipakai:
 ```php
