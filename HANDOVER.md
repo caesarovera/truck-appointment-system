@@ -119,6 +119,15 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-08`: **History git ditulis ulang (24 commit) + `docs/GIT-HISTORY-REWRITE.md` baru.**
+  Trailer `Co-Authored-By: Claude ...` → `Co-Authored-By: Overa Caesar` di seluruh history
+  (`git filter-branch --msg-filter` + force-push; SHA semua commit berubah — clone lain
+  harus `git fetch && git reset --hard origin/main`, JANGAN pull). Baris `Claude-Session:`
+  sengaja dipertahankan (jejak audit). Prosedur lengkap + jebakan nyata (unstaged changes,
+  SHA lama masih resolvable, lease `--force-with-lease` basi pasca filter-branch)
+  didokumentasikan sebagai panduan manual di `docs/GIT-HISTORY-REWRITE.md`; README doc-map
+  ikut diupdate. Alasan: atribusi commit milik pemilik repo; panduan ditulis supaya bisa
+  diulang tanpa AI. Commit BERIKUTNYA wajib pakai trailer baru.
 - `2026-07-08`: **Nav/layout bersama FE (`AppNav`+`AppLayout` parent route).** Kode:
   2 komponen baru, `router/index.ts` restrukturisasi nested (meta `requiresAuth` di parent),
   Dashboard disederhanakan, link "← Dashboard" dihapus dari 6 halaman. Docs: `FRONTEND.md`

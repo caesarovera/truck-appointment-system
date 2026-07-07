@@ -46,6 +46,7 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 | [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail kode backend** + contoh | memahami "kenapa" sebuah kode backend |
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | **Penjelasan detail frontend** (Vue SPA): arsitektur, TanStack Query, tiap halaman + "kenapa" | menyentuh/memahami SPA |
 | [`docs/DUMMY-DATA.md`](docs/DUMMY-DATA.md) | Akun & data demo | butuh data uji |
+| [`docs/GIT-HISTORY-REWRITE.md`](docs/GIT-HISTORY-REWRITE.md) | Panduan manual menulis ulang pesan commit seluruh history (filter-branch + force-push, jebakan nyata) | perlu mengubah trailer/pesan commit lama |
 | [`HANDOVER.md`](HANDOVER.md) | Status hidup antar-sesi + langkah berikutnya | awal tiap sesi |
 
 ## Mulai cepat
