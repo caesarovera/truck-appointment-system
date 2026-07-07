@@ -23,6 +23,7 @@ Status yang dipakai: `Accepted` · `Superseded by ADR-XXXX` · `Deprecated`.
 | [0001](0001-package-by-layer.md) | Organisasi folder package-by-layer (bukan package-by-feature) | Accepted |
 | [0002](0002-repository-interface.md) | Akses data lewat Repository ber-interface (Ports & Adapters) | Accepted |
 | [0003](0003-defer-token-abilities.md) | Tunda penegakan token abilities Sanctum | Accepted |
+| [0004](0004-guard-state-quota-columns.md) | Guard kolom state & kuota dari mass-assignment | Accepted |
 
 ## Cara menambah ADR
 1. Salin format di salah satu file di atas, nomori berikutnya (`000N-judul-kebab.md`).

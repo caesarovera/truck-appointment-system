@@ -23,6 +23,11 @@ use Illuminate\Support\Str;
  * sengaja hampir penuh untuk demo race condition.
  *
  * Asumsi: model & migrasi sudah dibuat sesuai docs/BUSINESS-FLOW.md §4.
+ *
+ * Catatan forceFill: kolom status/version/booked_count/company_id guarded dari
+ * mass-assignment (ADR-0004). Seeder menata KONDISI AWAL lintas status — bukan
+ * menjalankan alur bisnis — jadi sah melewati Action; forceFill membuat niat
+ * "bypass yang disengaja" itu terlihat eksplisit di code review.
  */
 final class DemoSeeder extends Seeder
 {
@@ -54,8 +59,10 @@ final class DemoSeeder extends Seeder
         $tomorrow = $this->windows($gateB, Carbon::tomorrow());
 
         // Window hari ini jam 08:00 sengaja hampir penuh (sisa 1) untuk demo race.
+        // forceFill: booked_count guarded (ADR-0004) — seeder = jalur tepercaya
+        // yang sengaja melewati Action (menata kondisi awal, bukan alur bisnis).
         $nearFull = $today[8];
-        $nearFull->update(['booked_count' => $nearFull->capacity - 1]);
+        $nearFull->forceFill(['booked_count' => $nearFull->capacity - 1])->save();
 
         // --- Appointment lintas status ---
         // 2x COMPLETED (kemarin) + gate-in/out
@@ -133,7 +140,9 @@ final class DemoSeeder extends Seeder
     {
         $windows = [];
         foreach (range(6, 17) as $hour) {
-            $windows[$hour] = SlotWindow::create([
+            // forceFill: booked_count/status guarded (ADR-0004) — lihat catatan run().
+            $window = new SlotWindow;
+            $window->forceFill([
                 'gate_id' => $gate->id,
                 'date' => $date->toDateString(),
                 'start_time' => sprintf('%02d:00:00', $hour),
@@ -141,7 +150,9 @@ final class DemoSeeder extends Seeder
                 'capacity' => 5,
                 'booked_count' => 0,
                 'status' => 'OPEN',
-            ]);
+            ])->save();
+
+            $windows[$hour] = $window;
         }
 
         return $windows;
@@ -157,7 +168,9 @@ final class DemoSeeder extends Seeder
         string $status,
         bool $returnsQuota = false,
     ): Appointment {
-        $appointment = Appointment::create([
+        // forceFill: company_id/status/version guarded (ADR-0004) — lihat catatan run().
+        $appointment = new Appointment;
+        $appointment->forceFill([
             'company_id' => $company->id,
             'truck_id' => $truck->id,
             'driver_id' => $driver->id,
@@ -166,7 +179,7 @@ final class DemoSeeder extends Seeder
             'status' => $status,
             'booking_code' => 'TAS-'.Str::upper(Str::random(8)),
             'version' => 1,
-        ]);
+        ])->save();
 
         Container::create([
             'appointment_id' => $appointment->id,

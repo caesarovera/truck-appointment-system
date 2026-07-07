@@ -33,15 +33,19 @@ class Appointment extends Model
 
     use LogsActivity;
 
-    /** @var list<string> */
+    /**
+     * `status`, `version`, `company_id` SENGAJA tidak fillable (ADR-0004):
+     * status & version hanya boleh berubah lewat Action ber-lock (state machine,
+     * BUSINESS-FLOW §2), company_id ditentukan dari actor — bukan input klien.
+     * Repository/seeder menulisnya via property assignment / forceFill eksplisit.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
-        'company_id',
         'truck_id',
         'driver_id',
         'slot_window_id',
         'move_type',
-        'status',
-        'version',
         'booking_code',
     ];
 

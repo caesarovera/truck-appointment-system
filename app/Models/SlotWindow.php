@@ -27,15 +27,19 @@ class SlotWindow extends Model
     /** @use HasFactory<SlotWindowFactory> */
     use HasFactory;
 
-    /** @var list<string> */
+    /**
+     * `booked_count` & `status` SENGAJA tidak fillable (ADR-0004): kuota hanya
+     * boleh naik/turun lewat Action ber-lock (CLAUDE.md §JANGAN), status hanya
+     * lewat Open/CloseSlotWindowAction. Ditulis via property assignment eksplisit.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'gate_id',
         'date',
         'start_time',
         'end_time',
         'capacity',
-        'booked_count',
-        'status',
     ];
 
     /** @return array<string, string> */

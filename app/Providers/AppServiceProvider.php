@@ -48,6 +48,9 @@ class AppServiceProvider extends ServiceProvider
         // Catch N+1s in dev/test, never crash production (CLAUDE.md hardening).
         Model::preventLazyLoading(! $this->app->isProduction());
         Model::preventAccessingMissingAttributes(! $this->app->isProduction());
+        // Kolom guarded (status/version/booked_count, ADR-0004) yang di-mass-assign
+        // harus MELEDAK di dev/test, bukan dibuang diam-diam → bug ketahuan dini.
+        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
 
         $this->configureRateLimiters();
     }
