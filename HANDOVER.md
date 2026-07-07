@@ -10,9 +10,9 @@
 ---
 
 ## Status
-- Update terakhir: `2026-06-28` · Sesi: **Admin CRUD master data** (terminal/gate/company/user) + **dokumentasi diselaraskan**. **4 persona + admin lengkap.**
+- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **152 pass / 416 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **158 pass / 425 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **57 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
@@ -65,23 +65,63 @@
 - **[FIXED] `version` optimistic lock tak konsisten:** `cancel` kini terima `version` opsional → bila dikirim, optimistic lock ditegakkan (`OptimisticLockException` 409 `version_conflict`); bila tidak, cancel tetap jalan (backward compatible). `CancelAppointmentRequest` + `CancelAppointmentAction::execute($appointment, ?int $expectedVersion)`. 4 test.
 - **[FIXED] `dueForNoShow` muat semua kandidat ke memori:** kini dipindai `chunkById` (size dari `config('tas.no_show_chunk_size')` default 500) → hanya N baris di-hydrate per iterasi; hanya yang lewat grace ditahan. Test lintas-batas chunk (size=2, 5 due).
 - **[FIXED] Idempotency lock TTL 10 dtk → 60 dtk** (`config('tas.idempotency.lock_seconds')`, ttl_hours juga) supaya lock tak kedaluwarsa di tengah request berat. Nilai header di-`hash('sha256')` jadi kunci cache (bounded lintas store, anti key-injection). 2 test (replay key panjang + contention 409).
-- **[catatan] `$fillable` memuat `status`/`version`/`company_id`:** aman sekarang (Action set eksplisit, tak ada mass-assign), tapi ranjau laten — pertimbangkan `$guarded` kolom yang hanya Action boleh ubah.
+- **[FIXED 2026-07-07 → ADR-0004] `$fillable` memuat `status`/`version`/`company_id`:** dulu aman hanya karena konvensi (Action set eksplisit) — kini kolom state/kuota dikeluarkan dari `$fillable` + `preventSilentlyDiscardingAttributes` aktif di non-prod. Lihat *Senior review ronde 2* di bawah.
 
 - [x] **Backlog hardening (3 item dari senior review):** (1) optimistic `version` opsional di cancel, (2) `dueForNoShow` chunked scan (config `no_show_chunk_size`), (3) idempotency lock TTL 60s + key hashing (config `idempotency.lock_seconds`/`ttl_hours`). Semua via `config/tas.php` (tunable env). +8 test di `tests/Feature/{Appointments,Jobs,Hardening}`. Detail di *Senior review* (status [FIXED]).
 
+## Senior review ronde 2 (2026-07-07) — temuan & keputusan
+> Audit ulang seluruh Actions/Repositories/middleware/jobs/routes/seeder. Kesimpulan: fondasi tetap sehat; 2 temuan diperbaiki, 2 dicatat sebagai backlog sadar (bukan lupa).
+- **[FIXED] Idempotency key tidak di-scope per endpoint (bug replay lintas operasi).**
+  *Kenapa bug:* kunci cache lama = `user + sha256(header)` saja. User yang memakai nilai
+  `Idempotency-Key` sama di dua endpoint berbeda (mis. booking lalu gate-in — realistis bila
+  klien mem-buffer key atau salah reuse UUID) menerima **replay respons booking di gate-in**,
+  dan operasi keduanya tidak pernah dieksekusi. Idempotency semestinya berlaku **per operasi**,
+  bukan per nilai header global (bandingkan Stripe: key di-scope per endpoint).
+  *Perbaikan:* `method|path` ikut di-hash → `idem:{user}:sha256(METHOD|path|key)`
+  (`IdempotencyKey::cacheKey`). +1 test cross-endpoint di `tests/Feature/Hardening/IdempotencyTest.php`.
+- **[FIXED → ADR-0004] Mass-assignment trap (temuan #4 ronde 1).** `status`/`version`/`company_id`
+  keluar dari `Appointment::$fillable`; `booked_count`/`status` keluar dari `SlotWindow::$fillable`;
+  `Model::preventSilentlyDiscardingAttributes(!prod)` diaktifkan supaya pelanggaran meledak di
+  dev/test alih-alih dibuang diam-diam. `DemoSeeder` beralih ke `forceFill()` (bypass yang
+  disengaja & terlihat). Kenapa-nya lengkap di `docs/adr/0004-guard-state-quota-columns.md`.
+  +5 test `tests/Feature/Hardening/MassAssignmentGuardTest.php`.
+- **[BACKLOG — disadari, belum dikerjakan] Booking ke window yang sudah lewat tidak ditolak.**
+  Window kemarin yang masih `OPEN` tetap bisa di-book; `NoShowSweepJob` akan menandainya
+  `NO_SHOW` ≤5 menit kemudian (kuota kembali, tak ada korupsi data — makanya bukan urgent).
+  Perbaikan wajar: tolak di `BookAppointmentAction`/`RescheduleAppointmentAction` bila
+  `window.date+end_time < now` (409). Butuh keputusan produk kecil (boleh book window yang
+  sedang berjalan?) → kerjakan sebagai slice TDD terpisah.
+- **[catatan, risiko ~nol] `booking_code` collision salah-lapor.** `booking_code` unik di DB;
+  bila 8-char random tabrakan (≈1/2.8×10¹²), `UniqueConstraintViolationException`-nya akan
+  tertangkap sebagai `DuplicateBookingException` (pesan "kontainer sudah dibooking" — menyesatkan).
+  Tidak layak kode tambahan sekarang; cukup tahu saat debugging kasus aneh.
+- **[dikembalikan] `docs/adr/README.md`** sempat ter-rename lokal jadi `README_ADR.md` (isi identik,
+  belum di-commit) — dikembalikan: `README.md` adalah konvensi GitHub agar isi folder ter-render
+  otomatis sebagai indeks.
+
 ## Sedang dikerjakan
-- (kosong) — Admin CRUD + penyelarasan dokumentasi selesai di checkpoint hijau (152 Pest / 57 Vitest).
+- (kosong) — Senior review ronde 2 selesai di checkpoint hijau (158 Pest / 57 Vitest).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
 1. **Wiring realtime (Reverb + Echo)** — paling berdampak: kuota & antrian live. Server sudah ber-event/ber-test (`SlotAvailabilityChanged`, `GateQueueUpdated`). Perlu: `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` + sambung Laravel Echo di SPA → ganti polling/invalidasi manual dgn push (invalidate query saat event masuk). Lihat Jebakan.
 2. **Polish UI:** layout/nav bersama (saat ini link di Dashboard saja), loading skeleton, e2e happy-path.
 3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada); swap `GateEventGateway` ke TOS riil.
-4. **Backlog hardening sisa:** token abilities sempit (lihat *Senior review*) — ditegakkan saat aplikasi menerbitkan token ber-scope sempit. (3 item lain sudah [FIXED].)
+4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit) + tolak booking/reschedule ke window yang sudah lewat (lihat *Senior review ronde 2*). Temuan `$fillable` sudah [FIXED → ADR-0004].
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-07`: **Senior review ronde 2 → ADR-0004 baru + DemoSeeder pakai `forceFill`.**
+  Kode: `IdempotencyKey` (key kini scope `method|path` — fix replay lintas endpoint),
+  `Appointment`/`SlotWindow` (`$fillable` diperketat), `AppServiceProvider`
+  (`preventSilentlyDiscardingAttributes` non-prod), `DemoSeeder` (`forceFill` = bypass Action
+  yang disengaja & eksplisit; perilaku seed TIDAK berubah, `migrate:fresh --seed` diverifikasi).
+  Docs: `docs/adr/0004-guard-state-quota-columns.md` baru (+ tabel `docs/adr/README.md`),
+  `CODE-WALKTHROUGH` (format key idempotency), hitungan test diselaraskan ke **158 Pest /
+  57 Vitest** di README/ONBOARDING/SETUP-GUIDE/HANDOVER. Alasan: menutup temuan #4 ronde 1
+  (kontrak §JANGAN kini ditegakkan framework, bukan konvensi) + bug idempotency nyata.
+  Tidak menyentuh CLAUDE.md.
 - `2026-06-28`: **`docs/ARCHITECTURE.md` + log `docs/adr/` baru (P0 dari senior review arsitektur).**
   ARCHITECTURE.md: pola (Layered = ADR + Action/Command + Repository + Ports&Adapters +
   Event-driven), peta folder aktual, aturan aliran dependensi, trace request booking

@@ -282,7 +282,11 @@ class User extends Authenticatable
 - `$guard_name = 'api'`: **wajib** karena permission kita di-seed untuk guard `api`
   (lihat RolePermissionSeeder). Kalau tidak diset, cek `->can()` meleset.
 - `$fillable`: kolom yang boleh diisi massal (mass assignment). **Kenapa penting:**
-  cegah penyerang mengirim field tak terduga (mis. `is_admin`).
+  cegah penyerang mengirim field tak terduga (mis. `is_admin`). Kolom yang hanya boleh
+  diubah Action ber-lock **sengaja tidak** fillable: `status`/`version`/`company_id`
+  (Appointment) & `booked_count`/`status` (SlotWindow) — lihat `docs/adr/0004`.
+  Repository menulisnya via property assignment; seeder pakai `forceFill()` (bypass
+  eksplisit); factory memang unguarded by design.
 - `$hidden`: `password` tak pernah ikut saat model di-serialize ke JSON.
 - `'password' => 'hashed'`: set password otomatis di-hash. Bersifat *idempoten* —
   kalau nilai sudah hash, dibiarkan (jadi `Hash::make()` manual di seeder aman).
@@ -491,6 +495,7 @@ public function boot(): void
 {
     Model::preventLazyLoading(! $this->app->isProduction());
     Model::preventAccessingMissingAttributes(! $this->app->isProduction());
+    Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
 }
 ```
 - **`preventLazyLoading`:** kalau kode mengakses relasi yang belum di-`with()`
@@ -498,6 +503,9 @@ public function boot(): void
   saat ngoding, bukan jadi lambat di prod. Di production dimatikan (jangan crash).
 - **`preventAccessingMissingAttributes`:** error kalau baca kolom yang tidak ada
   (salah ketik nama kolom).
+- **`preventSilentlyDiscardingAttributes`:** mass-assign kolom di luar `$fillable`
+  (mis. `status`/`booked_count`, ADR-0004) melempar `MassAssignmentException` di
+  dev/test alih-alih dibuang diam-diam — pelanggaran kontrak ketahuan dini.
 - **Binding repository** didaftarkan di `register()` (Contracts → impl Eloquent):
   ```php
   $this->app->bind(SlotRepositoryInterface::class, SlotRepository::class);
@@ -772,12 +780,13 @@ final class AppointmentResource extends JsonResource
 
 **Middleware** `IdempotencyKey`:
 ```php
-$lock = Cache::lock("{$cacheKey}:lock", 10);
+$cacheKey = 'idem:'.$scope.':'.hash('sha256', $method.'|'.$path.'|'.$key);  // scope per endpoint!
+$lock = Cache::lock("{$cacheKey}:lock", $lockSeconds);   // config tas.idempotency.lock_seconds (60)
 if (! $lock->get()) abort(409);            // kembar masih in-flight
 try {
     $response = $next($request);
     if ($response instanceof JsonResponse && $response->getStatusCode() < 400) {
-        Cache::put($cacheKey, ['status'=>..., 'body'=>$response->getData(true)], now()->addHours(24));
+        Cache::put($cacheKey, ['status'=>..., 'body'=>$response->getData(true)], now()->addHours($ttlHours));
     }
     return $response;
 } finally { $lock->release(); }
@@ -785,6 +794,9 @@ try {
 Klien kirim header `Idempotency-Key: <uuid>`. Request kedua dengan key sama →
 **respons pertama diputar ulang** (header `Idempotent-Replayed: true`), **tanpa**
 membuat appointment baru. Krusial untuk mobile yang sering double-tap.
+`method|path` ikut di-hash (fix 2026-07-07): tanpanya, key sama yang dipakai ulang di
+endpoint LAIN (booking lalu gate-in) akan salah memutar ulang respons booking —
+idempotency berlaku **per operasi**, bukan per nilai header global.
 
 ### J.5 Test slice (TDD)
 Dua level, sesuai `CLAUDE.md`:
@@ -1377,10 +1389,12 @@ membuktikan benar lintas-batas chunk.
 durasi handler berat (booking + broadcast) → kedaluwarsa di tengah → duplikat menyelinap.
 ```php
 $lockSeconds = (int) config('tas.idempotency.lock_seconds', 60);   // > worst-case handler
-$cacheKey = 'idem:'.$scope.':'.hash('sha256', $key);   // bounded lintas store, anti injeksi
+$cacheKey = 'idem:'.$scope.':'.hash('sha256', $method.'|'.$path.'|'.$key);
+// bounded lintas store, anti injeksi + scope per endpoint (fix 2026-07-07:
+// tanpa method|path, key yang di-reuse di endpoint lain memutar ulang respons yang salah)
 ```
 Test: replay tetap benar walau Idempotency-Key panjang/berkarakter aneh (buah hashing);
-request kembar saat lock ditahan → 409.
+key sama di endpoint berbeda → TIDAK di-replay; request kembar saat lock ditahan → 409.
 
 ---
 

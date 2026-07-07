@@ -415,7 +415,7 @@ Contoh output sehat:
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
   ...
-  Tests:    152 passed (416 assertions)
+  Tests:    158 passed (425 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -654,7 +654,7 @@ hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, drive
 gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
 (§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
-Gerbang kualitas terakhir: `composer test` → **152 pass (416 assertions)** ·
+Gerbang kualitas terakhir: `composer test` → **158 pass (425 assertions)** ·
 `composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **57 pass**.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **wiring realtime

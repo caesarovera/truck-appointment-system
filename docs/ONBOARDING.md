@@ -130,7 +130,7 @@ Target realistis. Setiap hari diakhiri dengan satu hasil nyata.
 | Hari | Fokus | Hasil akhir hari itu |
 |------|-------|----------------------|
 | **1** | Orientasi + kontrak (Tahap 0–1) | Paham peta mental & 3 aturan emas; bisa sebut larangan utama |
-| **2** | Jalankan project (Tahap 2) | `composer test` **152 hijau** + `npm run test:js` **57 hijau** di mesinmu; bisa login SPA |
+| **2** | Jalankan project (Tahap 2) | `composer test` **158 hijau** + `npm run test:js` **57 hijau** di mesinmu; bisa login SPA |
 | **3** | Domain (Tahap 3) | Bisa gambar ulang state machine appointment & jelaskan 5 role |
 | **4** | Golden path (Tahap 4a) | Berhasil booking via curl + uji idempotency; paham `BookAppointmentAction` |
 | **5** | Latihan pertama | Selesaikan 1 latihan kecil (§12) lewat loop TDD; semua gerbang hijau |
@@ -284,7 +284,7 @@ php artisan migrate:fresh --seed     # skema baru + data demo
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
 composer fix                         # Pint (format)
 composer analyse                     # PHPStan level 8
-composer test                        # Pest (152 hijau)
+composer test                        # Pest (158 hijau)
 ./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
 
 # Menjalankan app
