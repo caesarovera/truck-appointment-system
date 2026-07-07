@@ -59,6 +59,13 @@ final class BookAppointmentAction
                 throw SlotUnavailableException::closed();
             }
 
+            // Window yang sudah berakhir tak boleh di-book: tanpa guard ini booking
+            // lolos lalu langsung disapu NO_SHOW ≤5 menit kemudian. Window yang
+            // sedang berjalan tetap boleh (truk masih bisa datang sebelum tutup).
+            if ($window->hasEnded()) {
+                throw SlotUnavailableException::expired();
+            }
+
             if (! $window->hasCapacity()) {
                 throw SlotUnavailableException::full();
             }

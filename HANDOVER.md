@@ -10,9 +10,9 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004).
+- Update terakhir: `2026-07-07` · Sesi: **Senior review ronde 2** — fix idempotency scope per endpoint + guard mass-assignment (ADR-0004) + tolak booking ke window yang sudah berakhir.
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **158 pass / 425 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **161 pass / 434 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **57 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 
 ## Sudah selesai
@@ -85,12 +85,15 @@
   dev/test alih-alih dibuang diam-diam. `DemoSeeder` beralih ke `forceFill()` (bypass yang
   disengaja & terlihat). Kenapa-nya lengkap di `docs/adr/0004-guard-state-quota-columns.md`.
   +5 test `tests/Feature/Hardening/MassAssignmentGuardTest.php`.
-- **[BACKLOG — disadari, belum dikerjakan] Booking ke window yang sudah lewat tidak ditolak.**
-  Window kemarin yang masih `OPEN` tetap bisa di-book; `NoShowSweepJob` akan menandainya
-  `NO_SHOW` ≤5 menit kemudian (kuota kembali, tak ada korupsi data — makanya bukan urgent).
-  Perbaikan wajar: tolak di `BookAppointmentAction`/`RescheduleAppointmentAction` bila
-  `window.date+end_time < now` (409). Butuh keputusan produk kecil (boleh book window yang
-  sedang berjalan?) → kerjakan sebagai slice TDD terpisah.
+- **[FIXED 2026-07-07 sesi lanjutan] Booking ke window yang sudah lewat tidak ditolak.**
+  Dulu: window kemarin yang masih `OPEN` bisa di-book → `NoShowSweepJob` menandainya
+  `NO_SHOW` ≤5 menit kemudian (absurd bagi transporter walau tak merusak data).
+  Kini: `SlotWindow::hasEnded()` (basis `date+end_time` — sama dengan deadline no-show)
+  ditolak `SlotUnavailableException::expired()` (409) di `BookAppointmentAction` &
+  `RescheduleAppointmentAction`. **Keputusan produk:** window yang **sedang berjalan**
+  (mulai tapi belum berakhir) tetap boleh di-book — truk masih bisa datang sebelum tutup.
+  Ikutan: default `SlotWindowFactory` pindah ke `date=besok` ("valid by default") supaya
+  test berjam-acak tidak flaky sore/malam; `dueForNoShow` refactor pakai `endsAt()`. +3 test.
 - **[catatan, risiko ~nol] `booking_code` collision salah-lapor.** `booking_code` unik di DB;
   bila 8-char random tabrakan (≈1/2.8×10¹²), `UniqueConstraintViolationException`-nya akan
   tertangkap sebagai `DuplicateBookingException` (pesan "kontainer sudah dibooking" — menyesatkan).
@@ -100,18 +103,27 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — Senior review ronde 2 selesai di checkpoint hijau (158 Pest / 57 Vitest).
+- (kosong) — Senior review ronde 2 + guard window-berakhir selesai di checkpoint hijau (161 Pest / 57 Vitest).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
 1. **Wiring realtime (Reverb + Echo)** — paling berdampak: kuota & antrian live. Server sudah ber-event/ber-test (`SlotAvailabilityChanged`, `GateQueueUpdated`). Perlu: `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` + sambung Laravel Echo di SPA → ganti polling/invalidasi manual dgn push (invalidate query saat event masuk). Lihat Jebakan.
 2. **Polish UI:** layout/nav bersama (saat ini link di Dashboard saja), loading skeleton, e2e happy-path.
 3. **Opsional backend:** laporan utilisasi company-scoped untuk transporter; CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada); swap `GateEventGateway` ke TOS riil.
-4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit) + tolak booking/reschedule ke window yang sudah lewat (lihat *Senior review ronde 2*). Temuan `$fillable` sudah [FIXED → ADR-0004].
+4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit). Temuan `$fillable` [FIXED → ADR-0004]; tolak booking ke window lewat [FIXED 2026-07-07].
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-07`: **Guard "window sudah berakhir" (409) + default `SlotWindowFactory` → besok.**
+  Kode: `SlotWindow::endsAt()/hasEnded()`, `SlotUnavailableException::expired()`, guard di
+  `Book/RescheduleAppointmentAction`, `dueForNoShow` reuse `endsAt()`. Factory default
+  `date=besok`: window berjam-acak dengan `date=hari-ini` bisa sudah berakhir saat suite
+  jalan sore/malam → flaky; test yang butuh hari-ini/masa-lalu memang sudah set eksplisit.
+  Docs: `BUSINESS-FLOW §3.2b/§3.3` (aturan tolak), `CODE-WALKTHROUGH §J` (guard expired),
+  hitungan test → **161 Pest / 434 assert**. Alasan: tutup backlog ronde 2 — booking yang
+  langsung jadi NO_SHOW ≤5 menit itu jebakan UX; keputusan produk: window berjalan tetap
+  boleh di-book. Tidak menyentuh CLAUDE.md/seeder.
 - `2026-07-07`: **Senior review ronde 2 → ADR-0004 baru + DemoSeeder pakai `forceFill`.**
   Kode: `IdempotencyKey` (key kini scope `method|path` — fix replay lintas endpoint),
   `Appointment`/`SlotWindow` (`$fillable` diperketat), `AppServiceProvider`

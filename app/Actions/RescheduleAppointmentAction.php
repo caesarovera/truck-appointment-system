@@ -70,6 +70,11 @@ final class RescheduleAppointmentAction
             if (! $to->isOpen()) {
                 throw SlotUnavailableException::closed();
             }
+            // Guard yang sama dengan booking: window tujuan yang sudah berakhir
+            // hanya akan mengantar appointment ke sapuan NO_SHOW berikutnya.
+            if ($to->hasEnded()) {
+                throw SlotUnavailableException::expired();
+            }
             if (! $to->hasCapacity()) {
                 throw SlotUnavailableException::full();
             }

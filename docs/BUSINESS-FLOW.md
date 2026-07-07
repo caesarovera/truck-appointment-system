@@ -103,14 +103,14 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 3. `POST /api/v1/appointments` dengan header `Idempotency-Key`.
 4. `BookAppointmentAction` dalam `DB::transaction(attempts:3)`:
    a. `SlotWindow::where(id)->lockForUpdate()->first()`.
-   b. Jika `booked_count >= capacity` atau `status != OPEN` → tolak `409 Conflict`.
+   b. Jika `booked_count >= capacity`, `status != OPEN`, atau window **sudah berakhir** (`date+end_time` lewat; window berjalan masih boleh) → tolak `409 Conflict`.
    c. Buat appointment `status = BOOKED`, `booked_count++`.
    d. (Validasi dokumen lolos → langsung `CONFIRMED`.)
 5. Commit → Event `AppointmentBooked` → listener: kirim notifikasi ke sopir, jadwalkan `AppointmentReminderJob` (H-2 jam), invalidate cache, broadcast sisa kuota.
 > Dua transporter berebut slot terakhir: hanya satu lolos karena `lockForUpdate`; yang lain dapat `409`. Unique constraint `(slot_window_id, container_no)` aktif sebagai jaring terakhir.
 
 ### 3.3 Transporter reschedule / cancel
-- **Reschedule:** kirim `version` terakhir. `RescheduleAppointmentAction` lock kedua window (lama & baru), cek `version` cocok (kalau tidak → `409` optimistic lock gagal), pindahkan kuota, `version++`. Event `AppointmentRescheduled` → reminder lama dibatalkan, reminder baru dijadwalkan.
+- **Reschedule:** kirim `version` terakhir. `RescheduleAppointmentAction` lock kedua window (lama & baru), cek `version` cocok (kalau tidak → `409` optimistic lock gagal), window tujuan harus belum berakhir (guard yang sama dengan booking), pindahkan kuota, `version++`. Event `AppointmentRescheduled` → reminder lama dibatalkan, reminder baru dijadwalkan.
 - **Cancel:** hanya sebelum `ARRIVED`. Kuota window dikembalikan dalam transaksi ber-lock. Event `AppointmentCancelled`.
 
 ### 3.4 Driver di hari-H

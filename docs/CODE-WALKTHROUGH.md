@@ -690,6 +690,7 @@ public function execute(User $actor, BookAppointmentData $data): Appointment
         $window = $this->slots->lockForUpdate($data->slotWindowId);     // (1) KUNCI
         if ($window === null)            throw (new ModelNotFoundException)->setModel(SlotWindow::class);
         if (! $window->isOpen())         throw SlotUnavailableException::closed();   // (2) 409
+        if ($window->hasEnded())         throw SlotUnavailableException::expired();   // (2) 409
         if (! $window->hasCapacity())    throw SlotUnavailableException::full();      // (2) 409
 
         try {
@@ -707,7 +708,11 @@ public function execute(User $actor, BookAppointmentData $data): Appointment
 ```
 Nomor-nomor di atas:
 1. **Lock** baris slot — serialisasi perebut slot terakhir.
-2. Tolak kalau **ditutup/penuh** → exception ber-`render()` jadi **409**.
+2. Tolak kalau **ditutup/sudah berakhir/penuh** → exception ber-`render()` jadi **409**.
+   "Sudah berakhir" = `date+end_time` lewat (`SlotWindow::hasEnded()`, basis waktu yang
+   sama dengan deadline no-show); window yang **sedang berjalan** masih boleh di-book —
+   truk masih bisa datang sebelum tutup. Tanpa guard ini, booking ke window kemarin
+   lolos lalu langsung disapu `NO_SHOW` ≤5 menit kemudian.
 3. Kalau kontainer sudah dibooking di window itu, DB melempar unik-violation →
    diterjemahkan jadi **`DuplicateBookingException` (409)**. Ini "jaring terakhir"
    bila idempotency HTTP terlewat.

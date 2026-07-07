@@ -24,6 +24,11 @@ final class SlotUnavailableException extends RuntimeException
         return new self('Slot window sudah ditutup untuk booking.');
     }
 
+    public static function expired(): self
+    {
+        return new self('Slot window sudah berakhir.');
+    }
+
     public function render(Request $request): JsonResponse
     {
         return response()->json([

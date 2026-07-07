@@ -20,7 +20,11 @@ class SlotWindowFactory extends Factory
 
         return [
             'gate_id' => Gate::factory(),
-            'date' => now()->toDateString(),
+            // Besok, bukan hari ini: default factory harus "valid untuk di-book".
+            // Dengan date=hari-ini, window berjam-acak bisa sudah berakhir saat test
+            // jalan sore/malam → guard hasEnded() bikin test flaky. Test yang butuh
+            // hari-ini/masa-lalu set 'date' eksplisit.
+            'date' => now()->addDay()->toDateString(),
             'start_time' => sprintf('%02d:00:00', $hour),
             'end_time' => sprintf('%02d:00:00', $hour + 1),
             'capacity' => 5,

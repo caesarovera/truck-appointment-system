@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\SlotWindowStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\SlotWindowFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -56,6 +57,21 @@ class SlotWindow extends Model
     public function isOpen(): bool
     {
         return $this->status === SlotWindowStatus::OPEN;
+    }
+
+    /** Momen window berakhir (date + end_time) — basis deadline no-show & guard booking. */
+    public function endsAt(): Carbon
+    {
+        return $this->date->copy()->setTimeFromTimeString($this->end_time);
+    }
+
+    /**
+     * Sudah berakhirkah window ini? Window berjalan (mulai tapi belum berakhir)
+     * TIDAK dianggap berakhir — truk masih bisa datang sebelum tutup.
+     */
+    public function hasEnded(?CarbonInterface $now = null): bool
+    {
+        return $this->endsAt()->lessThanOrEqualTo($now ?? Carbon::now());
     }
 
     public function hasCapacity(): bool

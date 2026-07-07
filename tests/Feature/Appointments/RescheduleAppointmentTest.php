@@ -60,6 +60,28 @@ it('moves the appointment to a new window, shifting quota and bumping version', 
     expect(Container::query()->where('appointment_id', $appointment->id)->value('slot_window_id'))->toBe($to->id);
 });
 
+it('rejects rescheduling into a window that has already ended (409)', function (): void {
+    ['user' => $user, 'appointment' => $appointment, 'from' => $from] = rescheduleScenario();
+    Sanctum::actingAs($user);
+
+    // Window tujuan sudah berakhir kemarin — tanpa guard, appointment pindah
+    // ke sana lalu langsung disapu NO_SHOW oleh sweep.
+    $ended = SlotWindow::factory()->create([
+        'date' => now()->subDay()->toDateString(),
+        'start_time' => '08:00:00',
+        'end_time' => '09:00:00',
+    ]);
+
+    postJson("/api/v1/appointments/{$appointment->id}/reschedule", [
+        'slot_window_id' => $ended->id,
+        'version' => 1,
+    ])->assertStatus(409)->assertJsonPath('error', 'slot_unavailable');
+
+    // Tidak ada yang berpindah.
+    expect($appointment->fresh()->slot_window_id)->toBe($from->id)
+        ->and($ended->fresh()->booked_count)->toBe(0);
+});
+
 it('rejects a stale version (409 optimistic lock)', function (): void {
     ['user' => $user, 'appointment' => $appointment, 'to' => $to, 'from' => $from] = rescheduleScenario();
     Sanctum::actingAs($user);

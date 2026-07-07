@@ -125,9 +125,7 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
                         continue;
                     }
 
-                    $deadline = $window->date->copy()
-                        ->setTimeFromTimeString($window->end_time)
-                        ->addMinutes($graceMinutes);
+                    $deadline = $window->endsAt()->addMinutes($graceMinutes);
 
                     if ($deadline->lessThan($now)) {
                         $due->push($appointment);

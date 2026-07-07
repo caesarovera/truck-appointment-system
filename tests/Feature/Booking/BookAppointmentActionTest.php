@@ -81,6 +81,58 @@ it('rejects booking when the window is closed (409)', function (): void {
         ->toThrow(SlotUnavailableException::class);
 });
 
+it('rejects booking into a window that has already ended (409)', function (): void {
+    $this->travelTo(now()->setTime(12, 0)); // jauh dari tengah malam → window ±1 jam deterministik
+    ['actor' => $actor, 'window' => $window] = bookingScenario();
+    // Window kemarin yang lupa ditutup: tanpa guard ini booking lolos lalu
+    // langsung disapu NO_SHOW ≤5 menit kemudian — absurd bagi transporter.
+    $past = SlotWindow::factory()->create([
+        'date' => now()->subDay()->toDateString(),
+        'start_time' => '08:00:00',
+        'end_time' => '09:00:00',
+    ]);
+
+    $truck = Truck::query()->where('company_id', $actor->company_id)->firstOrFail();
+    $data = new BookAppointmentData(
+        slotWindowId: $past->id,
+        truckId: $truck->id,
+        driverId: User::query()->where('company_id', $actor->company_id)->whereKeyNot($actor->id)->firstOrFail()->id,
+        moveType: MoveType::DELIVERY,
+        containerNo: 'PAST0000001',
+    );
+
+    expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
+        ->toThrow(SlotUnavailableException::class, 'berakhir');
+
+    expect($past->fresh()->booked_count)->toBe(0);
+});
+
+it('still allows booking a window that is currently running', function (): void {
+    $this->travelTo(now()->setTime(12, 0)); // jauh dari tengah malam → window ±1 jam deterministik
+    Event::fake();
+    ['actor' => $actor, 'window' => $window] = bookingScenario();
+    // Sudah mulai tapi belum berakhir → truk masih bisa datang sebelum tutup.
+    $running = SlotWindow::factory()->create([
+        'date' => now()->toDateString(),
+        'start_time' => now()->subHour()->format('H:i:s'),
+        'end_time' => now()->addHour()->format('H:i:s'),
+    ]);
+
+    $truck = Truck::query()->where('company_id', $actor->company_id)->firstOrFail();
+    $data = new BookAppointmentData(
+        slotWindowId: $running->id,
+        truckId: $truck->id,
+        driverId: User::query()->where('company_id', $actor->company_id)->whereKeyNot($actor->id)->firstOrFail()->id,
+        moveType: MoveType::DELIVERY,
+        containerNo: 'RUNN0000001',
+    );
+
+    $appointment = app(BookAppointmentAction::class)->execute($actor, $data);
+
+    expect($appointment->slot_window_id)->toBe($running->id)
+        ->and($running->fresh()->booked_count)->toBe(1);
+});
+
 it('never over-books the last slot', function (): void {
     // Window sisa 1. Booking pertama lolos, kedua harus 409 — kuota tetap = capacity.
     ['actor' => $actor, 'data' => $data, 'window' => $window] = bookingScenario(capacity: 1, booked: 0);
