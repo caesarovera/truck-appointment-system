@@ -93,7 +93,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 ### 3.1 Planner membuka jendela slot
 1. Planner pilih terminal + gate + tanggal, set `capacity` per jam (mis. 20 truk/jam, 06:00–22:00).
 2. `OpenSlotWindowAction` membuat baris `slot_windows` (`booked_count = 0`).
-3. Event `SlotWindowOpened` → invalidate `Cache::tags(['slot', "gate:{$gateId}"])`.
+3. Event `SlotWindowOpened` → invalidate cache ketersediaan gate+tanggal itu (**explicit-key `Cache::forget`**, bukan `Cache::tags` — lihat `CLAUDE.md` §Hardening → Cache).
 4. Window langsung muncul di endpoint ketersediaan & broadcast ke channel `slot.{gateId}`.
 > Edge: planner menutup window → `CloseSlotWindowAction` set `status = CLOSED`, BUKAN delete. Appointment existing tetap valid, booking baru ditolak. Bila window batal total (mis. RTG down), planner pakai `appointment.override` untuk reschedule/cancel massal appointment terdampak — setiap aksi tercatat di Activity Log.
 

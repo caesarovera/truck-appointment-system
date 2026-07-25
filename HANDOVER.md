@@ -193,13 +193,25 @@
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
 2. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
-3. **[SELESAI 2026-07-25 — baris Docker Compose di CLAUDE.md dikoreksi]** Sisa yang masih perlu keputusan Anda: baris **`Queue/Cache/Session: Redis 7 + Horizon`** (CLAUDE.md §Stack) juga belum mencerminkan kenyataan — `.env` dev memakai `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`, `DB_CONNECTION=sqlite`, `BROADCAST_CONNECTION=log`. **Nol Redis dipakai** (var `REDIS_*` ada tapi tak menyentuh apa pun). Ini penyakit yang sama dengan klaim Docker/CI. Dua pilihan sah: (a) tandai baris itu sebagai **target**, bukan keadaan (mis. "target produksi: Redis 7 + Horizon; dev: driver `database`") — ini menjaga alasan keputusan `Cache::flexible` explicit-key yang memang bersandar pada "nanti pindah ke Redis"; atau (b) benar-benar pasang Redis. **Belum dikerjakan karena mengubah §Stack = perubahan kontrak, butuh keputusan pemilik repo.**
+3. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
 4. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
 5. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` baris Redis ditandai TARGET + aturan cache diperbaiki.**
+  (1) §Stack: `Queue/Cache/Session: Redis 7 + Horizon` → dipisah jadi **target produksi** vs **dev
+  sekarang** (driver `database`, DB `sqlite`, `BROADCAST_CONNECTION=log`). Redis tetap tercatat sebagai
+  arah — penting, karena keputusan cache di bawah ini bersandar padanya.
+  (2) §Hardening → Cache: aturan lama menyuruh `Cache::tags(...)`, padahal `SlotRepository` justru
+  memakai **explicit-key `Cache::flexible` + `Cache::forget`** sejak `2026-06-27` karena store
+  `database` **tak mendukung tagging**. Jadi kontrak selama ini memerintahkan pola yang **akan rusak**
+  kalau benar-benar diikuti — lebih berbahaya daripada klaim status yang basi, sebab ini instruksi
+  yang menghasilkan kode salah. Kini aturannya berbunyi explicit-key, dengan izin refaktor ke
+  `Cache::tags` **setelah** pindah ke Redis. Alasan: penyimpangan itu sudah tercatat di changelog
+  `2026-06-27`, tapi tak pernah naik ke kontrak — persis pola "dokumen tahu, kontrak tidak" yang
+  membuat klaim CI & Docker luput. Tidak menyentuh kode/seeder/test (kode sudah benar sejak awal).
 - `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` §Stack baris infra dikoreksi.** Sebelumnya
   `* Infra: Docker Compose · CI: GitHub Actions` — **dua-duanya tidak ada** saat itu. Kini dipecah
   jadi dua baris jujur: (1) *Infra dev: **native, tanpa Docker** (PHP + SQLite); `docker-compose.yml`

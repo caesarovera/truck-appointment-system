@@ -18,7 +18,7 @@ API-first decoupled. Laravel 12 = REST API murni. Vue 3 = SPA terpisah. Bukan In
 
 * Backend: Laravel 12, PHP 8.3+ (`declare(strict_types=1)` wajib)
 * Auth: Sanctum (token + scopes) — scope per role, lihat `docs/BUSINESS-FLOW.md §1`
-* Queue/Cache/Session: Redis 7 + Horizon
+* Queue/Cache/Session — **target produksi:** Redis 7 + Horizon. **Dev sekarang:** driver `database` (DB `sqlite`, `BROADCAST_CONNECTION=log`). Bedanya bukan sekadar catatan — lihat konsekuensinya di §Hardening → Cache.
 * Realtime: Reverb (WebSocket) + Laravel Echo — channel `slot.{gateId}` (kuota live) & `gate.queue.{terminalId}`
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
@@ -59,7 +59,7 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 * Counter `booked_count` per slot window → naik/turun di dalam transaksi yang sama dengan create/cancel appointment.
 
 ### Cache
-* `Cache::tags(['slot', "gate:{$gateId}"])` untuk invalidasi selektif saat booking/cancel. Jangan `Cache::flush()`.
+* Invalidasi selektif saat booking/cancel: **explicit-key `Cache::forget`** (lihat `SlotRepository`), **BUKAN `Cache::tags`** — store `database` yang dipakai dev tak mendukung tagging. Boleh refaktor ke `Cache::tags(['slot', "gate:{$gateId}"])` **setelah** benar-benar pindah ke Redis (lihat §Stack). Jangan `Cache::flush()`.
 * Endpoint publik ketersediaan slot (`GET /api/v1/slots/availability`) di-poll banyak transporter → `Cache::flexible($key, [10, 30], $cb)` (anti-stampede).
 
 ### Queue
