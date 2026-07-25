@@ -24,6 +24,7 @@ Status yang dipakai: `Accepted` · `Superseded by ADR-XXXX` · `Deprecated`.
 | [0002](0002-repository-interface.md) | Akses data lewat Repository ber-interface (Ports & Adapters) | Accepted |
 | [0003](0003-defer-token-abilities.md) | Tunda penegakan token abilities Sanctum | Accepted |
 | [0004](0004-guard-state-quota-columns.md) | Guard kolom state & kuota dari mass-assignment | Accepted |
+| [0005](0005-ci-github-actions.md) | CI di GitHub Actions; e2e ditunda | Accepted |
 
 ## Cara menambah ADR
 1. Salin format di salah satu file di atas, nomori berikutnya (`000N-judul-kebab.md`).

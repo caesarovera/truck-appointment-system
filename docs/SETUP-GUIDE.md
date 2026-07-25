@@ -27,6 +27,7 @@
 11. [Troubleshooting (error nyata yang kami temui)](#11-troubleshooting)
 12. [Checklist verifikasi akhir](#12-checklist-verifikasi-akhir)
 13. [Lampiran: peta file yang dihasilkan](#13-lampiran-peta-file-yang-dihasilkan)
+14. [CI (GitHub Actions)](#14-ci-github-actions) · [14a untuk apa](#14a-untuk-apa-ci-ini-ada) · [14b apa yang dijalankan](#14b-apa-yang-dijalankan) · [14c cara memakai](#14c-cara-memakainya-sehari-hari)
 
 ---
 
@@ -668,8 +669,88 @@ status INACTIVE). Frontend: SPA Vue untuk transporter, driver, gate-officer, pla
 (§J–§W backend) & `docs/FRONTEND.md` (SPA).
 
 Gerbang kualitas terakhir: `composer test` → **191 pass (494 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **87 pass**.
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **87 pass**. Semuanya kini juga
+berjalan otomatis tiap push — lihat §14.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **verifikasi realtime
 di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCAST_CONNECTION=reverb`
-+ 2 browser); swap `GateEventGateway` ke TOS riil; polish UI (skeleton, e2e).
++ 2 browser); swap `GateEventGateway` ke TOS riil; polish UI (skeleton DONE, e2e ditunda — ADR-0005).
+
+---
+
+## 14. CI (GitHub Actions)
+
+### 14a. Untuk apa CI ini ada
+
+Sebelum 2026-07-25 repo tidak punya CI sama sekali (padahal `CLAUDE.md` mengklaim ada).
+Artinya 191 Pest + 87 Vitest **hanya jalan kalau ada yang ingat mengetik perintahnya**.
+Itu justru berbahaya di proyek yang dikerjakan lintas sesi & lintas perangkat: satu commit
+bisa hijau di laptop A dan merah di repo tanpa siapa pun tahu.
+
+CI menutup lubang itu. Perannya **satu kalimat**: tiap `git push` ke `main` dan tiap PR,
+seluruh gerbang kualitas dijalankan ulang di mesin bersih — supaya "hijau" berhenti
+bergantung pada disiplin & isi folder lokal seseorang.
+
+Yang **bukan** perannya: menggantikan test lokal. Loop TDD tetap di laptop (hitungan detik);
+CI adalah jaring pengaman terakhir, bukan tempat pertama kali mencoba.
+
+### 14b. Apa yang dijalankan
+
+File: `.github/workflows/ci.yml`. Dua job **paralel** (gagal di satu tak menutupi info job lain):
+
+| Job | Langkah | Perintah |
+|-----|---------|----------|
+| **backend** | format → analisis → test | `composer lint` · `composer analyse` · `composer test` |
+| **frontend** | test → tipe → bundel | `npm run test:js` · `npm run type-check` · `npm run build` |
+
+Perintahnya **sama persis dengan yang dipakai lokal**. Ini disengaja: kalau CI memakai
+rangkaian perintahnya sendiri, "hijau di CI" dan "hijau di laptop" berhenti berarti hal yang
+sama. Konsekuensinya — **menambah gerbang baru di lokal tanpa menambahkannya ke workflow
+membuat gerbang itu tak berlaku saat push.**
+
+Empat keputusan di dalam workflow yang perlu diketahui:
+
+* **`if: ${{ !cancelled() }}`** pada langkah setelah yang pertama → satu push melaporkan
+  **semua** gerbang yang rusak, bukan berhenti di kegagalan pertama. Hemat siklus push-tunggu.
+* **Tanpa `--ignore-platform-req`.** Di Windows, `composer install` perlu flag itu karena
+  Horizon minta `ext-pcntl`/`ext-posix` (§3b). Di Linux keduanya ada, jadi CI memverifikasi
+  dependensi apa adanya — sekaligus mendeteksi bila ada yang selama ini lolos hanya berkat flag.
+* **Tanpa service container database.** `phpunit.xml` memaksa sqlite `:memory:`, jadi tak ada
+  MySQL/Postgres yang perlu dinyalakan. CI juga tak menyentuh `database/database.sqlite`.
+* **Versi dipatok menyamai mesin dev** (PHP 8.3, Node 22) supaya beda versi tak jadi sumber
+  "hijau lokal, merah di CI". Kalau mesin dev naik versi, naikkan juga di workflow.
+
+### 14c. Cara memakainya sehari-hari
+
+CI tidak perlu dinyalakan — GitHub membacanya otomatis begitu `.github/workflows/ci.yml` ada
+di branch. Tidak ada secret/token yang perlu dipasang (semua gerbang berjalan offline).
+
+```bash
+git push                      # CI langsung jalan
+```
+
+Melihat hasil: repo di GitHub → tab **Actions** → pilih run teratas. Centang hijau = semua
+gerbang lolos; silang merah = klik job yang merah, buka langkah yang merah, log-nya sama
+persis dengan output lokal.
+
+**Kalau CI merah, jangan menebak-nebak lewat push berulang.** Jalankan gerbang yang sama di
+lokal — outputnya identik karena perintahnya identik:
+
+```bash
+composer lint      # Pint: format. Perbaiki dengan `composer fix`
+composer analyse   # PHPStan lvl 8
+composer test      # Pest
+npm run test:js && npm run type-check && npm run build
+```
+
+Kegagalan yang khas dan artinya:
+
+| Gejala di CI | Biasanya karena |
+|--------------|-----------------|
+| `backend` merah di langkah **Pint** | lupa `composer fix` sebelum commit |
+| `backend` merah di **Install dependensi** | `composer.lock` tak sinkron dengan `composer.json` — commit lock-nya |
+| `frontend` merah di **Vitest** tapi hijau lokal | file test/aset baru belum di-commit (CI cuma punya yang ada di git) |
+| `frontend` merah di **Build** saja | error yang hanya muncul saat bundling — Vitest & vue-tsc memang tak menangkapnya |
+| Semua job merah tepat setelah ganti versi PHP/Node lokal | versi di workflow belum ikut dinaikkan (§14b) |
+
+> Alasan lengkap kenapa CI didahulukan dan kenapa **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.

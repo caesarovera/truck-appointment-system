@@ -1,5 +1,7 @@
 # Truck Appointment System (TAS)
 
+[![CI](https://github.com/caesarovera/truck-appointment-system/actions/workflows/ci.yml/badge.svg)](https://github.com/caesarovera/truck-appointment-system/actions/workflows/ci.yml)
+
 Sistem penjadwalan kedatangan truk ke terminal peti kemas: perusahaan angkutan
 **booking slot** gate berkuota per jendela waktu, truk datang di slotnya, petugas
 gate melakukan **gate-in → bongkar/muat → gate-out**. Tujuan: meratakan antrian,
@@ -17,6 +19,11 @@ Status: backend MVP API lengkap & ber-test (**191 Pest**); SPA mencakup UI **4 p
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
 company/user) + **CRUD armada truk transporter** + **realtime kuota/antrian live (Reverb +
 Echo)** (**87 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
+
+**CI:** tiap push ke `main` & tiap PR menjalankan ulang semua gerbang di mesin bersih —
+backend (Pint · PHPStan lvl 8 · Pest) dan frontend (Vitest · vue-tsc · build) sebagai dua job
+paralel. Perintahnya sama persis dengan yang dipakai lokal, jadi "hijau di CI" = "hijau di
+laptop". Cara pakai & cara membaca kegagalan: [`docs/SETUP-GUIDE.md §14`](docs/SETUP-GUIDE.md#14-ci-github-actions).
 
 ## Mulai dari mana (urutan onboarding)
 
@@ -41,7 +48,7 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 | [`CLAUDE.md`](CLAUDE.md) | **Kontrak arsitektur** (aturan layer, hardening, larangan) | sebelum menulis kode apa pun |
 | [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
 | [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
-| [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah | menyiapkan/menjalankan project |
+| [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah (**§14 = CI**) | menyiapkan/menjalankan project · CI merah |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Pola arsitektur & peta folder** + trace request antar-lapisan | memahami struktur & aliran besar |
 | [`docs/adr/`](docs/adr/) | **Architecture Decision Records** — keputusan beralasan ("kenapa dulu begini") | sebelum mengubah keputusan arsitektur |
 | [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail kode backend** + contoh | memahami "kenapa" sebuah kode backend |

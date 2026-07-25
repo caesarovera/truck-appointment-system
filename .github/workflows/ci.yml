@@ -1,0 +1,99 @@
+# Gerbang kualitas otomatis. Menjalankan PERSIS perintah yang dipakai lokal
+# (composer lint/analyse/test · npm run test:js/type-check/build) supaya "hijau di
+# laptop" dan "hijau di CI" berarti hal yang sama. Kalau perintahnya berubah di
+# composer.json/package.json, ubah di sini juga.
+#
+# Penjelasan lengkap + cara baca kegagalan: docs/SETUP-GUIDE.md §14.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Push beruntun ke branch yang sama: batalkan run lama yang sudah tak relevan.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — Pint · PHPStan · Pest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          # pcntl/posix dibutuhkan Horizon. Di Windows keduanya tak ada — makanya
+          # dev lokal perlu --ignore-platform-req (lihat SETUP-GUIDE §3b). Di Linux
+          # keduanya tersedia, jadi CI TIDAK memakai flag itu: composer install di
+          # sini memverifikasi dependensi apa adanya, tanpa pengecualian.
+          extensions: pcntl, posix, pdo_sqlite, sqlite3, mbstring
+          coverage: none
+
+      - name: Cache dependensi Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install dependensi
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Siapkan .env + APP_KEY
+        # Test butuh APP_KEY (enkripsi/hash). DB tidak disiapkan di sini: phpunit.xml
+        # memaksa sqlite :memory:, jadi CI tak perlu service container database.
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Pint (format)
+        run: composer lint
+
+      - name: PHPStan level 8
+        # !cancelled() = tetap jalan walau step sebelumnya merah. Tujuannya: satu
+        # push melaporkan SEMUA gerbang yang rusak, bukan cuma yang pertama gagal.
+        if: ${{ !cancelled() }}
+        run: composer analyse
+
+      - name: Pest
+        if: ${{ !cancelled() }}
+        run: composer test
+
+  frontend:
+    name: Frontend — Vitest · vue-tsc · build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          # Samakan dengan mesin dev supaya beda versi tak jadi sumber "hijau lokal,
+          # merah di CI".
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependensi
+        # `npm ci` (bukan `npm install`): patuh pada package-lock.json, jadi CI
+        # menguji versi yang sama persis dengan yang terkunci di repo.
+        run: npm ci
+
+      - name: Vitest
+        run: npm run test:js
+
+      - name: Type-check (vue-tsc)
+        if: ${{ !cancelled() }}
+        run: npm run type-check
+
+      - name: Build produksi
+        # Build ikut jadi gerbang: error yang cuma muncul saat bundling (import
+        # circular, aset hilang) tak tertangkap Vitest maupun vue-tsc.
+        if: ${{ !cancelled() }}
+        run: npm run build

@@ -296,6 +296,10 @@ npm run test:js                      # Vitest (87 hijau)
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
+# Keenam perintah di atas juga dijalankan otomatis oleh CI tiap push/PR
+# (.github/workflows/ci.yml). Jalankan dulu di lokal — jangan pakai push
+# berulang sebagai cara mencari tahu apa yang rusak. Detail: SETUP-GUIDE §14.
+
 # Realtime (Windows native — TANPA Docker):
 php artisan reverb:start             # websocket (butuh BROADCAST_CONNECTION=reverb + worker)
 php artisan queue:listen             # proses job broadcast (ShouldBroadcast → queue)
@@ -320,6 +324,7 @@ Jangan baca semua dokumen tiap kali. Sesuaikan tugas:
 | **Frontend** Vue | FRONTEND.md (4 lapisan + pola TanStack Query + jebakan Vitest) |
 | **Admin CRUD** (lintas company) | CODE-WALKTHROUGH §V + FRONTEND §4 |
 | **CRUD ber-scope company sendiri** | CODE-WALKTHROUGH §W (armada truk) — pola `company_id` dari user login, bukan input |
+| **CI merah setelah push** | SETUP-GUIDE §14c (tabel gejala→sebab) — jalankan gerbang yang sama di lokal, outputnya identik |
 | Cari status proyek | HANDOVER.md |
 | Butuh akun/data uji | DUMMY-DATA.md |
 
@@ -387,7 +392,7 @@ Semua password `password`: `admin@tas.test`, `planner@tas.test`, `gate@tas.test`
 | `CLAUDE.md` | **Kontrak arsitektur** (aturan layer, hardening, JANGAN) | sebelum menulis kode | rujuk terus |
 | `docs/ARCHITECTURE.md` | Pola arsitektur, peta folder, trace request antar-lapisan | memahami struktur besar | sekali + rujuk |
 | `docs/adr/` | Architecture Decision Records — alasan keputusan | sebelum mengubah keputusan arsitektur | rujuk |
-| `docs/SETUP-GUIDE.md` | Setup & build manual + endpoint + troubleshooting | menyiapkan/menjalankan | sekali + rujuk |
+| `docs/SETUP-GUIDE.md` | Setup & build manual + endpoint + troubleshooting + **§14 CI** | menyiapkan/menjalankan · CI merah | sekali + rujuk |
 | `docs/BUSINESS-FLOW.md` | Domain: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema | rujuk per fitur |
 | `docs/CODE-WALKTHROUGH.md` | Penjelasan detail kode **backend** + "kenapa" | memahami kode backend | rujuk per slice |
 | `docs/FRONTEND.md` | Penjelasan detail **Vue SPA** + pola TanStack Query | memahami/menyentuh SPA | rujuk per fitur FE |

@@ -17,6 +17,24 @@
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **CI GitHub Actions (2026-07-25) — menutup klaim kontrak yang selama ini tidak benar.**
+  `CLAUDE.md` mencantumkan "CI: GitHub Actions" sejak awal, tapi **`.github/` tidak pernah ada**.
+  Akibatnya nyata: 191 Pest + 87 Vitest hanya jalan bila ada yang ingat mengetik perintahnya —
+  di proyek lintas-sesi/lintas-perangkat seperti ini, gerbang kualitas praktis tak menjaga apa pun
+  saat `push`. `.github/workflows/ci.yml` = **2 job paralel**: `backend` (`composer lint`→`analyse`
+  →`test`) & `frontend` (`npm run test:js`→`type-check`→`build`). **Prinsip: CI memanggil perintah
+  yang SAMA PERSIS dengan lokal** — kalau CI punya rangkaian sendiri, "hijau di CI" dan "hijau di
+  laptop" berhenti berarti sama. Konsekuensi yang harus diingat: **menambah gerbang baru di lokal
+  tanpa menambahkannya ke workflow = gerbang itu tak berlaku saat push.** Detail keputusan lain:
+  `if: !cancelled()` (satu push melaporkan SEMUA gerbang rusak, bukan berhenti di yang pertama);
+  **tanpa `--ignore-platform-req`** (flag itu kebutuhan Windows karena Horizon minta `ext-pcntl`/
+  `ext-posix`; di Linux ada, jadi CI memverifikasi dependensi apa adanya); **tanpa service container
+  DB** (`phpunit.xml` memaksa sqlite `:memory:`); versi dipatok menyamai mesin dev (PHP 8.3, Node 22).
+  Cara pakai + tabel gejala→sebab saat CI merah: `docs/SETUP-GUIDE.md §14`. Alasan CI didahulukan
+  & **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.
+  **BELUM DIVERIFIKASI:** run pertama belum dilihat hijau — mesin dev tak punya `gh` CLI, jadi
+  hasilnya harus dicek manual di tab **Actions** GitHub. Kalau merah, kemungkinan besar hal kecil
+  (nama action/versi), bukan perintah gerbangnya — keenam perintah itu terbukti hijau lokal.
 - [x] **Polish UI — skeleton loading (2026-07-25):** `components/SkeletonRows.vue` (props `rows`,
   `label`) menggantikan teks `Memuat…` di **11 titik / 8 halaman + `RescheduleDialog`**. Alasan
   utamanya bukan estetika: placeholder setinggi konten asli menghapus **layout shift** saat data
@@ -168,18 +186,31 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (191 Pest / 87 Vitest); terakhir: skeleton loading (polish UI bagian 1).
+- (kosong) — checkpoint hijau (191 Pest / 87 Vitest); terakhir: CI GitHub Actions dipasang.
+  **Satu hal menggantung:** run CI pertama belum dilihat hijau (tak ada `gh` CLI di mesin dev) →
+  cek tab **Actions** di GitHub, itu langkah pertama sesi berikutnya.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
-2. **Polish UI — sisa: e2e happy-path.** Loading skeleton **DONE** (lihat *Sudah selesai*). E2E **belum dimulai**: repo tak punya tooling e2e sama sekali (`package.json` cuma Vitest), jadi perlu paket baru (Playwright/Cypress) → **kontrak CLAUDE.md mewajibkan konfirmasi sebelum tambah paket**. Catatan teknis saat memutuskan: Playwright berdiri sendiri (tak lewat Vite, jadi pin vite6 aman) tapi mengunduh binary browser ~100-an MB; e2e juga butuh app benar-benar hidup (`php artisan serve` + `npm run dev` + DB ter-seed), beda dari Vitest yang murni jsdom.
-3. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
-4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
+2. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
+3. **Klaim `CLAUDE.md` yang MASIH tidak benar: `Infra: Docker Compose`.** Tidak ada `docker-compose.yml` di repo. Klaim CI di baris yang sama sudah dibereskan (lihat *Sudah selesai*); yang Docker belum. Pilihannya: bikin compose-nya (Redis+MySQL+Horizon untuk paritas produksi — sesi tersendiri) **atau** koreksi barisnya di CLAUDE.md. **Jangan diam-diam dibiarkan** — kontrak yang berbohong persis penyakit yang bikin CI luput bertahun-tahun.
+4. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
+5. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **CI GitHub Actions dipasang + ADR-0005 baru.** Kode: `.github/workflows/ci.yml`
+  **baru** (2 job paralel; perintahnya = skrip composer/npm yang sama dengan lokal). Docs:
+  `adr/0005-ci-github-actions.md` **baru** (+baris di `adr/README`), `SETUP-GUIDE §14` **baru**
+  (untuk apa · apa yang dijalankan · cara pakai + tabel gejala→sebab saat merah) + entri Daftar Isi,
+  `README` (badge CI + paragraf CI + doc-map SETUP-GUIDE menunjuk §14), `ONBOARDING` (baris routing
+  "CI merah setelah push" + catatan di perintah harian + peta dokumen). **CLAUDE.md sengaja TIDAK
+  diubah:** klaimnya "CI: GitHub Actions" justru baru sekarang jadi benar, jadi tak ada yang perlu
+  dikoreksi; menambahkan "CI hijau" ke Definition of Done = perubahan kontrak → butuh persetujuan
+  pemilik repo dulu. Alasan: gerbang kualitas yang hanya jalan kalau diingat manusia tidak menjaga
+  apa pun; klaim kontrak yang tidak benar adalah penyakitnya sendiri. Tidak menyentuh seeder/BE/FE.
 - `2026-07-25`: **Skeleton loading (polish UI bagian 1).** Kode: `components/SkeletonRows.vue`
   **baru**; 11 titik loading di `AdminPage`(4)/`SlotAvailabilityPage`/`MyBookingsPage`/`MyTrucksPage`/
   `DriverSchedulePage`/`GateDashboardPage`/`PlannerWindowsPage`/`MyUtilizationPage` +
