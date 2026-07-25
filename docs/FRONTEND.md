@@ -86,7 +86,23 @@ juga cek `company_id`, cermin aturan 403-nya). Halaman tidak lagi punya link
 ### `app.ts` — bootstrap
 Pasang Pinia, Router, **VueQueryPlugin**, lalu wiring hook 401 (`setUnauthorizedHandler`
 → clearSession + push login). Shell HTML: `resources/views/app.blade.php` + catch-all
-`routes/web.php` (`^(?!api).*$`) → semua path non-API mengembalikan SPA.
+`routes/web.php` (`^(?!api).*$`) → semua path non-API mengembalikan SPA. **Siklus Echo**:
+`watch(auth.isAuthenticated)` → `connectEcho()` saat login/restore, `disconnectEcho()` saat
+logout/401 (token untuk `/broadcasting/auth` sudah ada saat connect).
+
+### `echo.ts` + `composables/useRealtime.ts` — realtime (Reverb)
+- **`echo.ts`** — singleton Laravel Echo (transport pusher-js, broadcaster `reverb`). **Lazy &
+  opsional**: `connectEcho()` no-op bila `VITE_REVERB_APP_KEY` kosong → **degradasi mulus** (tanpa
+  Reverb app == polling/invalidasi biasa, bukan error). Auth channel privat via `/broadcasting/auth`
+  dgn header `Authorization: Bearer <token>` (SPA tak pakai cookie sesi → guard server WAJIB
+  `auth:sanctum`, lihat `bootstrap/app.php`).
+- **`useRealtime.ts`** — `useSlotRealtime(gate)` & `useGateQueueRealtime(terminalId)`: subscribe
+  reaktif ke `slot.{gateId}` / `gate.queue.{terminalId}`, event masuk → **`invalidateQueries`**
+  (BUKAN menambal cache dari payload — payload broadcast subset; API tetap sumber kebenaran).
+  `leave()` saat param ganti / unmount (cegah channel bocor). **`.listen('.slot.availability.changed')`
+  — titik depan wajib** (nama `broadcastAs`, bukan kelas PHP). Dipakai di `SlotAvailabilityPage`
+  (`gate`) & `GateDashboardPage` (`auth.user.terminal_id`). Test: `tests/js/useRealtime.test.ts`
+  (Echo di-mock via `vi.mock('@/echo')`); page test mem-`vi.mock('@/composables/useRealtime')` jadi no-op.
 
 ---
 
@@ -231,7 +247,7 @@ Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 
 > **Layout/nav bersama sudah ada** (2026-07-08): `AppLayout` + `AppNav` sebagai parent
 > route — lihat §2 router. Kartu-kartu Dashboard tetap dipertahankan sebagai pintu masuk
-> besar; navbar menjadi navigasi lintas-halaman. Realtime (Laravel Echo) masih belum
-> disambung: query di-invalidate manual lewat mutation; saat Reverb di-wire, event
-> broadcast akan memicu invalidasi yang sama secara *live*
-> (lihat `HANDOVER.md` → Jebakan & Langkah berikutnya).
+> besar; navbar menjadi navigasi lintas-halaman. **Realtime (Laravel Echo) SUDAH disambung**
+> (2026-07-25, lihat §2 `echo.ts`/`useRealtime`): event broadcast dari server memicu
+> invalidasi query yang sama secara *live*. Invalidasi manual lewat mutation tetap jalan
+> sebagai jaring pengaman bila Reverb mati (degradasi mulus).

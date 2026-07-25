@@ -10,12 +10,38 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-08` · Sesi: **Senior review ronde 2 + kelanjutan** — fix idempotency per-endpoint · ADR-0004 mass-assignment · tolak window berakhir · Sanctum TTL · utilisasi company-scoped (BE+FE `/reports`) · nav/layout bersama.
+- Update terakhir: `2026-07-25` · Sesi: **Wiring realtime (Reverb + Echo)** — fix guard `/broadcasting/auth` ke `auth:sanctum` (BE) + klien Echo (`echo.ts`/`useRealtime`) sambung ke SlotAvailability & GateDashboard (invalidate query saat event). **Reverb terbukti jalan di Windows native (TANPA Docker)** — smoke test: event→driver→POST diterima Reverb (dead-port throw, live-port sukses).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **169 pass / 452 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **67 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build backend: `composer test` → ✅ **174 pass / 459 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build frontend: `npm run test:js` → ✅ **74 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Paket FE baru: `laravel-echo@^2` + `pusher-js@^8` (klien Reverb; runtime browser, tak sentuh pin vite6).
 
 ## Sudah selesai
+- [x] **Realtime wiring — Reverb + Echo (2026-07-25):** Kuota slot & antrian gate kini live.
+  **Slice A (BE, TDD):** `bootstrap/app.php` — `channels:` dipindah dari `withRouting()` ke
+  `->withBroadcasting(channels, ['middleware'=>['auth:sanctum']])`. **Kenapa bug:** framework
+  mendaftarkan `/broadcasting/auth` dgn guard **`web`** (session cookie) saat channels lewat
+  `withRouting(channels:)`; SPA pakai **Bearer token Sanctum** → auth channel privat PASTI gagal.
+  **Pindah bukan tambah** (kalau dua-duanya, channels ter-`require` 2x + route ganda). 5 test
+  `tests/Feature/Realtime/BroadcastAuthTest.php` (unauth→401; slot.read→200; tanpa izin→403;
+  gate-officer terminal sendiri→200, terminal lain→403). **Jebakan test (didokumentasikan di
+  file):** `Broadcast::channel()` mendaftar di driver DEFAULT saat boot (`null` di phpunit);
+  meng-`config(['broadcasting.default'=>'pusher'])` sesudah boot → driver pusher **kosong channel**
+  → semua 403. Fix: `require base_path('routes/channels.php')` ulang di helper `usePusherBroadcaster()`
+  (idempoten). channels.php **tidak diubah** — callback RBAC-nya sudah benar.
+  **Slice B (FE):** `laravel-echo`+`pusher-js`. `echo.ts` = singleton Echo (init setelah token ada,
+  disconnect saat logout, **no-op bila `VITE_REVERB_APP_KEY` kosong** → degradasi mulus: app == polling
+  biasa bila Reverb mati). `composables/useRealtime.ts` (`useSlotRealtime`/`useGateQueueRealtime`):
+  subscribe reaktif `slot.{gateId}`/`gate.queue.{terminalId}`, event masuk → **invalidateQueries**
+  (BUKAN tambal cache — payload broadcast subset; API tetap sumber kebenaran), `leave()` saat param
+  ganti/unmount (cegah channel bocor). `.listen('.slot.availability.changed')` — **titik depan wajib**
+  (broadcastAs, bukan kelas PHP). Wiring: `SlotAvailabilityPage` (`useSlotRealtime(gate)`),
+  `GateDashboardPage` (`useGateQueueRealtime(auth.user.terminal_id)`), siklus connect/disconnect di
+  `app.ts` (watch `auth.isAuthenticated`). +7 Vitest `tests/js/useRealtime.test.ts` (Echo di-mock;
+  subscribe→invalidate, ganti gate→leave+rejoin, unmount→leave, Echo null→no-op). **Verifikasi live
+  (server):** Reverb `reverb:start` bind port di Windows native; dispatch event→driver reverb: dead-port
+  9999 → `BroadcastException` cURL 7, live-port 8080 → sukses (Reverb ingest). **BELUM diverifikasi
+  end-to-end:** frame WebSocket sampai ke browser (butuh 2 browser + `BROADCAST_CONNECTION=reverb`).
 - [x] **FE: nav/layout bersama (2026-07-08):** `components/AppNav.vue` (navbar: brand → `/`, link ber-gate **permission** — bukan nama role, cermin otorisasi server; `/reports` juga cek `company_id`; nama user + tombol Keluar) + `components/AppLayout.vue` (`AppNav` + `RouterView`) sebagai **parent route** semua halaman ber-auth di `router/index.ts`. `requiresAuth` cukup di parent (Vue Router menggabungkan meta parent→child) → halaman baru otomatis terlindungi tanpa mengulang meta. Dashboard disederhanakan (header+logout pindah ke navbar; kartu pintu-masuk dipertahankan); link "← Dashboard" di 6 halaman dihapus (redundan dgn navbar). 4 test `tests/js/AppNav.test.ts` (gating transporter, `/reports` tersembunyi utk planner tanpa company, logout→redirect, nama user) → **67 Vitest**. CATATAN test: stub `RouterLink: true` TIDAK merender slot — pakai `RouterLinkStub` dari `@vue/test-utils` bila perlu assert teks link.
 - [x] **FE: halaman Laporan Perusahaan `/reports` (2026-07-08):** UI untuk `GET /me/reports/utilization` (slice BE di bawah). `api/slots.ts` `fetchMyUtilization` (unwrap `data`+`meta.summary`, bentuk sama dgn `fetchUtilization`); `composables/useMyUtilization.ts` (useQuery key `['my-utilization',gate,date]` — **sengaja terpisah** dari `['utilization']` planner: beda scope, tak boleh saling menimpa cache; read-only → tanpa mutation/invalidation); `pages/MyUtilizationPage.vue` (dropdown gate `useGates` + tanggal; state prompt/loading/error/empty; per window "Milik Anda: selesai/no-show/batal/aktif" + konteks gate "terisi X/kapasitas" dipisah visual supaya angka global tak terbaca sebagai milik company; ringkasan `meta.summary`); route `/reports`; link Dashboard "Laporan Perusahaan" gated `can('report.read') && company_id != null` (planner/admin punya `report.read` tapi tanpa company → link tak muncul, mereka pakai `/planner`). +6 Vitest (5 page states + 1 api unwrap) → **63 Vitest**; vue-tsc & build hijau.
 - [x] **Utilisasi company-scoped transporter (2026-07-08):** `GET /api/v1/me/reports/utilization?gate=&date=` — menutup janji matriks RBAC §1 ("Laporan utilisasi → transporter: company sendiri") yang selama ini baru desain. `SlotRepository::utilization()` dapat param opsional `?int $companyId` — filter `where('company_id')` diterapkan ke **semua** subquery `withCount` supaya angka company lain tak pernah bocor; `capacity`/`booked_count` tetap global (konteks gate, sudah terbuka via availability). `MyUtilizationReportController` + `MyUtilizationReportRequest` (`can('report.read')`; 403 tanpa `company_id` — pola `/me/appointments`); reuse `SlotUtilizationResource`; `meta.company_id` di respons. Endpoint agregat planner/admin tak berubah. 4 test `tests/Feature/Reports/MyUtilizationReportTest.php` (scoping benar, planner tanpa company 403, driver tanpa `report.read` 403, gate wajib 422). UI-nya: entri FE `/reports` di atas.
@@ -107,18 +133,39 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (169 Pest / 67 Vitest); terakhir: nav/layout bersama.
+- (kosong) — checkpoint hijau (174 Pest / 74 Vitest); terakhir: wiring realtime Reverb + Echo.
 
 ## Langkah berikutnya (urut)
-**Semua 4 persona UI + admin CRUD master data selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user). Berikutnya:
-1. **Wiring realtime (Reverb + Echo)** — paling berdampak: kuota & antrian live. Server sudah ber-event/ber-test (`SlotAvailabilityChanged`, `GateQueueUpdated`). Perlu: `reverb:start` (Docker) + `BROADCAST_CONNECTION=reverb` + daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` + sambung Laravel Echo di SPA → ganti polling/invalidasi manual dgn push (invalidate query saat event masuk). Lihat Jebakan.
-2. **Polish UI:** loading skeleton, e2e happy-path. (Layout/nav bersama DONE 2026-07-08 — `AppNav`/`AppLayout`.)
-3. **Opsional backend:** CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada); swap `GateEventGateway` ke TOS riil. (Utilisasi company-scoped transporter DONE 2026-07-08 — UI-nya belum, kandidat saat polish FE.)
-4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit). Temuan `$fillable` [FIXED → ADR-0004]; tolak booking ke window lewat [FIXED 2026-07-07].
+**Semua 4 persona UI + admin CRUD + realtime wiring selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
+1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
+2. **Polish UI:** loading skeleton, e2e happy-path. UI utilisasi company-scoped transporter DONE (`/reports`).
+3. **Opsional backend:** CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada).
+4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **Audit staleness dokumen + kode (pasca realtime).**
+  *Docs:* selaraskan hitungan test current-state ke **174 Pest / 74 Vitest** (README, ONBOARDING,
+  SETUP-GUIDE — entri changelog historis TIDAK diubah, itu snapshot masa lalu); hapus klaim usang
+  "Git belum di-init" (repo sudah push) & "Realtime Echo masih belum disambung" (FRONTEND §4);
+  `CODE-WALKTHROUGH §P.5` baru (guard `/broadcasting/auth`). *Kode:* `.env.example` +REVERB_*/
+  VITE_REVERB_* (placeholder kosong — bukan secret; fresh clone tahu var realtime ada); **hapus
+  scaffold mati** `resources/js/app.js` + `bootstrap.js` + `resources/views/welcome.blade.php`
+  (catch-all `web.php` selalu render `app.blade.php`→`app.ts`; welcome tak ter-route & satu-satunya
+  pemuat app.js→bootstrap.js). Efek samping bagus: CSS produksi turun ~41→~21 kB (Tailwind tak lagi
+  pindai kelas di welcome). *Temuan penting:* `->withExceptions(fn)` kosong di `bootstrap/app.php`
+  **BUKAN dead code** — menghapusnya bikin `BindingResolutionException` (registrasi handler exception
+  di sana); dikembalikan + diberi komentar kenapa wajib tetap. Tidak menyentuh CLAUDE.md/seeder/BE-logic.
+- `2026-07-25`: **Wiring realtime (Reverb + Echo) + koreksi klaim "Reverb butuh Docker".**
+  Kode: `bootstrap/app.php` (guard `/broadcasting/auth` → `auth:sanctum` via `withBroadcasting`),
+  FE baru `echo.ts`/`composables/useRealtime.ts` + wiring 2 halaman + `app.ts`, paket `laravel-echo`+
+  `pusher-js`. Test: +5 Pest (`Realtime/BroadcastAuthTest`), +7 Vitest (`useRealtime.test`) →
+  **174 Pest / 74 Vitest**. Docs: `HANDOVER` (status, Sudah selesai, Jebakan **dikoreksi** — Reverb
+  jalan Windows native, hanya Horizon butuh pcntl), `SETUP-GUIDE`/`ONBOARDING` (koreksi Reverb≠Docker),
+  `FRONTEND.md` (§ realtime: echo.ts + useRealtime). Alasan: menutup tasklist realtime; klaim lama
+  "Reverb butuh Docker" salah (composer.json Reverb tak minta ekstensi) & menghambat dev tak perlu.
+  Tidak menyentuh CLAUDE.md/seeder. channels.php TIDAK diubah (callback RBAC sudah benar).
 - `2026-07-08`: **History git ditulis ulang (24 commit) + `docs/GIT-HISTORY-REWRITE.md` baru.**
   Trailer `Co-Authored-By: Claude ...` → `Co-Authored-By: Overa Caesar` di seluruh history
   (`git filter-branch --msg-filter` + force-push; SHA semua commit berubah — clone lain
@@ -236,15 +283,22 @@
   pindah ke Redis, boleh refaktor ke tags. Bukan perubahan kontrak, hanya implementasi.
 
 ## Jebakan / catatan
-- **Git belum di-init.** `is git repo: false`. Init dulu sebelum commit pertama (1 slice = 1 commit).
-- **Horizon/Reverb butuh `ext-pcntl`/`ext-posix`** yang tidak ada di PHP Windows native →
-  di-install dengan `--ignore-platform-req`. Jalankan keduanya di **Docker (Linux)**, bukan Windows.
-  `composer install` di Windows juga perlu flag itu.
-- **Realtime sisi server sudah ber-event & ber-test, tapi belum disiarkan sungguhan.** Event
-  `ShouldBroadcast` + listener + channel auth + TOS seam sudah jadi. Yang BELUM: (1) jalankan
-  `php artisan reverb:start` (Docker) + set `BROADCAST_CONNECTION=reverb` di `.env`; (2) endpoint
-  auth channel privat — default guard `web`; untuk SPA Sanctum daftarkan `Broadcast::routes(['middleware'=>['auth:sanctum']])` saat wiring frontend; (3) sambungkan Laravel Echo di Vue.
-  Push TOS masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
+- **Git:** repo sudah di-init & push ke GitHub `caesarovera/truck-appointment-system` (branch `main`).
+  Konvensi commit: 1 slice = 1 commit; atribusi `Co-Authored-By: Overa Caesar` (bukan Claude) —
+  lihat `docs/GIT-HISTORY-REWRITE.md`.
+- **KOREKSI (2026-07-25): hanya HORIZON butuh `ext-pcntl`/`ext-posix`, BUKAN Reverb.** Dulu dicatat
+  "Horizon/Reverb butuh pcntl → Docker" — salah untuk Reverb. `laravel/reverb` composer.json cuma minta
+  `php ^8.2` + paket PHP murni (react/socket, ratchet, pusher-php-server). **Terbukti: `php artisan
+  reverb:start` bind port 8080 di Windows native.** Untuk dev, queue cukup `queue:listen` (tanpa pcntl);
+  Horizon hanya dashboard pemantau. Jadi **realtime TIDAK butuh Docker**. Docker tetap relevan nanti
+  utk paritas produksi (Redis `Cache::tags`, Horizon, MySQL) — sesi tersendiri. `composer install` di
+  Windows tetap perlu `--ignore-platform-req` selama Horizon terpasang.
+- **Realtime: server + klien sudah tersambung (2026-07-25); tinggal verifikasi mata di browser.**
+  `ShouldBroadcast` event + listener + channel auth (`auth:sanctum`) + klien Echo (`echo.ts`/`useRealtime`)
+  semua jadi & ber-test. Untuk menyalakan: (1) `BROADCAST_CONNECTION=reverb` di `.env` (default masih
+  `log` supaya dev Windows tak butuh worker); (2) `php artisan reverb:start` (native) + `composer dev`
+  (queue:listen jalan — **`ShouldBroadcast` ke queue dulu, tanpa worker event DIAM tanpa error**);
+  (3) buka SPA. Push TOS masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
 - **php.ini diubah** (mesin dev): `pdo_sqlite` + `sqlite3` di-enable (tadinya disabled) agar
   `.env` sqlite jalan. Driver DB lain yang aktif hanya mysql.
 - **Frontend versi di-pin ke vite 6.** Proyek pakai `vite@^6` (kompat `laravel-vite-plugin@1.2`).

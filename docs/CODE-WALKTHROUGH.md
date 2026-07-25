@@ -1232,9 +1232,27 @@ public function handle(GateEventGateway $tos): void
 Job `ShouldBeUnique` + `WithoutOverlapping` per appointment. Saat integrasi TOS nyata
 tiba, cukup ganti binding `GateEventGateway` — Action/Job tak berubah.
 
+### P.5 Guard endpoint `/broadcasting/auth` (2026-07-25)
+Channel privat mewajibkan klien minta izin ke server dulu (Echo → `POST /broadcasting/auth`
+sebelum join). Endpoint ini didaftarkan di `bootstrap/app.php` — **bukan** lewat
+`withRouting(channels:)` (yang memberi guard default `web`/cookie sesi), melainkan:
+```php
+->withBroadcasting(
+    __DIR__.'/../routes/channels.php',
+    ['middleware' => ['auth:sanctum']],   // SPA pakai Bearer token, bukan cookie
+)
+```
+SPA kita autentik lewat Bearer token Sanctum (localStorage) tanpa cookie sesi → tanpa
+`auth:sanctum`, otorisasi channel privat **pasti gagal**. **Pindah, bukan tambah**: kalau
+`channels:` tetap di `withRouting` sekaligus `withBroadcasting` dipasang, `channels.php`
+ter-`require` dua kali & route `/broadcasting/auth` terdaftar ganda.
+
 > **Catatan test:** `phpunit.xml` set `BROADCAST_CONNECTION=null` agar event
-> `ShouldBroadcast` tidak menembak driver `log`. Test memverifikasi *dispatch* event
-> broadcast (Event::fake parsial) + nama channel, bukan koneksi WebSocket nyata.
+> `ShouldBroadcast` tidak menembak driver `log`. `tests/Feature/Realtime/BroadcastAuthTest.php`
+> menguji guard + RBAC per-channel; **jebakan:** `Broadcast::channel()` mendaftar di driver
+> DEFAULT saat boot (`null`), jadi mengganti `broadcasting.default` ke `pusher` sesudah boot
+> memberi broadcaster **kosong channel** (semua 403) → helper test me-`require` `channels.php`
+> ulang. Test lain memverifikasi *dispatch* event broadcast (Event::fake parsial) + nama channel.
 
 ---
 

@@ -43,9 +43,10 @@ Yang harus ada di mesin (versi yang teruji di sesi ini):
 | (opsional) Docker | untuk Horizon/Reverb/Redis | `docker --version` |
 
 > **Catatan Windows/laragon:** PHP berada di
-> `C:\laragon\bin\php\php-8.3.31-Win32-vs16-x64\`. Horizon & Reverb butuh
-> `ext-pcntl`/`ext-posix` yang **tidak ada** di PHP Windows native → dijalankan
-> lewat Docker (Linux). Lihat langkah 3 & bagian Troubleshooting.
+> `C:\laragon\bin\php\php-8.3.31-Win32-vs16-x64\`. **Hanya Horizon** yang butuh
+> `ext-pcntl`/`ext-posix` (tak ada di PHP Windows native) → jalankan di Docker (Linux).
+> **Reverb TIDAK butuh ekstensi itu** — jalan native (`reverb:start` bind port di Windows,
+> terverifikasi 2026-07-25). Lihat langkah 3 & Troubleshooting.
 
 Verifikasi cepat:
 ```bash
@@ -135,11 +136,11 @@ composer require laravel/horizon laravel/reverb \
   --ignore-platform-req=ext-posix
 ```
 
-> **Kenapa flag itu:** Horizon (queue worker) & Reverb (WebSocket) memakai
-> `ext-pcntl`/`ext-posix` yang tak tersedia di PHP Windows native. Flag membuat
-> Composer tetap menulis paket ke `composer.json`/`.lock`. **Saat dijalankan**,
-> keduanya hidup di container Docker (Linux). `composer install` berikutnya di
-> Windows juga perlu flag yang sama.
+> **Kenapa flag itu:** **Horizon** men-*declare* `ext-pcntl`/`ext-posix` di composer.json-nya
+> yang tak tersedia di PHP Windows native → tanpa flag, `composer require`/`install` gagal.
+> Flag membuat Composer tetap menulis paket. **Saat dijalankan**, hanya Horizon yang butuh
+> Docker (Linux); **Reverb jalan native di Windows** (composer.json Reverb tak minta ekstensi
+> itu). `composer install` berikutnya di Windows tetap perlu flag selama Horizon terpasang.
 
 ### 3c. Paket dev (test + analisis)
 ```bash
@@ -195,13 +196,15 @@ php artisan horizon:install
 php artisan vendor:publish --provider="Laravel\Reverb\ReverbServiceProvider"
 ```
 
-> **Realtime sisi server SUDAH jadi & ber-test** (event `ShouldBroadcast`
-> `SlotAvailabilityChanged`/`GateQueueUpdated` + listener + channel auth di
-> `routes/channels.php` + seam `GateEventGateway`). Yang **belum** dilakukan untuk
-> benar-benar menyiarkan: (1) `php artisan reverb:start` (Docker) + set
-> `BROADCAST_CONNECTION=reverb` di `.env`; (2) daftarkan
-> `Broadcast::routes(['middleware' => ['auth:sanctum']])` agar auth channel privat
-> jalan untuk SPA Sanctum; (3) sambungkan Laravel Echo di frontend Vue. TOS push
+> **Realtime SUDAH tersambung ujung-ke-ujung (server + klien), 2026-07-25.** Event
+> `ShouldBroadcast` `SlotAvailabilityChanged`/`GateQueueUpdated` + listener + channel
+> auth (`bootstrap/app.php` → `withBroadcasting(..., ['middleware'=>['auth:sanctum']])`,
+> WAJIB bukan `web` karena SPA pakai Bearer token) + klien Echo (`resources/js/echo.ts`,
+> `composables/useRealtime.ts`) menyala di SlotAvailability & GateDashboard.
+> **Menyalakan (Windows native, TANPA Docker):** (1) `BROADCAST_CONNECTION=reverb` di
+> `.env` (default `log`); (2) `php artisan reverb:start` + `composer dev` (queue:listen
+> wajib — `ShouldBroadcast` ke queue dulu, tanpa worker event diam). **Reverb tak butuh
+> `ext-pcntl`** (cek: bind port di Windows native) — hanya Horizon yang butuh. TOS push
 > masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
 
 ---
@@ -415,7 +418,7 @@ Contoh output sehat:
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
   ...
-  Tests:    169 passed (452 assertions)
+  Tests:    174 passed (459 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -554,13 +557,14 @@ Driver SQLite belum aktif. → **Langkah 1** (aktifkan `pdo_sqlite` + `sqlite3`)
 ### Horizon gagal install: "requires ext-pcntl"
 PHP Windows tak punya `ext-pcntl`. → install dengan
 `--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix`, jalankan
-Horizon/Reverb di Docker.
+**Horizon** di Docker. (Reverb tak terpengaruh — jalan native.)
 
 ### `reverb:install` menggantung / error prompt
 Installer-nya interaktif. → di lingkungan non-interaktif, publish config saja
-(`vendor:publish ... ReverbServiceProvider`). Realtime sisi server sudah ber-event &
-ber-test; untuk menyiarkan sungguhan jalankan `reverb:start` (Docker) +
-`BROADCAST_CONNECTION=reverb` + `Broadcast::routes(auth:sanctum)` (lihat langkah 4c).
+(`vendor:publish ... ReverbServiceProvider`). Realtime **sudah tersambung ujung-ke-ujung**
+(2026-07-25): guard channel `auth:sanctum` (`bootstrap/app.php`) + klien Echo (`echo.ts`).
+Menyalakan (**Windows native, TANPA Docker**): `reverb:start` + `BROADCAST_CONNECTION=reverb`
++ worker `queue:listen` (lihat langkah 4c).
 
 ### PHPStan: `Strict comparison ... will always evaluate to false` (enum)
 Larastan menebak kolom sebagai `string`. → tambah docblock `@property` di model,
@@ -655,10 +659,9 @@ hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, drive
 gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
 (§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
-Gerbang kualitas terakhir: `composer test` → **169 pass (452 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **67 pass**.
+Gerbang kualitas terakhir: `composer test` → **174 pass (459 assertions)** ·
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **74 pass**.
 
-Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **wiring realtime
-sungguhan** (Reverb server + `Broadcast::routes` auth:sanctum + Laravel Echo di SPA +
-swap `GateEventGateway` ke TOS riil); polish layout/nav bersama; laporan utilisasi
-company-scoped transporter.
+Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **verifikasi realtime
+di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCAST_CONNECTION=reverb`
++ 2 browser); swap `GateEventGateway` ke TOS riil; polish UI (skeleton, e2e).

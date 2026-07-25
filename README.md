@@ -13,9 +13,10 @@ Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 
-Status: backend MVP API lengkap & ber-test (**169 Pest**); SPA mencakup UI **4 persona**
+Status: backend MVP API lengkap & ber-test (**174 Pest**); SPA mencakup UI **4 persona**
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
-company/user) (**67 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
+company/user) + **realtime kuota/antrian live (Reverb + Echo)** (**74 Vitest**). Detail hidup:
+[`HANDOVER.md`](HANDOVER.md).
 
 ## Mulai dari mana (urutan onboarding)
 

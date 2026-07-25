@@ -130,7 +130,7 @@ Target realistis. Setiap hari diakhiri dengan satu hasil nyata.
 | Hari | Fokus | Hasil akhir hari itu |
 |------|-------|----------------------|
 | **1** | Orientasi + kontrak (Tahap 0–1) | Paham peta mental & 3 aturan emas; bisa sebut larangan utama |
-| **2** | Jalankan project (Tahap 2) | `composer test` **169 hijau** + `npm run test:js` **67 hijau** di mesinmu; bisa login SPA |
+| **2** | Jalankan project (Tahap 2) | `composer test` **174 hijau** + `npm run test:js` **74 hijau** di mesinmu; bisa login SPA |
 | **3** | Domain (Tahap 3) | Bisa gambar ulang state machine appointment & jelaskan 5 role |
 | **4** | Golden path (Tahap 4a) | Berhasil booking via curl + uji idempotency; paham `BookAppointmentAction` |
 | **5** | Latihan pertama | Selesaikan 1 latihan kecil (§12) lewat loop TDD; semua gerbang hijau |
@@ -268,7 +268,7 @@ Junior hampir pasti kena ini; semua sudah pernah terjadi & dicatat:
 | PHPStan "Strict comparison always false" (enum) | Tambah `@property AppointmentStatus $status` di model | SETUP §11 |
 | PHPStan `method.childReturnType` di factory `definition()` | Hapus docblock `@return array<...>` (warisi tipe induk) | SETUP §11 |
 | `Cache::tags() does not support tagging` | Store dev `database` tak dukung tag → key eksplisit + `Cache::forget` | HANDOVER changelog |
-| Horizon/Reverb gagal di Windows | Butuh `ext-pcntl` → jalankan di **Docker (Linux)** | HANDOVER *Jebakan* |
+| Horizon gagal di Windows | Butuh `ext-pcntl` → jalankan di **Docker (Linux)**. **Reverb TIDAK butuh pcntl** — jalan native | HANDOVER *Jebakan* |
 | Test "menghapus" data dev | Aktifkan `:memory:` di `phpunit.xml` | SETUP §8c |
 | "could not find driver" saat migrate | Aktifkan `pdo_sqlite` + `sqlite3` di php.ini | SETUP §1 |
 | `Declaration ...::data() must be compatible` | Form Request sudah punya `data()`/`date()` → ganti nama (`toData()`) | SETUP §11 |
@@ -284,7 +284,7 @@ php artisan migrate:fresh --seed     # skema baru + data demo
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
 composer fix                         # Pint (format)
 composer analyse                     # PHPStan level 8
-composer test                        # Pest (169 hijau)
+composer test                        # Pest (174 hijau)
 ./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
 
 # Menjalankan app
@@ -292,13 +292,16 @@ php artisan serve                    # shell + API (buka http://localhost:8000)
 npm run dev                          # Vite HMR (terminal lain)
 
 # Frontend
-npm run test:js                      # Vitest (67 hijau)
+npm run test:js                      # Vitest (74 hijau)
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
-# Hanya di Docker/Linux (butuh ext-pcntl):
-php artisan horizon                  # queue worker
-php artisan reverb:start             # websocket
+# Realtime (Windows native — TANPA Docker):
+php artisan reverb:start             # websocket (butuh BROADCAST_CONNECTION=reverb + worker)
+php artisan queue:listen             # proses job broadcast (ShouldBroadcast → queue)
+
+# Hanya Horizon yang butuh ext-pcntl (Docker/Linux):
+php artisan horizon                  # dashboard + queue worker (opsional, ganti queue:listen)
 ```
 
 Buka app di **`http://localhost:8000`** (Laravel), **bukan** port 5173 (itu Vite HMR saja).
