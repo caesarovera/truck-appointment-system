@@ -628,11 +628,14 @@ app/
                     SlotWindow, Appointment, Container, GateTransaction
   Actions/          Book/Reschedule/Cancel/GateIn/GateOut/MarkNoShow/
                     Open|CloseSlotWindow + Admin/ (CRUD terminal/gate/company/user)
+                    + Fleet/ (CRUD truk transporter)
   Contracts/        Slot/Appointment/Gate/Fleet/Terminal/Company/User repo interfaces
   Repositories/     impl Eloquent dari tiap interface (bound di AppServiceProvider)
   Http/Controllers/Api/V1/  invokable controllers + Admin/ (20 controller CRUD)
+                    + Fleet/ (4 controller armada truk)
   Exceptions/       SlotUnavailable, Duplicate*, OptimisticLock,
-                    InvalidAppointmentState, EntityInUse (409 cascade-delete guard)
+                    InvalidAppointmentState, EntityInUse (409 cascade-delete guard),
+                    FleetOwnership + InactiveTruck (422 guard armada saat booking)
   Providers/        AppServiceProvider (preventLazyLoading + repo bindings + rate limiters)
 database/
   migrations/       8 migrasi domain + users(updated) + (publish: sanctum,
@@ -655,13 +658,14 @@ composer.json       scripts: test / analyse / fix / lint
 ---
 
 ### Status & langkah berikutnya
-**Backend MVP API + SPA 4 persona + admin CRUD sudah lengkap & hijau** (status hidup:
-`HANDOVER.md`). Backend: data layer → booking (anti-race) → auth Sanctum + Policy →
-reschedule/cancel → gate-in/out → job no-show/reminder → realtime broadcast (+ seam TOS)
-→ endpoint pendukung (me/today + utilisasi) → slot-window open/close → rate-limit
-hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, driver,
-gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
-(§J–§V backend) & `docs/FRONTEND.md` (SPA).
+**Backend MVP API + SPA 4 persona + admin CRUD + CRUD armada truk sudah lengkap & hijau**
+(status hidup: `HANDOVER.md`). Backend: data layer → booking (anti-race) → auth Sanctum +
+Policy → reschedule/cancel → gate-in/out → job no-show/reminder → realtime broadcast
+(+ seam TOS) → endpoint pendukung (me/today + utilisasi) → slot-window open/close →
+rate-limit hardening → master data CRUD admin → armada truk transporter (+ penegakan
+status INACTIVE). Frontend: SPA Vue untuk transporter, driver, gate-officer, planner,
++ halaman admin & armada. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
+(§J–§W backend) & `docs/FRONTEND.md` (SPA).
 
 Gerbang kualitas terakhir: `composer test` → **191 pass (494 assertions)** ·
 `composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **84 pass**.

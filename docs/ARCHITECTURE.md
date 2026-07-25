@@ -31,18 +31,22 @@ direkam di **[`docs/adr/`](adr/)**.
 app/
 ├── Http/                          ◄── LAPISAN HTTP (ADR)
 │   ├── Controllers/Api/V1/        controller INVOKABLE (1 file = 1 endpoint)
-│   │   ├── Admin/                 CRUD master data
+│   │   ├── Admin/                 CRUD master data (lintas company)
+│   │   ├── Fleet/                 CRUD armada truk (scoped company sendiri)
 │   │   └── Auth/                  login / logout / me
 │   ├── Requests/V1/               Form Request — gerbang input (validasi + authorize)
-│   │   └── Admin/
+│   │   ├── Admin/
+│   │   └── Fleet/
 │   ├── Resources/V1/              API Resource — "Responder" (bentuk JSON keluar)
 │   └── Middleware/                IdempotencyKey
 │
 ├── Actions/                       ◄── LAPISAN BUSINESS (Command pattern)
 │   ├── BookAppointmentAction ...  Action domain — nama kata kerja, 1 tanggung jawab
-│   └── Admin/                     Action CRUD
+│   ├── Admin/                     Action CRUD
+│   └── Fleet/                     Action CRUD truk transporter
 ├── DataTransferObjects/           DTO (Spatie Data) — input bertipe, lepas dari HTTP
-│   └── Admin/
+│   ├── Admin/
+│   └── Fleet/
 ├── Events/                        domain event (model penuh)
 │   └── Broadcasting/              event WebSocket (payload datar, kontrak FE)
 ├── Listeners/                     reaksi atas event: cache, broadcast, job, TOS, reminder

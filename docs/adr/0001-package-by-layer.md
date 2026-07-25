@@ -41,6 +41,10 @@ saat satu area benar-benar besar — saat ini hanya `Admin/` (mis. `Actions/Admi
 **Risiko & mitigasi:** kemunculan sub-folder `Admin/` di beberapa lapisan adalah **sinyal
 awal** bahwa struktur "menemukan fitur". Ini wajar dan belum perlu diapa-apakan.
 
+*Update 2026-07-25:* `Fleet/` menyusul (Actions · DataTransferObjects · Http/Controllers ·
+Http/Requests). Jadi sekarang **2 area fitur** ber-sub-folder, masih di bawah ambang
+tinjau-ulang di bawah — dan syarat kedua (tim bertambah) juga belum terpenuhi.
+
 ## Kapan ditinjau ulang
 
 Pertimbangkan ekstraksi ke modul (package-by-feature / pendekatan ala *spatie/laravel-domain*

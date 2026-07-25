@@ -292,7 +292,7 @@ php artisan serve                    # shell + API (buka http://localhost:8000)
 npm run dev                          # Vite HMR (terminal lain)
 
 # Frontend
-npm run test:js                      # Vitest (74 hijau)
+npm run test:js                      # Vitest (84 hijau)
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
@@ -318,7 +318,8 @@ Jangan baca semua dokumen tiap kali. Sesuaikan tugas:
 | Menyentuh **status/akses** | BUSINESS-FLOW §1 (RBAC) & §2 (state machine) — Policy & seeder wajib cocok |
 | Menyentuh **skema DB** | BUSINESS-FLOW §4 (ERD) + CLAUDE.md "JANGAN ubah migrasi yang sudah jalan" |
 | **Frontend** Vue | FRONTEND.md (4 lapisan + pola TanStack Query + jebakan Vitest) |
-| **Admin CRUD** | CODE-WALKTHROUGH §V + FRONTEND §4 |
+| **Admin CRUD** (lintas company) | CODE-WALKTHROUGH §V + FRONTEND §4 |
+| **CRUD ber-scope company sendiri** | CODE-WALKTHROUGH §W (armada truk) — pola `company_id` dari user login, bukan input |
 | Cari status proyek | HANDOVER.md |
 | Butuh akun/data uji | DUMMY-DATA.md |
 

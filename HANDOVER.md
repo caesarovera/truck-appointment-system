@@ -178,8 +178,11 @@
   types `TruckStatus`/`TruckPayload`. Test: +13 Fleet, +3 penegakan INACTIVE, +2 file Vitest →
   **191 Pest / 494 assert · 84 Vitest**. Docs: `BUSINESS-FLOW §3.2` (aturan status truk = kontrol
   penjadwalan + urutan guard), `CODE-WALKTHROUGH §W` **baru** (+TOC), `SETUP-GUIDE` (5 baris tabel
-  endpoint + catatan 422 di booking + hitungan test), `FRONTEND` (baris route `/trucks`, catatan
-  dropdown ACTIVE-saja, daftar rute, tabel nav), `README`/`ONBOARDING` (hitungan test).
+  endpoint + catatan 422 di booking + §13 peta file + hitungan test), `FRONTEND` (baris route
+  `/trucks`, catatan dropdown ACTIVE-saja, daftar rute, tabel nav), `ARCHITECTURE` (peta folder:
+  sub-folder `Fleet/` di 4 lapisan), `adr/0001` (catatan: kini **2** area fitur ber-sub-folder —
+  masih di bawah ambang tinjau-ulang ≥3, syarat "tim bertambah" juga belum), `README`/`ONBOARDING`
+  (hitungan test + baris routing "CRUD ber-scope company sendiri" → §W).
   Alasan: menutup task #3 "CRUD truk/sopir" (bagian truk) yang menggantung uncommitted; status truk
   yang tak ditegakkan itu **bug nyata** — endpoint hapus menyuruh pakai INACTIVE padahal INACTIVE
   tak menghentikan apa pun. Tidak menyentuh CLAUDE.md/seeder/migrasi. **Sopir belum** (lihat
