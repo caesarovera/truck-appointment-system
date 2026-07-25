@@ -101,13 +101,16 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 1. Transporter Admin lihat `GET /api/v1/slots/availability?gate=&date=` (data dari `Cache::flexible`).
 2. Pilih window, isi: move type (`DELIVERY`/`RECEIVAL`), nomor kontainer, truk, sopir.
 3. `POST /api/v1/appointments` dengan header `Idempotency-Key`.
-4. `BookAppointmentAction` dalam `DB::transaction(attempts:3)`:
+4. Sebelum transaksi: truk & sopir wajib milik company sendiri (`422 fleet_ownership`), lalu truk wajib berstatus `ACTIVE` (`422 truck_inactive`). Urutan cek disengaja — kepemilikan dulu supaya status truk company lain tak bocor lewat pesan error yang berbeda.
+5. `BookAppointmentAction` dalam `DB::transaction(attempts:3)`:
    a. `SlotWindow::where(id)->lockForUpdate()->first()`.
    b. Jika `booked_count >= capacity`, `status != OPEN`, atau window **sudah berakhir** (`date+end_time` lewat; window berjalan masih boleh) → tolak `409 Conflict`.
    c. Buat appointment `status = BOOKED`, `booked_count++`.
    d. (Validasi dokumen lolos → langsung `CONFIRMED`.)
-5. Commit → Event `AppointmentBooked` → listener: kirim notifikasi ke sopir, jadwalkan `AppointmentReminderJob` (H-2 jam), invalidate cache, broadcast sisa kuota.
+6. Commit → Event `AppointmentBooked` → listener: kirim notifikasi ke sopir, jadwalkan `AppointmentReminderJob` (H-2 jam), invalidate cache, broadcast sisa kuota.
 > Dua transporter berebut slot terakhir: hanya satu lolos karena `lockForUpdate`; yang lain dapat `409`. Unique constraint `(slot_window_id, container_no)` aktif sebagai jaring terakhir.
+
+> **Status truk (`ACTIVE`/`INACTIVE`) = kontrol penjadwalan, bukan label.** Truk `INACTIVE` (rusak, dijual, izin mati) tak muncul di `GET /me/fleet` (pengisi dropdown booking) **dan** ditolak `BookAppointmentAction`. Ini jalur "pensiunkan truk" resmi: truk yang sudah punya riwayat appointment tak bisa di-hapus (`409 entity_in_use`, FK `RESTRICT` menjaga audit trail) — set `INACTIVE`. Appointment yang sudah ada tidak terpengaruh; hanya booking baru yang dicegah.
 
 ### 3.3 Transporter reschedule / cancel
 - **Reschedule:** kirim `version` terakhir. `RescheduleAppointmentAction` lock kedua window (lama & baru), cek `version` cocok (kalau tidak → `409` optimistic lock gagal), window tujuan harus belum berakhir (guard yang sama dengan booking), pindahkan kuota, `version++`. Event `AppointmentRescheduled` → reminder lama dibatalkan, reminder baru dijadwalkan.

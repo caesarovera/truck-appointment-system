@@ -86,11 +86,19 @@ export interface OpenWindowPayload {
 
 export type MoveType = 'DELIVERY' | 'RECEIVAL';
 
-/** Truk (TruckResource) dari GET /me/fleet. */
+export type TruckStatus = 'ACTIVE' | 'INACTIVE';
+
+/** Truk (TruckResource) dari GET /me/fleet & GET /me/trucks. */
 export interface Truck {
     id: number;
     plate_no: string;
     status: string;
+}
+
+/** Body create/update truk (POST/PATCH /me/trucks). */
+export interface TruckPayload {
+    plate_no: string;
+    status: TruckStatus;
 }
 
 /** Sopir (DriverResource) dari GET /me/fleet. */

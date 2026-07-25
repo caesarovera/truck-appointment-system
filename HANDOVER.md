@@ -10,13 +10,36 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-25` · Sesi: **Wiring realtime (Reverb + Echo)** — fix guard `/broadcasting/auth` ke `auth:sanctum` (BE) + klien Echo (`echo.ts`/`useRealtime`) sambung ke SlotAvailability & GateDashboard (invalidate query saat event). **Reverb terbukti jalan di Windows native (TANPA Docker)** — smoke test: event→driver→POST diterima Reverb (dead-port throw, live-port sukses).
+- Update terakhir: `2026-07-25` · Sesi: **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **174 pass / 459 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **74 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
-- Paket FE baru: `laravel-echo@^2` + `pusher-js@^8` (klien Reverb; runtime browser, tak sentuh pin vite6).
+- Build backend: `composer test` → ✅ **191 pass / 494 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build frontend: `npm run test:js` → ✅ **84 pass** · `npm run type-check` (vue-tsc) → ✅.
+- Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **CRUD armada truk transporter + penegakan `INACTIVE` (2026-07-25):** transporter kelola
+  armadanya sendiri tanpa lewat admin. **BE:** `Create/Update/DeleteTruckAction`, `TruckData` (Spatie
+  Data), `UpsertTruckRequest`/`DeleteTruckRequest`, 4 controller invokable di `Fleet/`, `FleetRepository`
+  +`createTruck`/`updateTruck`/`deleteTruck`, `EntityInUseException::truck()`, relasi `Truck::appointments()`,
+  4 route `/me/trucks` (GET/POST/PATCH/DELETE). **company_id selalu dari user login, tak pernah dari body** —
+  itu beda inti dengan Admin CRUD yang lintas-company. Plat unik **per company** (`Rule::unique(...)->where('company_id')`)
+  bukan global: dua perusahaan boleh punya plat sama. Hapus truk ber-riwayat appointment → **409
+  `entity_in_use`** (FK `RESTRICT`; hard-delete merusak audit trail). **FE:** `api/trucks.ts`,
+  `useTrucks.ts` (mutasi invalidate `me-trucks` **dan** `me-fleet` → dropdown booking ikut segar),
+  `MyTrucksPage.vue` (form create/edit dipakai bersama, hapus konfirmasi 2-langkah, map 409/422),
+  route `/trucks` + link nav/dashboard gated `fleet.manage`.
+  **[BUG DIPERBAIKI] `INACTIVE` cuma label.** Ditemukan saat review slice ini: `BookAppointmentAction`
+  hanya cek kepemilikan, `trucksForCompany()` tak menyaring status → truk INACTIVE **muncul di dropdown
+  booking dan berhasil di-book (test membuktikan 201)**. Padahal pesan 409 hapus-truk secara eksplisit
+  menyuruh "nonaktifkan saja". Fix: `InactiveTruckException` (422 `truck_inactive`) + guard di
+  `BookAppointmentAction` **setelah** cek kepemilikan (kalau dibalik, beda pesan error membocorkan
+  keberadaan & kondisi truk company lain) + `trucksForCompany($companyId, ?TruckStatus $status = null)`
+  → `/me/fleet` ACTIVE saja, `/me/trucks` semua status (biar bisa diaktifkan lagi). Menyaring dropdown
+  saja tak cukup: truk bisa dinonaktifkan saat form booking terbuka → Action tetap menolak; pesan server
+  lolos ke UI lewat fallback `data.message` di `BookingForm` (tak perlu mapping baru).
+  **Test:** 13 `tests/Feature/Fleet/TruckCrudTest.php` + 3 penegakan INACTIVE (2 di `Booking/`, salah satunya
+  **mengunci urutan guard**; 1 di `Reference/MyFleetTest`) + 2 file Vitest → **191 Pest / 84 Vitest**.
+  Detail kode: `docs/CODE-WALKTHROUGH.md §W`; aturan bisnis: `docs/BUSINESS-FLOW.md §3.2`.
 - [x] **Realtime wiring — Reverb + Echo (2026-07-25):** Kuota slot & antrian gate kini live.
   **Slice A (BE, TDD):** `bootstrap/app.php` — `channels:` dipindah dari `withRouting()` ke
   `->withBroadcasting(channels, ['middleware'=>['auth:sanctum']])`. **Kenapa bug:** framework
@@ -133,18 +156,34 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (174 Pest / 74 Vitest); terakhir: wiring realtime Reverb + Echo.
+- (kosong) — checkpoint hijau (191 Pest / 84 Vitest); terakhir: CRUD armada truk + fix penegakan `INACTIVE`.
 
 ## Langkah berikutnya (urut)
-**Semua 4 persona UI + admin CRUD + realtime wiring selesai** (transporter book/list/cancel/reschedule · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
+**Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
 2. **Polish UI:** loading skeleton, e2e happy-path. UI utilisasi company-scoped transporter DONE (`/reports`).
-3. **Opsional backend:** CRUD truk/sopir (fleet) untuk transporter (master data terminal/gate/company/user admin sudah ada).
+3. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
 4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **CRUD armada truk (`/me/trucks`) + penegakan status `INACTIVE`.**
+  Kode BE: `Actions/Fleet/*` (3), `DataTransferObjects/Fleet/TruckData`, `Http/Requests/V1/Fleet/*` (2),
+  `Http/Controllers/Api/V1/Fleet/*` (4), `FleetRepository`+`FleetRepositoryInterface` (3 method CRUD +
+  param `?TruckStatus` di `trucksForCompany`), `EntityInUseException::truck()`, `Truck::appointments()`,
+  `routes/api.php` (4 route). Fix bug: `InactiveTruckException` **baru** (422 `truck_inactive`),
+  guard di `BookAppointmentAction`, `MyFleetController` → ACTIVE saja. Kode FE: `api/trucks.ts`,
+  `composables/useTrucks.ts`, `pages/MyTrucksPage.vue`, route `/trucks`, link `AppNav`+`DashboardPage`,
+  types `TruckStatus`/`TruckPayload`. Test: +13 Fleet, +3 penegakan INACTIVE, +2 file Vitest →
+  **191 Pest / 494 assert · 84 Vitest**. Docs: `BUSINESS-FLOW §3.2` (aturan status truk = kontrol
+  penjadwalan + urutan guard), `CODE-WALKTHROUGH §W` **baru** (+TOC), `SETUP-GUIDE` (5 baris tabel
+  endpoint + catatan 422 di booking + hitungan test), `FRONTEND` (baris route `/trucks`, catatan
+  dropdown ACTIVE-saja, daftar rute, tabel nav), `README`/`ONBOARDING` (hitungan test).
+  Alasan: menutup task #3 "CRUD truk/sopir" (bagian truk) yang menggantung uncommitted; status truk
+  yang tak ditegakkan itu **bug nyata** — endpoint hapus menyuruh pakai INACTIVE padahal INACTIVE
+  tak menghentikan apa pun. Tidak menyentuh CLAUDE.md/seeder/migrasi. **Sopir belum** (lihat
+  *Langkah berikutnya* #3 — keputusan produk soal pembuatan akun user).
 - `2026-07-25`: **Audit staleness dokumen + kode (pasca realtime).**
   *Docs:* selaraskan hitungan test current-state ke **174 Pest / 74 Vitest** (README, ONBOARDING,
   SETUP-GUIDE — entri changelog historis TIDAK diubah, itu snapshot masa lalu); hapus klaim usang

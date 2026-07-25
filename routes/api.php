@@ -28,6 +28,10 @@ use App\Http\Controllers\Api\V1\Auth\MeController;
 use App\Http\Controllers\Api\V1\BookAppointmentController;
 use App\Http\Controllers\Api\V1\CancelAppointmentController;
 use App\Http\Controllers\Api\V1\CloseSlotWindowController;
+use App\Http\Controllers\Api\V1\Fleet\CreateTruckController;
+use App\Http\Controllers\Api\V1\Fleet\DeleteTruckController;
+use App\Http\Controllers\Api\V1\Fleet\ListTrucksController;
+use App\Http\Controllers\Api\V1\Fleet\UpdateTruckController;
 use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
 use App\Http\Controllers\Api\V1\GateQueueController;
@@ -56,6 +60,12 @@ Route::prefix('v1')->group(function (): void {
         // Referensi/master data (read) untuk dropdown & form booking.
         Route::get('gates', ListGatesController::class);
         Route::get('me/fleet', MyFleetController::class);
+
+        // Armada truk milik transporter (fleet.manage, scoped company sendiri).
+        Route::get('me/trucks', ListTrucksController::class);
+        Route::post('me/trucks', CreateTruckController::class);
+        Route::patch('me/trucks/{truck}', UpdateTruckController::class);
+        Route::delete('me/trucks/{truck}', DeleteTruckController::class);
 
         Route::get('slots/availability', SlotAvailabilityController::class);
         // Planner kelola jendela slot (slot.manage) — otorisasi di FormRequest.

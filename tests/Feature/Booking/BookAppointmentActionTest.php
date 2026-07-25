@@ -6,9 +6,11 @@ use App\Actions\BookAppointmentAction;
 use App\DataTransferObjects\BookAppointmentData;
 use App\Enums\AppointmentStatus;
 use App\Enums\MoveType;
+use App\Enums\TruckStatus;
 use App\Events\AppointmentBooked;
 use App\Exceptions\DuplicateBookingException;
 use App\Exceptions\FleetOwnershipException;
+use App\Exceptions\InactiveTruckException;
 use App\Exceptions\SlotUnavailableException;
 use App\Models\Container;
 use App\Models\SlotWindow;
@@ -182,4 +184,37 @@ it('forbids booking with a truck or driver from another company', function (): v
         ->toThrow(FleetOwnershipException::class);
 
     expect($window->fresh()->booked_count)->toBe(0);
+});
+
+it('rejects booking with an INACTIVE truck', function (): void {
+    ['actor' => $actor, 'data' => $data, 'window' => $window] = bookingScenario();
+
+    // Truk dipensiunkan (rusak/dijual/izin mati). Endpoint hapus truk ber-riwayat
+    // menyuruh transporter memakai INACTIVE — jadi status itu wajib benar-benar
+    // menghentikan penjadwalan, bukan sekadar label.
+    Truck::query()->whereKey($data->truckId)->update(['status' => TruckStatus::INACTIVE]);
+
+    expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
+        ->toThrow(InactiveTruckException::class);
+
+    expect($window->fresh()->booked_count)->toBe(0);
+});
+
+it('reports a foreign INACTIVE truck as ownership failure, not inactive', function (): void {
+    // Urutan guard penting: kepemilikan dicek DULU. Kalau status dicek lebih dulu,
+    // pesan error yang berbeda membocorkan keberadaan & kondisi truk company lain.
+    ['actor' => $actor, 'window' => $window] = bookingScenario();
+    $foreignTruck = Truck::factory()->inactive()->create();
+    $foreignDriver = User::factory()->create(['company_id' => $foreignTruck->company_id]);
+
+    $data = new BookAppointmentData(
+        slotWindowId: $window->id,
+        truckId: $foreignTruck->id,
+        driverId: $foreignDriver->id,
+        moveType: MoveType::DELIVERY,
+        containerNo: 'XXXU0000000',
+    );
+
+    expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
+        ->toThrow(FleetOwnershipException::class);
 });

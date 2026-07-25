@@ -36,6 +36,7 @@
 - [T. Read Referensi (gates + fleet)](#t-slice-read-referensi-gates--fleet)
 - [U. Read endpoints persona (booking list + gate queue)](#u-read-endpoints-persona-booking-list--gate-queue)
 - [V. Admin CRUD master data (terminal/gate/company/user)](#v-admin-crud-master-data-terminalgatecompanyuser)
+- [W. CRUD armada truk transporter (`/me/trucks`)](#w-crud-armada-truk-transporter-metrucks)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -1585,6 +1586,85 @@ yang hanya tersedia di arrow function `fn () => seed(...)`.
 
 > **Frontend admin** (AdminPage 4-tab, `useAdmin` composable, invalidasi cache): di
 > `docs/FRONTEND.md §4`.
+
+---
+
+## W. CRUD armada truk transporter (`/me/trucks`)
+
+Bedanya dengan Admin CRUD (§V): admin melihat **lintas company**, transporter **hanya
+company sendiri**. Karena itu tidak ada parameter `company_id` di mana pun — nilainya
+selalu diambil dari user yang login.
+
+### W.1 Scope company: dari token, bukan dari input
+
+```php
+// CreateTruckController — company_id TIDAK pernah datang dari body request.
+$companyId = (int) $request->user()?->company_id;
+$truck = $action->execute($companyId, $request->toData());
+```
+
+Untuk update/delete, kepemilikan dicek di FormRequest (`UpsertTruckRequest::authorize`,
+`DeleteTruckRequest::authorize`): `$truck->company_id === $user->company_id`, else **403**.
+Otorisasi kepemilikan di `authorize()` (bukan di Action) supaya request ditolak sebelum
+validasi jalan — dan supaya pesan error tak membocorkan isi truk company lain.
+
+### W.2 Plat unik **per company**, bukan global
+
+```php
+Rule::unique('trucks', 'plate_no')->where('company_id', $companyId)->ignore($truckId)
+```
+
+Dua perusahaan angkutan berbeda boleh saja mencatat plat yang sama (data entry, truk
+berpindah tangan). Yang dilarang hanya duplikat di dalam satu company. `->ignore()`
+supaya update truk tanpa ganti plat tidak menabrak dirinya sendiri.
+
+### W.3 Hapus truk: 409, bukan cascade
+
+`FleetRepository::deleteTruck()` menolak bila `appointments()->exists()` →
+`EntityInUseException::truck()` (409 `entity_in_use`). FK `appointments.truck_id` =
+`RESTRICT`: hard-delete truk ber-riwayat merusak audit trail. Jalur resmi "pensiunkan
+truk" adalah **status `INACTIVE`** — lihat W.4.
+
+### W.4 `INACTIVE` ditegakkan, bukan sekadar label (fix 2026-07-25)
+
+Awalnya `TruckStatus` hanya kolom: truk `INACTIVE` masih muncul di dropdown booking dan
+tetap **berhasil di-book (201)** — padahal pesan 409 di W.3 justru menyuruh transporter
+memakai INACTIVE. Dua sisi diperbaiki:
+
+```php
+// 1) BookAppointmentAction — tolak di server (sumber kebenaran)
+if ($truck === null || ! $driverOwned) {
+    throw new FleetOwnershipException;          // kepemilikan DULU…
+}
+if ($truck->status !== TruckStatus::ACTIVE) {
+    throw new InactiveTruckException;           // …baru status (422 truck_inactive)
+}
+```
+
+**Urutan guard itu keamanan, bukan gaya.** Kalau status dicek lebih dulu, dua pesan error
+yang berbeda memberi tahu penyerang bahwa truk milik company lain itu ada dan sedang
+nonaktif — kebocoran lintas-tenant lewat *error message*.
+
+```php
+// 2) FleetRepository::trucksForCompany($companyId, ?TruckStatus $status = null)
+//    /me/fleet  (dropdown booking) → TruckStatus::ACTIVE
+//    /me/trucks (halaman kelola)   → null = semua, supaya bisa diaktifkan lagi
+->when($status !== null, fn ($q) => $q->where('status', $status))
+```
+
+Parameter opsional (pola sama dengan `AppointmentRepository::forCompany`) — satu query,
+dua kebutuhan, tanpa method kembar. Menyaring dropdown saja **tidak cukup**: truk bisa
+dinonaktifkan saat form booking sudah terbuka, jadi Action tetap harus menolak.
+
+### W.5 Test
+`tests/Feature/Fleet/TruckCrudTest.php` (13) — scoping company, 403 lintas company,
+duplikat plat per company, enum status, 409 delete-in-use, dan listing yang **tetap**
+memuat INACTIVE. Penegakan INACTIVE diuji di tempat aturannya hidup:
+`tests/Feature/Booking/` (Action + endpoint 422, plus test yang mengunci **urutan guard**)
+dan `tests/Feature/Reference/MyFleetTest.php` (dropdown menyaring INACTIVE).
+
+> **Frontend armada** (`MyTrucksPage`, `useTrucks` yang meng-invalidate `me-fleet` juga):
+> `docs/FRONTEND.md`.
 
 ---
 

@@ -147,8 +147,9 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/login` | `pages/LoginPage.vue` | publik | form login; map error server ke pesan |
 | `/` | `pages/DashboardPage.vue` | semua | kartu profil + **nav per-izin** (`auth.can(...)`) |
 | `/slots` | `pages/SlotAvailabilityPage.vue` | `slot.read` | dropdown gate (`useGates`) + tanggal → list window + sisa kuota; tombol **Booking** (bila `appointment.write`) buka `BookingForm` |
-| — | `components/BookingForm.vue` | `appointment.write` | modal: truk/sopir dari `useFleet`, move_type/kontainer; kirim **Idempotency-Key** (`crypto.randomUUID`); map 409 `slot_unavailable`/`duplicate_booking` |
+| — | `components/BookingForm.vue` | `appointment.write` | modal: truk/sopir dari `useFleet` (**hanya truk ACTIVE** — server yang menyaring), move_type/kontainer; kirim **Idempotency-Key** (`crypto.randomUUID`); map 409 `slot_unavailable`/`duplicate_booking`. Truk dinonaktifkan saat form terbuka → submit kena 422 `truck_inactive`; pesan server lolos lewat fallback `data.message` (tak perlu mapping khusus) |
 | `/bookings` | `pages/MyBookingsPage.vue` | `appointment.write` | `GET /me/appointments` (filter status); **Batalkan** (konfirmasi 2-langkah) & **Pindah jadwal**; kirim `version` (optimistic lock) |
+| `/trucks` | `pages/MyTrucksPage.vue` | `fleet.manage` | CRUD armada truk company sendiri (`/me/trucks`): form create/edit dipakai bersama (`editingId != null` = mode edit), hapus konfirmasi 2-langkah; map 409 `entity_in_use` & 422. Menampilkan truk **ACTIVE + INACTIVE** (kebalikan dropdown booking) supaya truk nonaktif bisa diaktifkan lagi |
 | — | `components/RescheduleDialog.vue` | — | modal pilih window tujuan (**reuse** `useGates`+`useSlotAvailability`); default ke gate/tanggal window saat ini; kirim `slot_window_id`+`version` |
 | `/today` | `pages/DriverSchedulePage.vue` | `appointment.read.self` | jadwal hari-H sopir, urut jam, nama gate |
 | `/gate` | `pages/GateDashboardPage.vue` | `gate.process` | antrian (`GET /gate/queue`); **Gate In** (CONFIRMED) / **Gate Out** (IN_PROGRESS) |
@@ -231,7 +232,7 @@ Jebakan yang sudah ditemukan & dicatat:
 ## 6. Peta rute & navigasi
 
 Rute (semua `requiresAuth` kecuali `/login`): `/login`, `/` (dashboard), `/slots`,
-`/bookings`, `/today`, `/gate`, `/planner`, `/admin`.
+`/bookings`, `/trucks`, `/today`, `/gate`, `/planner`, `/reports`, `/admin`.
 
 Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 `auth.can(perm)`:
@@ -240,6 +241,7 @@ Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
 |------|------|---------|
 | Ketersediaan Slot | `slot.read` | transporter/planner/gate-officer |
 | Booking Saya | `appointment.write` | transporter |
+| Armada Truk | `fleet.manage` | transporter |
 | Jadwal Hari Ini | `appointment.read.self` | driver |
 | Dashboard Gate | `gate.process` | gate-officer |
 | Kelola Slot | `slot.manage` | planner |

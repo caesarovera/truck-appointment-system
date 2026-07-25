@@ -31,6 +31,11 @@ const routes: RouteRecordRaw[] = [
                 component: () => import('@/pages/MyBookingsPage.vue'),
             },
             {
+                path: 'trucks',
+                name: 'trucks',
+                component: () => import('@/pages/MyTrucksPage.vue'),
+            },
+            {
                 path: 'today',
                 name: 'today',
                 component: () => import('@/pages/DriverSchedulePage.vue'),

@@ -7,9 +7,11 @@ namespace App\Actions;
 use App\Contracts\AppointmentRepositoryInterface;
 use App\Contracts\SlotRepositoryInterface;
 use App\DataTransferObjects\BookAppointmentData;
+use App\Enums\TruckStatus;
 use App\Events\AppointmentBooked;
 use App\Exceptions\DuplicateBookingException;
 use App\Exceptions\FleetOwnershipException;
+use App\Exceptions\InactiveTruckException;
 use App\Exceptions\SlotUnavailableException;
 use App\Models\Appointment;
 use App\Models\SlotWindow;
@@ -24,7 +26,7 @@ use Illuminate\Support\Str;
  * Booking 1 slot (jantung anti-race proyek ini).
  *
  * Alur (docs/BUSINESS-FLOW.md §3.2):
- *  1. Validasi kepemilikan truk & sopir (isolasi antar-company).
+ *  1. Validasi kepemilikan truk & sopir (isolasi antar-company) + truk masih ACTIVE.
  *  2. DB::transaction(attempts: 3)  → auto-retry bila deadlock.
  *  3. SlotWindow::lockForUpdate     → serialisasi perebut slot terakhir.
  *  4. Tolak bila ditutup / penuh    → 409.
@@ -89,18 +91,25 @@ final class BookAppointmentAction
 
     private function assertFleetBelongsToCompany(int $companyId, BookAppointmentData $data): void
     {
-        $truckOwned = Truck::query()
+        $truck = Truck::query()
             ->whereKey($data->truckId)
             ->where('company_id', $companyId)
-            ->exists();
+            ->first();
 
         $driverOwned = User::query()
             ->whereKey($data->driverId)
             ->where('company_id', $companyId)
             ->exists();
 
-        if (! $truckOwned || ! $driverOwned) {
+        if ($truck === null || ! $driverOwned) {
             throw new FleetOwnershipException;
+        }
+
+        // Truk yang dipensiunkan tak boleh dijadwalkan lagi. Dicek SETELAH
+        // kepemilikan: kalau dibalik, pesan error yang berbeda membocorkan
+        // keberadaan & kondisi truk milik company lain.
+        if ($truck->status !== TruckStatus::ACTIVE) {
+            throw new InactiveTruckException;
         }
     }
 

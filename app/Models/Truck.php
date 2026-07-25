@@ -9,6 +9,7 @@ use Database\Factories\TruckFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -34,5 +35,11 @@ class Truck extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(TransportCompany::class, 'company_id');
+    }
+
+    /** @return HasMany<Appointment, $this> */
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
     }
 }

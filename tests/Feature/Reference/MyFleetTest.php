@@ -39,6 +39,22 @@ it('returns only the transporter own company trucks and drivers', function (): v
         ->assertJsonStructure(['data' => ['trucks' => [['id', 'plate_no', 'status']], 'drivers' => [['id', 'name']]]]);
 });
 
+it('omits INACTIVE trucks (this feeds the booking form dropdown)', function (): void {
+    $company = TransportCompany::factory()->create();
+    Truck::factory()->count(2)->create(['company_id' => $company->id]);
+    Truck::factory()->inactive()->create(['company_id' => $company->id]);
+
+    $dispatcher = User::factory()->create(['company_id' => $company->id]);
+    $dispatcher->assignRole('transporter');
+    Sanctum::actingAs($dispatcher);
+
+    // Truk nonaktif tak boleh bisa dipilih saat booking. Halaman kelola armada
+    // (`GET /me/trucks`) tetap menampilkannya supaya bisa diaktifkan kembali.
+    getJson('/api/v1/me/fleet')
+        ->assertOk()
+        ->assertJsonCount(2, 'data.trucks');
+});
+
 it('does not count the transporter themselves as a driver', function (): void {
     $company = TransportCompany::factory()->create();
     Truck::factory()->create(['company_id' => $company->id]);

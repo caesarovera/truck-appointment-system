@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TruckStatus;
 use App\Models\Appointment;
 use App\Models\SlotWindow;
 use App\Models\TransportCompany;
@@ -113,4 +114,17 @@ it('rejects a truck from another company via validation (422)', function (): voi
     postJson('/api/v1/appointments', $payload)
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('truck_id');
+});
+
+it('rejects booking with an INACTIVE truck (422 truck_inactive)', function (): void {
+    ['user' => $user, 'payload' => $payload] = transporterBookingContext();
+    Sanctum::actingAs($user);
+
+    Truck::query()->whereKey($payload['truck_id'])->update(['status' => TruckStatus::INACTIVE]);
+
+    postJson('/api/v1/appointments', $payload)
+        ->assertStatus(422)
+        ->assertJsonPath('error', 'truck_inactive');
+
+    expect(Appointment::query()->count())->toBe(0);
 });

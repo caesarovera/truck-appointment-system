@@ -29,6 +29,13 @@ const auth = useAuthStore();
                 >
                     Booking Saya
                 </RouterLink>
+                <RouterLink
+                    v-if="auth.can('fleet.manage')"
+                    to="/trucks"
+                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                >
+                    Armada Truk
+                </RouterLink>
                 <!-- report.read + punya company: planner/admin (tanpa company) pakai /planner. -->
                 <RouterLink
                     v-if="auth.can('report.read') && auth.user?.company_id != null"

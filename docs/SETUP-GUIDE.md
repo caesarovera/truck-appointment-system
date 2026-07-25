@@ -418,7 +418,7 @@ Contoh output sehat:
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
   ...
-  Tests:    174 passed (459 assertions)
+  Tests:    191 passed (494 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -471,9 +471,13 @@ Endpoint yang sudah ada:
 | `POST` | `/api/v1/logout` | token | — | cabut token saat ini |
 | `GET`  | `/api/v1/me` | token | — | profil + role + permission |
 | `GET`  | `/api/v1/gates?terminal={id}` | token | `slot.read` | daftar gate (dropdown); `terminal` opsional |
-| `GET`  | `/api/v1/me/fleet` | token | `fleet.manage` | truk & sopir milik company transporter (form booking) |
+| `GET`  | `/api/v1/me/fleet` | token | `fleet.manage` | truk & sopir milik company transporter (form booking) — truk **ACTIVE saja** |
+| `GET`  | `/api/v1/me/trucks` | token | `fleet.manage` | armada truk company sendiri, **semua status** (halaman kelola) |
+| `POST` | `/api/v1/me/trucks` | token | `fleet.manage` | tambah truk (body: `plate_no`, `status`); plat unik **per company** → 422 |
+| `PATCH` | `/api/v1/me/trucks/{truck}` | token | `fleet.manage` | ubah plat/status; truk company lain → 403 |
+| `DELETE` | `/api/v1/me/trucks/{truck}` | token | `fleet.manage` | hapus truk (204); punya riwayat appointment → 409 `entity_in_use` (pakai status INACTIVE) |
 | `GET`  | `/api/v1/slots/availability?gate={id}&date=YYYY-MM-DD` | token | `slot.read` | sisa kuota slot |
-| `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`) |
+| `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`); truk INACTIVE → 422 `truck_inactive` |
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | token | Policy `update` | pindah window (body: `slot_window_id`, `version`) |
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |
@@ -659,8 +663,8 @@ hardening → master data CRUD admin. Frontend: SPA Vue untuk transporter, drive
 gate-officer, planner, + halaman admin. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
 (§J–§V backend) & `docs/FRONTEND.md` (SPA).
 
-Gerbang kualitas terakhir: `composer test` → **174 pass (459 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **74 pass**.
+Gerbang kualitas terakhir: `composer test` → **191 pass (494 assertions)** ·
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **84 pass**.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **verifikasi realtime
 di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCAST_CONNECTION=reverb`

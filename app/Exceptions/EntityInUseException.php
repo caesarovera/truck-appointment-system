@@ -25,6 +25,11 @@ final class EntityInUseException extends RuntimeException
         return new self('Perusahaan masih memiliki data terkait (user/truk/appointment). Hapus semua data terkait terlebih dahulu.');
     }
 
+    public static function truck(): self
+    {
+        return new self('Truk masih dipakai pada appointment. Nonaktifkan (status INACTIVE) alih-alih menghapus.');
+    }
+
     public function render(Request $request): JsonResponse
     {
         return response()->json([

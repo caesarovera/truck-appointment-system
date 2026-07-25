@@ -30,6 +30,9 @@ const activeClass = 'text-indigo-700 font-medium bg-indigo-50';
             <RouterLink v-if="auth.can('appointment.write')" to="/bookings" :class="linkClass" :exact-active-class="activeClass">
                 Booking Saya
             </RouterLink>
+            <RouterLink v-if="auth.can('fleet.manage')" to="/trucks" :class="linkClass" :exact-active-class="activeClass">
+                Armada
+            </RouterLink>
             <RouterLink
                 v-if="auth.can('report.read') && auth.user?.company_id != null"
                 to="/reports"

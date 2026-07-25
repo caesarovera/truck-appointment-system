@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Contracts\FleetRepositoryInterface;
+use App\Enums\TruckStatus;
 use App\Http\Requests\V1\FleetRequest;
 use App\Http\Resources\V1\DriverResource;
 use App\Http\Resources\V1\TruckResource;
@@ -26,8 +27,11 @@ final class MyFleetController
         abort_if($companyId === null, Response::HTTP_FORBIDDEN);
 
         return response()->json([
+            // Hanya truk ACTIVE: endpoint ini mengisi dropdown form booking, dan
+            // truk INACTIVE ditolak BookAppointmentAction (422 truck_inactive).
+            // Halaman kelola armada pakai `GET /me/trucks` yang menampilkan semua.
             'data' => [
-                'trucks' => TruckResource::collection($this->fleet->trucksForCompany($companyId)),
+                'trucks' => TruckResource::collection($this->fleet->trucksForCompany($companyId, TruckStatus::ACTIVE)),
                 'drivers' => DriverResource::collection($this->fleet->driversForCompany($companyId)),
             ],
         ]);
