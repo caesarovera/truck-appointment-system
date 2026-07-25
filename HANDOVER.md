@@ -32,9 +32,10 @@
   DB** (`phpunit.xml` memaksa sqlite `:memory:`); versi dipatok menyamai mesin dev (PHP 8.3, Node 22).
   Cara pakai + tabel gejala→sebab saat CI merah: `docs/SETUP-GUIDE.md §14`. Alasan CI didahulukan
   & **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.
-  **BELUM DIVERIFIKASI:** run pertama belum dilihat hijau — mesin dev tak punya `gh` CLI, jadi
-  hasilnya harus dicek manual di tab **Actions** GitHub. Kalau merah, kemungkinan besar hal kecil
-  (nama action/versi), bukan perintah gerbangnya — keenam perintah itu terbukti hijau lokal.
+  **TERVERIFIKASI hijau** (run [30164709068](https://github.com/caesarovera/truck-appointment-system/actions/runs/30164709068),
+  commit `f7f4641`): **kedua** job benar-benar jalan — `backend` 32 dtk & `frontend` 30 dtk, paralel
+  → **37 dtk** total. Angka itu berguna sebagai basis: kalau suatu saat melonjak jauh, curigai cache
+  Composer/npm meleset (key-nya `composer.lock`/`package-lock.json`).
 - [x] **Polish UI — skeleton loading (2026-07-25):** `components/SkeletonRows.vue` (props `rows`,
   `label`) menggantikan teks `Memuat…` di **11 titik / 8 halaman + `RescheduleDialog`**. Alasan
   utamanya bukan estetika: placeholder setinggi konten asli menghapus **layout shift** saat data
@@ -186,9 +187,7 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (191 Pest / 87 Vitest); terakhir: CI GitHub Actions dipasang.
-  **Satu hal menggantung:** run CI pertama belum dilihat hijau (tak ada `gh` CLI di mesin dev) →
-  cek tab **Actions** di GitHub, itu langkah pertama sesi berikutnya.
+- (kosong) — checkpoint hijau (191 Pest / 87 Vitest + **CI hijau di GitHub**); terakhir: CI GitHub Actions dipasang & terverifikasi.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
