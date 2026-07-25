@@ -23,7 +23,8 @@ API-first decoupled. Laravel 12 = REST API murni. Vue 3 = SPA terpisah. Bukan In
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
-* Infra: Docker Compose · CI: GitHub Actions
+* Infra dev: **native, tanpa Docker** (PHP + SQLite di mesin dev). `docker-compose.yml` **belum ada** — rencana, untuk paritas produksi (Redis/MySQL/Horizon). Jangan tulis "sudah pakai Docker" sebelum file-nya benar-benar ada.
+* CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
 ## Aturan layer (non-negotiable)
 
@@ -94,7 +95,7 @@ Alur: brainstorm di mobile (claude.ai) → eksekusi presisi di Claude Code. CLAU
 3. Kerjakan **1 vertical slice per sesi** (1 Action + test + wiring), bukan seluruh fitur sekaligus. Konteks tetap ramping.
 
 **Urutan build (sekali di awal):**
-1. Scaffold Laravel 12 + Docker Compose + Pest + PHPStan(8) + Pint + GitHub Actions.
+1. Scaffold Laravel 12 + Pest + PHPStan(8) + Pint + GitHub Actions. (Docker Compose **tidak** dipakai — dev native, lihat §Stack.)
 2. Install paket inti (konfirmasi via `composer.json` dulu): Sanctum, Horizon, Reverb, Spatie Permission/Activity Log/Laravel Data.
 3. Migrasi + Model + Factory dari `BUSINESS-FLOW.md §4`, lalu jalankan seeder yang sudah ada.
 4. Contracts + Repository (`SlotRepositoryInterface`, `AppointmentRepositoryInterface`) → bind di `AppServiceProvider`.

@@ -41,7 +41,7 @@ Yang harus ada di mesin (versi yang teruji di sesi ini):
 | Composer | 2.8.11 | `composer --version` |
 | Node.js + npm | LTS (untuk frontend nanti) | `node -v && npm -v` |
 | Git | apa saja | `git --version` |
-| (opsional) Docker | untuk Horizon/Reverb/Redis | `docker --version` |
+| (opsional) Docker | untuk **Horizon** & Redis/MySQL paritas produksi. **Reverb tidak butuh** — jalan native (lihat catatan di bawah) | `docker --version` |
 
 > **Catatan Windows/laragon:** PHP berada di
 > `C:\laragon\bin\php\php-8.3.31-Win32-vs16-x64\`. **Hanya Horizon** yang butuh

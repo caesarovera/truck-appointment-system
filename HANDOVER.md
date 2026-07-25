@@ -193,13 +193,26 @@
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
 2. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
-3. **Klaim `CLAUDE.md` yang MASIH tidak benar: `Infra: Docker Compose`.** Tidak ada `docker-compose.yml` di repo. Klaim CI di baris yang sama sudah dibereskan (lihat *Sudah selesai*); yang Docker belum. Pilihannya: bikin compose-nya (Redis+MySQL+Horizon untuk paritas produksi — sesi tersendiri) **atau** koreksi barisnya di CLAUDE.md. **Jangan diam-diam dibiarkan** — kontrak yang berbohong persis penyakit yang bikin CI luput bertahun-tahun.
+3. **[SELESAI 2026-07-25 — baris Docker Compose di CLAUDE.md dikoreksi]** Sisa yang masih perlu keputusan Anda: baris **`Queue/Cache/Session: Redis 7 + Horizon`** (CLAUDE.md §Stack) juga belum mencerminkan kenyataan — `.env` dev memakai `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`, `DB_CONNECTION=sqlite`, `BROADCAST_CONNECTION=log`. **Nol Redis dipakai** (var `REDIS_*` ada tapi tak menyentuh apa pun). Ini penyakit yang sama dengan klaim Docker/CI. Dua pilihan sah: (a) tandai baris itu sebagai **target**, bukan keadaan (mis. "target produksi: Redis 7 + Horizon; dev: driver `database`") — ini menjaga alasan keputusan `Cache::flexible` explicit-key yang memang bersandar pada "nanti pindah ke Redis"; atau (b) benar-benar pasang Redis. **Belum dikerjakan karena mengubah §Stack = perubahan kontrak, butuh keputusan pemilik repo.**
 4. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
 5. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` §Stack baris infra dikoreksi.** Sebelumnya
+  `* Infra: Docker Compose · CI: GitHub Actions` — **dua-duanya tidak ada** saat itu. Kini dipecah
+  jadi dua baris jujur: (1) *Infra dev: **native, tanpa Docker** (PHP + SQLite); `docker-compose.yml`
+  **belum ada** — rencana, untuk paritas produksi (Redis/MySQL/Horizon)*, plus larangan eksplisit
+  menulis "sudah pakai Docker" sebelum file-nya benar-benar ada; (2) *CI: GitHub Actions* + pointer
+  ke `SETUP-GUIDE §14` + pengingat bahwa gerbang baru wajib ikut masuk workflow. §Urutan build
+  langkah 1 juga dihapus "Docker Compose"-nya. Ikutan: `SETUP-GUIDE` tabel prasyarat — baris Docker
+  masih menyebut Reverb butuh Docker, padahal 4 baris di bawahnya file yang sama sudah mengoreksinya
+  (Reverb jalan native); kini konsisten. Alasan: kontrak yang menyatakan sesuatu ada padahal tidak
+  adalah persis penyakit yang membuat CI luput selama ini — dokumen yang tak bisa dipercaya lebih
+  buruk daripada dokumen yang mengaku belum lengkap. **Masih tersisa & belum disentuh:** baris
+  `Queue/Cache/Session: Redis 7 + Horizon` (lihat *Langkah berikutnya* #3) — butuh keputusan pemilik
+  repo, bukan diputuskan sepihak. Tidak menyentuh seeder/kode.
 - `2026-07-25`: **CI GitHub Actions dipasang + ADR-0005 baru.** Kode: `.github/workflows/ci.yml`
   **baru** (2 job paralel; perintahnya = skrip composer/npm yang sama dengan lokal). Docs:
   `adr/0005-ci-github-actions.md` **baru** (+baris di `adr/README`), `SETUP-GUIDE §14` **baru**
