@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { isAxiosError } from 'axios';
 import { useMyAppointments } from '@/composables/useMyAppointments';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 import { useCancelAppointment } from '@/composables/useCancelAppointment';
 import RescheduleDialog from '@/components/RescheduleDialog.vue';
 import type { Appointment } from '@/types/api';
@@ -72,7 +73,7 @@ function extractError(e: unknown): string {
 
             <p v-if="error" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">{{ error }}</p>
 
-            <p v-if="isLoading" class="text-sm text-gray-500">Memuat booking…</p>
+            <SkeletonRows v-if="isLoading" :rows="3" label="Memuat booking…" />
 
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat daftar booking. Coba lagi.

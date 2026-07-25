@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import { useTodaySchedule } from '@/composables/useTodaySchedule';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 
 const { appointments, isLoading, isError } = useTodaySchedule();
 
@@ -22,7 +23,7 @@ const today = new Date().toISOString().slice(0, 10);
         </header>
 
         <main class="p-6 space-y-4">
-            <p v-if="isLoading" class="text-sm text-gray-500">Memuat jadwal…</p>
+            <SkeletonRows v-if="isLoading" :rows="3" label="Memuat jadwal…" />
 
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat jadwal. Coba lagi.

@@ -668,7 +668,7 @@ status INACTIVE). Frontend: SPA Vue untuk transporter, driver, gate-officer, pla
 (§J–§W backend) & `docs/FRONTEND.md` (SPA).
 
 Gerbang kualitas terakhir: `composer test` → **191 pass (494 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **84 pass**.
+`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **87 pass**.
 
 Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **verifikasi realtime
 di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCAST_CONNECTION=reverb`

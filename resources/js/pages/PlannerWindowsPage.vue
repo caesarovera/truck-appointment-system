@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { isAxiosError } from 'axios';
 import { useGates } from '@/composables/useGates';
 import { useUtilization, useOpenSlotWindow, useCloseSlotWindow } from '@/composables/usePlannerWindows';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 
 function today(): string {
     return new Date().toISOString().slice(0, 10);
@@ -133,7 +134,7 @@ function extractError(e: unknown): string {
 
             <!-- Daftar window -->
             <p v-if="!enabled" class="text-sm text-gray-500">Pilih gate untuk melihat window.</p>
-            <p v-else-if="isLoading" class="text-sm text-gray-500">Memuat window…</p>
+            <SkeletonRows v-else-if="isLoading" :rows="4" label="Memuat window…" />
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat window. Coba lagi.
             </p>

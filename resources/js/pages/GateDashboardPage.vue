@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { isAxiosError } from 'axios';
 import { useAuthStore } from '@/stores/auth';
 import { useGateQueue, useGateIn, useGateOut } from '@/composables/useGateQueue';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 import { useGateQueueRealtime } from '@/composables/useRealtime';
 import type { Appointment } from '@/types/api';
 
@@ -64,7 +65,7 @@ const busy = computed(() => gateInMutation.isPending.value || gateOutMutation.is
         <main class="p-6 space-y-4">
             <p v-if="error" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">{{ error }}</p>
 
-            <p v-if="isLoading" class="text-sm text-gray-500">Memuat antrian…</p>
+            <SkeletonRows v-if="isLoading" :rows="4" label="Memuat antrian…" />
 
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat antrian. Coba lagi.

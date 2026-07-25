@@ -3,6 +3,7 @@ import { ref } from 'vue';
 
 import { useGates } from '@/composables/useGates';
 import { useMyUtilization } from '@/composables/useMyUtilization';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 
 function today(): string {
     return new Date().toISOString().slice(0, 10);
@@ -50,7 +51,7 @@ const { windows, summary, isLoading, isError, enabled } = useMyUtilization(gate,
             </div>
 
             <p v-if="!enabled" class="text-sm text-gray-500">Pilih gate untuk melihat laporan.</p>
-            <p v-else-if="isLoading" class="text-sm text-gray-500">Memuat laporan…</p>
+            <SkeletonRows v-else-if="isLoading" :rows="3" label="Memuat laporan…" />
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat laporan. Coba lagi.
             </p>

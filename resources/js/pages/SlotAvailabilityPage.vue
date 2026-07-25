@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 import { useSlotRealtime } from '@/composables/useRealtime';
 import BookingForm from '@/components/BookingForm.vue';
 import type { BookedAppointment, SlotWindow } from '@/types/api';
@@ -70,7 +71,7 @@ function onBooked(appointment: BookedAppointment): void {
 
             <p v-if="!enabled" class="text-sm text-gray-500">Pilih gate untuk melihat slot.</p>
 
-            <p v-else-if="isLoading" class="text-sm text-gray-500">Memuat ketersediaan…</p>
+            <SkeletonRows v-else-if="isLoading" :rows="4" label="Memuat ketersediaan…" />
 
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat ketersediaan slot. Coba lagi.

@@ -13,10 +13,22 @@
 - Update terakhir: `2026-07-25` · Sesi: **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
 - Build backend: `composer test` → ✅ **191 pass / 494 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **84 pass** · `npm run type-check` (vue-tsc) → ✅.
+- Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Polish UI — skeleton loading (2026-07-25):** `components/SkeletonRows.vue` (props `rows`,
+  `label`) menggantikan teks `Memuat…` di **11 titik / 8 halaman + `RescheduleDialog`**. Alasan
+  utamanya bukan estetika: placeholder setinggi konten asli menghapus **layout shift** saat data
+  masuk. **Aksesibilitas dijaga:** balok abu-abu tak mengabarkan apa pun ke pembaca layar, jadi teks
+  lama dipindah ke `<span class="sr-only">` di dalam `role="status" aria-busy="true"` dan balok
+  visualnya `aria-hidden`. Efek samping enak: test lama yang meng-assert teks `Memuat laporan`
+  **tetap hijau tanpa diubah** — bukti integrasi skeleton↔halaman sekaligus.
+  **Sengaja TIDAK diubah:** indikator `isFetching` di `/slots` (refetch latar saat data lama masih
+  tampil) — menggantinya dengan skeleton justru menyembunyikan data yang sudah benar. Skeleton hanya
+  untuk `isLoading` (belum ada data sama sekali). +3 Vitest → **87 Vitest**. Detail: `docs/FRONTEND.md`
+  (§4 → *Loading state*). **Sisa dari task Polish UI: e2e happy-path** — belum, butuh paket baru
+  (lihat *Langkah berikutnya* #2).
 - [x] **CRUD armada truk transporter + penegakan `INACTIVE` (2026-07-25):** transporter kelola
   armadanya sendiri tanpa lewat admin. **BE:** `Create/Update/DeleteTruckAction`, `TruckData` (Spatie
   Data), `UpsertTruckRequest`/`DeleteTruckRequest`, 4 controller invokable di `Fleet/`, `FleetRepository`
@@ -156,18 +168,27 @@
   otomatis sebagai indeks.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (191 Pest / 84 Vitest); terakhir: CRUD armada truk + fix penegakan `INACTIVE`.
+- (kosong) — checkpoint hijau (191 Pest / 87 Vitest); terakhir: skeleton loading (polish UI bagian 1).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
-2. **Polish UI:** loading skeleton, e2e happy-path. UI utilisasi company-scoped transporter DONE (`/reports`).
+2. **Polish UI — sisa: e2e happy-path.** Loading skeleton **DONE** (lihat *Sudah selesai*). E2E **belum dimulai**: repo tak punya tooling e2e sama sekali (`package.json` cuma Vitest), jadi perlu paket baru (Playwright/Cypress) → **kontrak CLAUDE.md mewajibkan konfirmasi sebelum tambah paket**. Catatan teknis saat memutuskan: Playwright berdiri sendiri (tak lewat Vite, jadi pin vite6 aman) tapi mengunduh binary browser ~100-an MB; e2e juga butuh app benar-benar hidup (`php artisan serve` + `npm run dev` + DB ter-seed), beda dari Vitest yang murni jsdom.
 3. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
 4. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-25`: **Skeleton loading (polish UI bagian 1).** Kode: `components/SkeletonRows.vue`
+  **baru**; 11 titik loading di `AdminPage`(4)/`SlotAvailabilityPage`/`MyBookingsPage`/`MyTrucksPage`/
+  `DriverSchedulePage`/`GateDashboardPage`/`PlannerWindowsPage`/`MyUtilizationPage` +
+  `RescheduleDialog` beralih dari `<p>Memuat…</p>` ke komponen itu. Test: +3 Vitest
+  (`tests/js/SkeletonRows.test.ts`) → **87 Vitest**. Docs: `FRONTEND` (baris komponen di tabel §4 +
+  sub-bagian *Loading state* berisi alasan sr-only & kenapa `isFetching` dikecualikan),
+  `README`/`ONBOARDING`/`SETUP-GUIDE` (hitungan Vitest). Alasan: teks "Memuat…" bikin tinggi konten
+  melompat saat data masuk; label dipindah ke `sr-only` supaya pembaca layar tak kehilangan info
+  (dan test lama tetap hijau). Tidak menyentuh CLAUDE.md/BE/seeder.
 - `2026-07-25`: **CRUD armada truk (`/me/trucks`) + penegakan status `INACTIVE`.**
   Kode BE: `Actions/Fleet/*` (3), `DataTransferObjects/Fleet/TruckData`, `Http/Requests/V1/Fleet/*` (2),
   `Http/Controllers/Api/V1/Fleet/*` (4), `FleetRepository`+`FleetRepositoryInterface` (3 method CRUD +

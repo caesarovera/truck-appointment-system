@@ -156,6 +156,28 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
 | `/reports` | `pages/MyUtilizationPage.vue` | `report.read` **+ punya company** | laporan company sendiri (`GET /me/reports/utilization`): selesai/no-show/batal/aktif per window + ringkasan; read-only (`useMyUtilization`, key `['my-utilization']` sengaja terpisah dari `['utilization']` planner — beda scope, tak boleh saling menimpa cache) |
 | `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **4-tab** master data (terminal/gate/company/user); form inline create/edit + hapus dgn konfirmasi |
+| — | `components/SkeletonRows.vue` | — | placeholder loading bersama (`rows`, `label`) — dipakai 11 titik di 8 halaman + `RescheduleDialog`. Lihat catatan di bawah |
+
+### Loading state — `SkeletonRows`
+
+Semua state "sedang memuat" list memakai satu komponen, bukan teks `Memuat…`.
+Alasannya bukan estetika: placeholder setinggi konten aslinya membuat halaman tidak
+melompat saat data masuk (**layout shift**), dan bentuk yang seragam bikin loading
+terasa sama di semua persona.
+
+```vue
+<SkeletonRows v-if="isLoading" :rows="4" label="Memuat antrian…" />
+```
+
+Dua hal yang sengaja dipertahankan:
+
+* **Label tetap ada untuk pembaca layar.** Balok abu-abu tidak mengabarkan apa pun ke
+  screen reader, jadi teks lama dipindah ke `<span class="sr-only">` di dalam
+  `role="status" aria-busy="true"`; balok visualnya `aria-hidden`. Efek samping enak:
+  test lama yang meng-assert teks `Memuat laporan` **tetap hijau** tanpa diubah.
+* **`isFetching` di `/slots` TIDAK ikut jadi skeleton.** Itu indikator refetch latar
+  saat data lama masih tampil — menggantinya dengan skeleton justru menyembunyikan
+  data yang sudah benar. Skeleton hanya untuk `isLoading` (belum ada data sama sekali).
 
 ### Admin master data — `useAdmin` + `AdminPage` (4 tab)
 

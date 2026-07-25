@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useTerminals, useAdminGates, useCompanies, useUsers, useAdminRefs } from '@/composables/useAdmin'
 import type { AdminTerminal, AdminGate, AdminCompany, AdminUser, AdminRole } from '@/types/api'
+import SkeletonRows from '@/components/SkeletonRows.vue'
 
 type Tab = 'terminals' | 'gates' | 'companies' | 'users'
 const activeTab = ref<Tab>('terminals')
@@ -135,7 +136,7 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
                 <button v-if="tEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="tCancel">Batal</button>
             </form>
 
-            <p v-if="loadingTerminals" class="text-gray-500 text-sm">Memuat…</p>
+            <SkeletonRows v-if="loadingTerminals" :rows="3" label="Memuat terminal…" />
             <table v-else class="w-full text-sm border-collapse">
                 <thead><tr class="bg-gray-100 text-left">
                     <th class="p-2 border">ID</th>
@@ -175,7 +176,7 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
                 <button v-if="gEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="gCancel">Batal</button>
             </form>
 
-            <p v-if="loadingGates" class="text-gray-500 text-sm">Memuat…</p>
+            <SkeletonRows v-if="loadingGates" :rows="3" label="Memuat gate…" />
             <table v-else class="w-full text-sm border-collapse">
                 <thead><tr class="bg-gray-100 text-left">
                     <th class="p-2 border">ID</th>
@@ -211,7 +212,7 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
                 <button v-if="cEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="cCancel">Batal</button>
             </form>
 
-            <p v-if="loadingCompanies" class="text-gray-500 text-sm">Memuat…</p>
+            <SkeletonRows v-if="loadingCompanies" :rows="3" label="Memuat perusahaan…" />
             <table v-else class="w-full text-sm border-collapse">
                 <thead><tr class="bg-gray-100 text-left">
                     <th class="p-2 border">ID</th>
@@ -264,7 +265,7 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
                 </div>
             </form>
 
-            <p v-if="loadingUsers" class="text-gray-500 text-sm">Memuat…</p>
+            <SkeletonRows v-if="loadingUsers" :rows="3" label="Memuat user…" />
             <table v-else class="w-full text-sm border-collapse">
                 <thead><tr class="bg-gray-100 text-left">
                     <th class="p-2 border">ID</th>

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { isAxiosError } from 'axios';
 
 import { useMyTrucks } from '@/composables/useTrucks';
+import SkeletonRows from '@/components/SkeletonRows.vue';
 import type { Truck, TruckStatus } from '@/types/api';
 
 const { trucks, isLoading, isError, create, update, remove } = useMyTrucks();
@@ -140,7 +141,7 @@ function mapError(e: unknown): string {
             </form>
 
             <!-- List -->
-            <p v-if="isLoading" class="text-sm text-gray-500">Memuat armada…</p>
+            <SkeletonRows v-if="isLoading" :rows="3" label="Memuat armada…" />
 
             <p v-else-if="isError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3">
                 Gagal memuat armada. Coba lagi.
