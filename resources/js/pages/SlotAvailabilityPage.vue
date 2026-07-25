@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
+import { useSlotRealtime } from '@/composables/useRealtime';
 import BookingForm from '@/components/BookingForm.vue';
 import type { BookedAppointment, SlotWindow } from '@/types/api';
 
@@ -17,6 +18,9 @@ const date = ref<string>(today());
 
 const { gates, isLoading: gatesLoading } = useGates();
 const { windows, isLoading, isFetching, isError, enabled } = useSlotAvailability(gate, date);
+
+// Sisa kuota live: dorongan dari server (channel slot.{gateId}) memicu refetch.
+useSlotRealtime(gate);
 
 const canBook = computed(() => auth.can('appointment.write'));
 

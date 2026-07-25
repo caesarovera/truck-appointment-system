@@ -17,6 +17,16 @@ vi.mock('@/composables/useGateQueue', () => ({
     useGateOut: () => gateOutMutation,
 }));
 
+// Realtime (Echo) di-mock: uji halaman terisolasi tanpa WebSocket.
+vi.mock('@/composables/useRealtime', () => ({
+    useGateQueueRealtime: vi.fn(),
+    useSlotRealtime: vi.fn(),
+}));
+
+vi.mock('@/stores/auth', () => ({
+    useAuthStore: () => ({ user: { terminal_id: 1 } }),
+}));
+
 import GateDashboardPage from '@/pages/GateDashboardPage.vue';
 
 function appointment(id: number, status: string, startTime: string): Appointment {

@@ -27,6 +27,12 @@ vi.mock('@/composables/useGates', () => ({
     useGates: () => gatesState,
 }));
 
+// Realtime (Echo) di-mock: uji halaman terisolasi tanpa WebSocket.
+vi.mock('@/composables/useRealtime', () => ({
+    useSlotRealtime: vi.fn(),
+    useGateQueueRealtime: vi.fn(),
+}));
+
 let canPermissions: string[] = [];
 vi.mock('@/stores/auth', () => ({
     useAuthStore: () => ({ can: (p: string) => canPermissions.includes(p) }),

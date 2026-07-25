@@ -2,12 +2,19 @@
 import { computed, ref } from 'vue';
 
 import { isAxiosError } from 'axios';
+import { useAuthStore } from '@/stores/auth';
 import { useGateQueue, useGateIn, useGateOut } from '@/composables/useGateQueue';
+import { useGateQueueRealtime } from '@/composables/useRealtime';
 import type { Appointment } from '@/types/api';
 
+const auth = useAuthStore();
 const { appointments, isLoading, isError } = useGateQueue();
 const gateInMutation = useGateIn();
 const gateOutMutation = useGateOut();
+
+// Antrian live: gate-in/out di terminal ini (channel gate.queue.{terminalId})
+// memicu refetch. Terminal diambil dari user petugas yang login.
+useGateQueueRealtime(computed(() => auth.user?.terminal_id ?? null));
 
 const error = ref<string | null>(null);
 
