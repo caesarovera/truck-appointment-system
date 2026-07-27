@@ -318,7 +318,7 @@ Jangan baca semua dokumen tiap kali. Sesuaikan tugas:
 
 | Tugasmu | Baca ini |
 |---------|----------|
-| Backend fitur baru | CLAUDE.md (loop TDD) + CODE-WALKTHROUGH slice termirip + checklist urutan slice di `docs/SKILL.md` (**template, belum diregistrasi sebagai skill `/slice`** — lihat *Senior review ronde 3* di HANDOVER) |
+| Backend fitur baru | CLAUDE.md (loop TDD) + CODE-WALKTHROUGH slice termirip + skill `/slice` (`.claude/skills/slice/SKILL.md` — urutan lapisan + gerbang kualitas) |
 | Menyentuh **status/akses** | BUSINESS-FLOW §1 (RBAC) & §2 (state machine) — Policy & seeder wajib cocok |
 | Menyentuh **skema DB** | BUSINESS-FLOW §4 (ERD) + CLAUDE.md "JANGAN ubah migrasi yang sudah jalan" |
 | **Frontend** Vue | FRONTEND.md (4 lapisan + pola TanStack Query + jebakan Vitest) |

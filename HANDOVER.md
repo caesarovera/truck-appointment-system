@@ -233,13 +233,21 @@
 - **[FIXED] Drift dokumen sisa dari audit `CLAUDE.md` (task #3 ditandai SELESAI padahal belum tuntas
   dipropagasi).** Lihat entri changelog `2026-07-26` di bawah: `README` masih mengklaim Redis/Horizon
   sebagai stack terpakai, dan §Perintah `CLAUDE.md` sendiri masih basi di 3 titik.
-- **[catatan, P4 — belum dikerjakan] Hygiene.** (1) `.claude/settings.local.json` **tracked di git**
-  (tak masuk `.gitignore`) & menumpuk 74 entri izin one-off, termasuk perintah `sed` berisi hitungan
-  test lama. (2) 3 dokumen yatim tak dirujuk peta README: `docs/VIBE-CODING.md` (isinya menyatakan
-  sendiri "File ini boleh dihapus"), `docs/SKILL.md` & `docs/security-reviewer.md` — dua terakhir
-  **definisi skill/agent Claude Code** (punya frontmatter `name:`/`tools:`) yang diparkir di `docs/`
-  sehingga tak teregistrasi apa pun; tempat yang benar `.claude/skills/<nama>/SKILL.md` &
-  `.claude/agents/` (lihat `tas-claude-code-guide.html` §07).
+- **[FIXED 2026-07-27 — P4] Hygiene `.claude/` & dokumen yatim.** Temuan aslinya: (1)
+  `.claude/settings.local.json` **tracked di git** (tak masuk `.gitignore`) & menumpuk 74 entri izin
+  one-off termasuk perintah `sed` berisi hitungan test lama; (2) 3 dokumen yatim tak dirujuk peta
+  README — `docs/VIBE-CODING.md`, `docs/SKILL.md`, `docs/security-reviewer.md`; dua terakhir
+  **definisi skill/agent Claude Code** yang diparkir di `docs/` sehingga **tak teregistrasi apa pun**.
+  *Fix:* `SKILL.md` → `.claude/skills/slice/SKILL.md` & `security-reviewer.md` →
+  `.claude/agents/security-reviewer.md` (keduanya `git mv`, history terjaga); `settings.local.json`
+  di-`git rm --cached` + masuk `.gitignore` **per-file, bukan seluruh `.claude/`** — `skills/` &
+  `agents/` justru wajib di-commit supaya tersedia lintas perangkat (`tas-claude-code-guide.html §07`);
+  `VIBE-CODING.md` dihapus (isinya cuma penunjuk ke guide, tak ada yang merujuknya — tetap terekam
+  di git history). Keduanya juga **usang saat dipindah** dan ikut dikoreksi: `SKILL.md` menyuruh
+  `composer test --parallel` (flag dobel — `composer test` sudah `pest --parallel`) dan tak menyebut
+  gerbang FE; `security-reviewer` menyuruh memeriksa "setiap endpoint punya middleware scope"
+  padahal ADR-0003 **sengaja menunda** token abilities → agent itu akan melaporkan false positive
+  di **setiap** endpoint. Ditambah item baru: guard armada saat booking (ADR-0004, §W.4/§W.5).
 - **[catatan] `DemoSeeder` tak punya truk `INACTIVE`** — keenam truk di-hardcode `'status' => 'ACTIVE'`.
   Aturan bisnis + jalur 422 `truck_inactive` yang baru ditambahkan **tak bisa didemokan dari data demo**,
   dan checklist anti-drift di bawah ("DemoSeeder menyentuh semua status & semua entitas") belum terpenuhi
@@ -267,6 +275,25 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-27`: **P4 hygiene — skill & agent Claude Code diregistrasi; `settings.local.json` di-untrack.**
+  Kode: **tak ada**. Struktur: `docs/SKILL.md` → `.claude/skills/slice/SKILL.md`,
+  `docs/security-reviewer.md` → `.claude/agents/security-reviewer.md` (`git mv`),
+  `docs/VIBE-CODING.md` **dihapus** (penunjuk yatim; tak ada satu pun dokumen merujuknya, dan isinya
+  menyatakan sendiri boleh dihapus). `.gitignore` +`.claude/settings.local.json` **(per-file)** dan
+  file itu di-`git rm --cached`. Docs: `README` peta dokumentasi +baris `.claude/skills` & `agents`,
+  `ONBOARDING` baris routing "Backend fitur baru" kini menunjuk skill `/slice` yang **benar-benar
+  ada**. Alasan: dua file itu punya frontmatter `name:`/`tools:` — mereka **definisi** skill/agent,
+  bukan bacaan; diparkir di `docs/` artinya nol efek. Sebaliknya `settings.local.json` adalah
+  override personal per-mesin (akhiran `.local`) yang tiap sesi bertambah entri izin one-off —
+  ia satu-satunya isi `.claude/` yang **tidak** boleh di-commit, sementara guide justru menyuruh
+  commit `.claude/` demi skill/agent lintas perangkat. Selama ini terbalik: yang personal ikut,
+  yang seharusnya dibagi malah tak ada. **Ikutan (isi keduanya juga usang):** `SKILL.md`
+  memerintahkan `composer test --parallel` — flag dobel, sebab `composer test` **sudah**
+  `pest --parallel` (kelas bug yang sama dengan §Perintah `CLAUDE.md` kemarin) + gerbang FE
+  ditambahkan; `security-reviewer` menyuruh audit "middleware scope tiap endpoint" padahal ADR-0003
+  **sengaja menunda** token abilities → agent akan melaporkan false positive di setiap endpoint,
+  kini diberi larangan eksplisit + rujukan ADR, ditambah item mass-assignment (ADR-0004) dan guard
+  armada booking (§W.4/§W.5). Tidak menyentuh `CLAUDE.md`/seeder/BE/FE/test.
 - `2026-07-27`: **Fix bug P1 `driver_invalid_role` + ADR-0006 (sopir admin-only) + KONTRAK PRD BERUBAH.**
   *Kode BE:* `InvalidDriverException` **baru** (422 `driver_invalid_role`), guard ketiga di
   `BookAppointmentAction::assertFleetBelongsToCompany()` — `->role('driver','api')->exists()`,

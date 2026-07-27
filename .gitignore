@@ -23,3 +23,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Claude Code: override personal per-mesin (skills/ & agents/ TETAP di-commit)
+.claude/settings.local.json

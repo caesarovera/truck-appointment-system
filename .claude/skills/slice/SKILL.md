@@ -42,9 +42,18 @@ Bangun fitur "$ARGUMENTS" secara berurutan dan uji tiap langkah.
 ## Setelah selesai
 
 ```bash
-composer test --parallel   # semua hijau
-composer analyse           # PHPStan 8, bersih
-composer fix               # Pint
+composer test        # pest --parallel (flag sudah di dalam script — jangan tambah lagi)
+composer analyse     # PHPStan level 8, bersih
+composer fix         # Pint
+```
+
+Kalau slice-nya menyentuh SPA, gerbang frontend ikut wajib — CI menjalankan
+ketiganya juga (`.github/workflows/ci.yml`):
+
+```bash
+npm run test:js      # Vitest
+npm run type-check   # vue-tsc --noEmit
+npm run build        # error yang cuma muncul saat bundling
 ```
 
 ## Tidak boleh
