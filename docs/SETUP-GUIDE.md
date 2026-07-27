@@ -740,6 +740,33 @@ Melihat hasil: repo di GitHub → tab **Actions** → pilih run teratas. Centang
 gerbang lolos; silang merah = klik job yang merah, buka langkah yang merah, log-nya sama
 persis dengan output lokal.
 
+**Cek status dari terminal — TANPA `gh`.** GitHub CLI (`gh`) memang paling nyaman
+(`gh run list`), tapi ia **tidak terpasang** di mesin dev ini. Itu bukan jalan buntu: repo ini
+**publik**, jadi REST API GitHub bisa dibaca tanpa token, tanpa autentikasi, tanpa paket
+tambahan. `curl` sudah ada bawaan Git for Windows; `jq` **tidak** ada, jadi resep di bawah
+memakai PHP yang jelas terpasang (perintah ini terverifikasi jalan di mesin dev, 2026-07-27):
+
+```bash
+curl -s "https://api.github.com/repos/caesarovera/truck-appointment-system/actions/runs?per_page=5" \
+  | php -r '$r=json_decode(file_get_contents("php://stdin"),true)["workflow_runs"]??[]; foreach($r as $x) printf("%-8s %-10s %s\n", substr($x["head_sha"],0,7), $x["conclusion"]??$x["status"], $x["display_title"]);'
+```
+
+```
+f6495a0  success    chore: registrasikan skill & agent Claude Code; untrack settings.loca…
+5976732  success    fix: tolak driver_id yang bukan ber-role driver (422) + ADR-0006 sopi…
+```
+
+`conclusion` kosong + `status: in_progress` = run masih berjalan. Untuk membedah run yang
+merah sampai level langkah, ambil `id`-nya lalu:
+`…/actions/runs/{id}/jobs` → tiap job punya array `steps` berisi `name` + `conclusion`,
+jadi ketahuan **langkah mana** yang gagal tanpa membuka browser.
+
+> **Satu run per PUSH, bukan per COMMIT.** GitHub menjalankan workflow di commit paling ujung
+> dari sebuah push. Push 3 commit sekaligus → hanya **1** run, di commit terakhir. Isi commit
+> di tengah tetap teruji (ia leluhur dari yang diuji), tapi tak ada bukti hijau yang menempel
+> padanya sendiri — relevan kalau suatu saat commit itu di-`revert`/`cherry-pick` sendirian.
+> Ingin tiap commit punya jejaknya sendiri? Push satu per satu.
+
 **Kalau CI merah, jangan menebak-nebak lewat push berulang.** Jalankan gerbang yang sama di
 lokal — outputnya identik karena perintahnya identik:
 

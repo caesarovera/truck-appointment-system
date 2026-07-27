@@ -16,6 +16,7 @@
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
 - Build backend: `composer test` → ✅ **194 pass / 501 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- **CI TERVERIFIKASI hijau** — run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) di commit `f6495a0`: **kedua job + SEMUA step** sukses (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build). Run sebelumnya `5976732` juga sukses. Yang paling berarti: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
@@ -275,6 +276,17 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-27`: **Catat CI terverifikasi hijau + resep cek CI tanpa `gh`.** Kode: tak ada. Docs:
+  `HANDOVER` §Status (run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447)
+  @ `f6495a0` — kedua job + semua step sukses) + §Jebakan (baris baru), `SETUP-GUIDE §14c`
+  (sub-bagian *cek status dari terminal tanpa `gh`* + peringatan **1 run per PUSH, bukan per
+  COMMIT**). Alasan: sesi ini sempat menyimpulkan "status CI tak bisa diverifikasi" hanya karena
+  `gh: command not found` — padahal repo publik, dan REST API GitHub terbaca tanpa token sama
+  sekali. Kesimpulan yang berhenti di rintangan pertama itu persis yang bikin klaim usang
+  bertahan lama; resepnya ditulis (dan **diuji jalan** di mesin dev, tanpa `jq` yang memang tak
+  ada) supaya sesi berikutnya tak mengulang kebuntuan yang sama. Nilai konkretnya: step
+  *Install dependensi* backend = `composer install` **tanpa** `--ignore-platform-req`, satu-satunya
+  gerbang yang mesin Windows tak bisa uji sendiri — kini terbukti hijau.
 - `2026-07-27`: **P4 hygiene — skill & agent Claude Code diregistrasi; `settings.local.json` di-untrack.**
   Kode: **tak ada**. Struktur: `docs/SKILL.md` → `.claude/skills/slice/SKILL.md`,
   `docs/security-reviewer.md` → `.claude/agents/security-reviewer.md` (`git mv`),
@@ -561,6 +573,15 @@
   `log` supaya dev Windows tak butuh worker); (2) `php artisan reverb:start` (native) + `composer dev`
   (queue:listen jalan — **`ShouldBroadcast` ke queue dulu, tanpa worker event DIAM tanpa error**);
   (3) buka SPA. Push TOS masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
+- **Cek status CI tanpa `gh` — `gh` TIDAK terpasang di mesin dev ini** (sudah dicek: tak ada di
+  PATH PowerShell maupun 3 lokasi instalasi umum). Itu **bukan** alasan untuk bilang "status CI tak
+  bisa diverifikasi": repo ini **publik**, jadi REST API GitHub terbaca tanpa token/autentikasi.
+  `curl` ada bawaan Git for Windows, `jq` **tidak** ada → pakai resep berbasis PHP di
+  `docs/SETUP-GUIDE.md §14c` (terverifikasi jalan 2026-07-27). Dicatat karena sesi ini sempat
+  berhenti di rintangan pertama (`gh: command not found`) dan menyimpulkan terlalu cepat —
+  padahal pintu lain terbuka. **Ingat juga:** GitHub bikin **1 run per PUSH, bukan per COMMIT**
+  (push 3 commit sekaligus → 1 run di commit terakhir), jadi commit `3025eb4` tak punya run
+  sendiri walau isinya tetap teruji lewat keturunannya.
 - **php.ini diubah** (mesin dev): `pdo_sqlite` + `sqlite3` di-enable (tadinya disabled) agar
   `.env` sqlite jalan. Driver DB lain yang aktif hanya mysql.
 - **Frontend versi di-pin ke vite 6.** Proyek pakai `vite@^6` (kompat `laravel-vite-plugin@1.2`).
