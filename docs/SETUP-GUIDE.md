@@ -419,7 +419,7 @@ Contoh output sehat:
   PASS  Tests\Unit\AppointmentStatusTest
   PASS  Tests\Feature\FoundationSeedTest
   ...
-  Tests:    191 passed (494 assertions)
+  Tests:    194 passed (501 assertions)
 ```
 
 > Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
@@ -478,7 +478,7 @@ Endpoint yang sudah ada:
 | `PATCH` | `/api/v1/me/trucks/{truck}` | token | `fleet.manage` | ubah plat/status; truk company lain → 403 |
 | `DELETE` | `/api/v1/me/trucks/{truck}` | token | `fleet.manage` | hapus truk (204); punya riwayat appointment → 409 `entity_in_use` (pakai status INACTIVE) |
 | `GET`  | `/api/v1/slots/availability?gate={id}&date=YYYY-MM-DD` | token | `slot.read` | sisa kuota slot |
-| `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`); truk INACTIVE → 422 `truck_inactive` |
+| `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`); truk INACTIVE → 422 `truck_inactive`; `driver_id` bukan user ber-role `driver` → 422 `driver_invalid_role` |
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | token | Policy `update` | pindah window (body: `slot_window_id`, `version`) |
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |
@@ -636,7 +636,8 @@ app/
                     + Fleet/ (4 controller armada truk)
   Exceptions/       SlotUnavailable, Duplicate*, OptimisticLock,
                     InvalidAppointmentState, EntityInUse (409 cascade-delete guard),
-                    FleetOwnership + InactiveTruck (422 guard armada saat booking)
+                    FleetOwnership + InactiveTruck + InvalidDriver
+                    (422 guard armada saat booking: milik siapa → layak dipakai?)
   Providers/        AppServiceProvider (preventLazyLoading + repo bindings + rate limiters)
 database/
   migrations/       8 migrasi domain + users(updated) + (publish: sanctum,
@@ -650,7 +651,10 @@ config/             permission.php, activitylog.php, reverb.php, sanctum.php ...
 tests/
   Pest.php          binding TestCase + RefreshDatabase
   Unit/             AppointmentStatusTest
-  Feature/          FoundationSeedTest
+  Feature/          37 file, dikelompokkan per area: Auth · Booking · Appointments ·
+                    Gate · Slots · Jobs · Reports · Reference · Admin · Fleet ·
+                    Realtime · Hardening (+ FoundationSeedTest)
+  js/               20 file Vitest (SPA — lihat docs/FRONTEND.md §5)
 phpstan.neon        level 8
 phpunit.xml         DB :memory: untuk test
 composer.json       scripts: test / analyse / fix / lint
@@ -664,11 +668,14 @@ composer.json       scripts: test / analyse / fix / lint
 Policy → reschedule/cancel → gate-in/out → job no-show/reminder → realtime broadcast
 (+ seam TOS) → endpoint pendukung (me/today + utilisasi) → slot-window open/close →
 rate-limit hardening → master data CRUD admin → armada truk transporter (+ penegakan
-status INACTIVE). Frontend: SPA Vue untuk transporter, driver, gate-officer, planner,
-+ halaman admin & armada. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md`
-(§J–§W backend) & `docs/FRONTEND.md` (SPA).
+status INACTIVE & penegakan role sopir saat booking). Frontend: SPA Vue untuk transporter,
+driver, gate-officer, planner, + halaman admin & armada. Penjelasan tiap slice:
+`docs/CODE-WALKTHROUGH.md` (§J–§W backend) & `docs/FRONTEND.md` (SPA).
 
-Gerbang kualitas terakhir: `composer test` → **191 pass (494 assertions)** ·
+**CRUD sopir untuk transporter sengaja TIDAK dibangun** — sopir dibuat admin lewat Admin
+User CRUD. Alasan & kapan ditinjau ulang: [`adr/0006`](adr/0006-driver-management-admin-only.md).
+
+Gerbang kualitas terakhir: `composer test` → **194 pass (501 assertions)** ·
 `composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **87 pass**. Semuanya kini juga
 berjalan otomatis tiap push — lihat §14.
 
@@ -683,7 +690,7 @@ di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCA
 ### 14a. Untuk apa CI ini ada
 
 Sebelum 2026-07-25 repo tidak punya CI sama sekali (padahal `CLAUDE.md` mengklaim ada).
-Artinya 191 Pest + 87 Vitest **hanya jalan kalau ada yang ingat mengetik perintahnya**.
+Artinya 194 Pest + 87 Vitest **hanya jalan kalau ada yang ingat mengetik perintahnya**.
 Itu justru berbahaya di proyek yang dikerjakan lintas sesi & lintas perangkat: satu commit
 bisa hijau di laptop A dan merah di repo tanpa siapa pun tahu.
 

@@ -156,7 +156,7 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
 | `/reports` | `pages/MyUtilizationPage.vue` | `report.read` **+ punya company** | laporan company sendiri (`GET /me/reports/utilization`): selesai/no-show/batal/aktif per window + ringkasan; read-only (`useMyUtilization`, key `['my-utilization']` sengaja terpisah dari `['utilization']` planner — beda scope, tak boleh saling menimpa cache) |
 | `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **4-tab** master data (terminal/gate/company/user); form inline create/edit + hapus dgn konfirmasi |
-| — | `components/SkeletonRows.vue` | — | placeholder loading bersama (`rows`, `label`) — dipakai 11 titik di 8 halaman + `RescheduleDialog`. Lihat catatan di bawah |
+| — | `components/SkeletonRows.vue` | — | placeholder loading bersama (`rows`, `label`) — dipakai **12 titik** di 8 halaman + `RescheduleDialog` (`AdminPage` sendiri 4, satu per tab). Lihat catatan di bawah |
 
 ### Loading state — `SkeletonRows`
 

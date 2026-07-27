@@ -3,7 +3,8 @@
 > Dokumen ini menjelaskan **setiap potongan kode** yang dibuat (foundation + seluruh
 > slice backend MVP: booking, auth, policy, reschedule/cancel, gate-in/out,
 > no-show/reminder, realtime, endpoint pendukung, slot-window management, **hardening
-> rate-limit**, **read referensi & persona**, **admin CRUD master data**), lengkap dengan **alasan (kenapa)** dan
+> rate-limit**, **read referensi & persona**, **admin CRUD master data**, **CRUD armada
+> truk transporter**), lengkap dengan **alasan (kenapa)** dan
 > **contoh**. Sasaran: kamu bisa membaca kode TAS dan paham *kenapa* ditulis begitu,
 > bukan sekadar *apa*-nya. **Kode frontend (Vue SPA) ada di `docs/FRONTEND.md`.**
 >
@@ -1656,12 +1657,52 @@ Parameter opsional (pola sama dengan `AppointmentRepository::forCompany`) — sa
 dua kebutuhan, tanpa method kembar. Menyaring dropdown saja **tidak cukup**: truk bisa
 dinonaktifkan saat form booking sudah terbuka, jadi Action tetap harus menolak.
 
-### W.5 Test
+### W.5 `driver_id` wajib benar-benar sopir (fix 2026-07-27)
+
+Bug kembar W.4, ditemukan di senior review ronde 3 — **pola yang sama persis**: repository
+menyaring, Action tidak. `FleetRepository::driversForCompany()` sudah lama membatasi sopir ke
+`->role('driver', 'api')`, dan `MyFleetTest` bahkan sudah menguji "transporter tidak dihitung
+sebagai sopir". Tapi jalur tulisnya tak pernah diuji: `BookAppointmentRequest` hanya memvalidasi
+`Rule::exists('users','id')->where('company_id')`, dan Action cuma `exists()`. Hasilnya booking
+dengan `driver_id` = akun **transporter** sendiri → **201 Created**.
+
+```php
+// BookAppointmentAction::assertFleetBelongsToCompany() — guard ketiga
+$isDriver = User::query()->whereKey($data->driverId)->role('driver', 'api')->exists();
+
+if (! $isDriver) {
+    throw new InvalidDriverException;               // 422 driver_invalid_role
+}
+```
+
+**Kenapa query terpisah, bukan `$driver->hasRole('driver')`:** `hasRole()` menyentuh relasi
+`roles` secara lazy, dan `preventLazyLoading` aktif di non-prod. Scope `role()` milik Spatie
+menyelesaikannya di SQL — sekaligus memakai sumber kebenaran yang **sama persis** dengan
+`driversForCompany()`, sehingga dropdown dan penegakan tak mungkin berbeda pendapat.
+
+**Kenapa 422 dan bukan 403:** user-nya ada dan memang milik company si transporter — yang salah
+adalah kelayakan pilihannya, sejajar dengan `truck_inactive`. Urutan guard tetap: kepemilikan →
+kelayakan, alasan sama dengan W.4.
+
+Dampak kalau dibiarkan bukan sekadar data kotor: `AppointmentReminderJob` mengirim pengingat ke
+non-sopir, dan appointment itu **tak akan pernah muncul** di `/me/appointments/today` (butuh
+`appointment.read.self`) — sopir sungguhan tak pernah tahu ia dijadwalkan.
+
+### W.6 Test
 `tests/Feature/Fleet/TruckCrudTest.php` (13) — scoping company, 403 lintas company,
 duplikat plat per company, enum status, 409 delete-in-use, dan listing yang **tetap**
 memuat INACTIVE. Penegakan INACTIVE diuji di tempat aturannya hidup:
 `tests/Feature/Booking/` (Action + endpoint 422, plus test yang mengunci **urutan guard**)
 dan `tests/Feature/Reference/MyFleetTest.php` (dropdown menyaring INACTIVE).
+
+Penegakan `driver_invalid_role` (W.5) diuji dengan pola yang sama: 2 test Action (tolak
+rekan sekantor non-sopir + **urutan guard**: non-sopir company lain harus dilaporkan sebagai
+`fleet_ownership`) + 1 test endpoint (422 `driver_invalid_role`). Ikutan yang berguna:
+`UserFactory::driver()` — state baru yang meng-assign role via `Role::findOrCreate('driver','api')`,
+jadi jalan baik di test yang menjalankan `RolePermissionSeeder` maupun yang tidak. Helper
+booking lama (`bookingScenario`, `transporterBookingContext`, `bookingRateLimitContext`)
+memakai state itu; **ketiganya sebelumnya membuat "sopir" tanpa role** — itulah kenapa gap
+ini lolos begitu lama.
 
 > **Frontend armada** (`MyTrucksPage`, `useTrucks` yang meng-invalidate `me-fleet` juga):
 > `docs/FRONTEND.md`.

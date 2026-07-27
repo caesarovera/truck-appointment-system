@@ -12,6 +12,7 @@ use App\Events\AppointmentBooked;
 use App\Exceptions\DuplicateBookingException;
 use App\Exceptions\FleetOwnershipException;
 use App\Exceptions\InactiveTruckException;
+use App\Exceptions\InvalidDriverException;
 use App\Exceptions\SlotUnavailableException;
 use App\Models\Appointment;
 use App\Models\SlotWindow;
@@ -26,7 +27,8 @@ use Illuminate\Support\Str;
  * Booking 1 slot (jantung anti-race proyek ini).
  *
  * Alur (docs/BUSINESS-FLOW.md §3.2):
- *  1. Validasi kepemilikan truk & sopir (isolasi antar-company) + truk masih ACTIVE.
+ *  1. Validasi kepemilikan truk & sopir (isolasi antar-company), lalu kelayakan:
+ *     truk masih ACTIVE & sopir benar-benar ber-role `driver`.
  *  2. DB::transaction(attempts: 3)  → auto-retry bila deadlock.
  *  3. SlotWindow::lockForUpdate     → serialisasi perebut slot terakhir.
  *  4. Tolak bila ditutup / penuh    → 409.
@@ -110,6 +112,21 @@ final class BookAppointmentAction
         // keberadaan & kondisi truk milik company lain.
         if ($truck->status !== TruckStatus::ACTIVE) {
             throw new InactiveTruckException;
+        }
+
+        // `driver_id` harus benar-benar sopir, bukan sekadar user sekantor.
+        // Rule::exists di FormRequest hanya menyaring company — dropdown /me/fleet
+        // menyaring role, tapi itu UI, bukan penegakan. Kalau lolos: reminder nyasar
+        // ke non-sopir dan appointment tak pernah muncul di /me/appointments/today
+        // (butuh `appointment.read.self`) → sopir sungguhan tak pernah tahu jadwalnya.
+        // Dicek SETELAH kepemilikan, alasan sama dengan truk INACTIVE di atas.
+        $isDriver = User::query()
+            ->whereKey($data->driverId)
+            ->role('driver', 'api')
+            ->exists();
+
+        if (! $isDriver) {
+            throw new InvalidDriverException;
         }
     }
 

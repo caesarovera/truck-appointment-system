@@ -130,7 +130,7 @@ Target realistis. Setiap hari diakhiri dengan satu hasil nyata.
 | Hari | Fokus | Hasil akhir hari itu |
 |------|-------|----------------------|
 | **1** | Orientasi + kontrak (Tahap 0–1) | Paham peta mental & 3 aturan emas; bisa sebut larangan utama |
-| **2** | Jalankan project (Tahap 2) | `composer test` **191 hijau** + `npm run test:js` **87 hijau** di mesinmu; bisa login SPA |
+| **2** | Jalankan project (Tahap 2) | `composer test` **194 hijau** + `npm run test:js` **87 hijau** di mesinmu; bisa login SPA |
 | **3** | Domain (Tahap 3) | Bisa gambar ulang state machine appointment & jelaskan 5 role |
 | **4** | Golden path (Tahap 4a) | Berhasil booking via curl + uji idempotency; paham `BookAppointmentAction` |
 | **5** | Latihan pertama | Selesaikan 1 latihan kecil (§12) lewat loop TDD; semua gerbang hijau |
@@ -284,7 +284,7 @@ php artisan migrate:fresh --seed     # skema baru + data demo
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
 composer fix                         # Pint (format)
 composer analyse                     # PHPStan level 8
-composer test                        # Pest (191 hijau)
+composer test                        # Pest (194 hijau)
 ./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
 
 # Menjalankan app
@@ -318,7 +318,7 @@ Jangan baca semua dokumen tiap kali. Sesuaikan tugas:
 
 | Tugasmu | Baca ini |
 |---------|----------|
-| Backend fitur baru | CLAUDE.md (loop TDD) + CODE-WALKTHROUGH slice termirip + skill `/slice` |
+| Backend fitur baru | CLAUDE.md (loop TDD) + CODE-WALKTHROUGH slice termirip + checklist urutan slice di `docs/SKILL.md` (**template, belum diregistrasi sebagai skill `/slice`** — lihat *Senior review ronde 3* di HANDOVER) |
 | Menyentuh **status/akses** | BUSINESS-FLOW §1 (RBAC) & §2 (state machine) — Policy & seeder wajib cocok |
 | Menyentuh **skema DB** | BUSINESS-FLOW §4 (ERD) + CLAUDE.md "JANGAN ubah migrasi yang sudah jalan" |
 | **Frontend** Vue | FRONTEND.md (4 lapisan + pola TanStack Query + jebakan Vitest) |

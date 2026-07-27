@@ -10,13 +10,33 @@
 ---
 
 ## Status
-- Update terakhir: `2026-07-25` · Sesi: **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
+- Update terakhir: `2026-07-27` · Sesi: **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug ditemukan di *Senior review ronde 3* (`2026-07-26`, audit kode + dokumen) ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang. Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
+- Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
+- Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **191 pass / 494 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **194 pass / 501 assert** · `composer analyse` → ✅ PHPStan lvl 8 · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Penegakan role sopir saat booking + ADR-0006 (2026-07-27).** Menutup bug P1 dari
+  *Senior review ronde 3*: `driver_id` menerima user mana pun se-company — termasuk akun
+  transporter sendiri — dan booking-nya **berhasil 201**. Kelas bug yang **sama persis**
+  dengan `INACTIVE` sesi sebelumnya: repository menyaring, Action tidak. Fix: guard ketiga
+  `->role('driver','api')->exists()` di `BookAppointmentAction`, **setelah** cek kepemilikan
+  (kalau dibalik, beda pesan error membocorkan keberadaan user company lain) →
+  `InvalidDriverException` (422 `driver_invalid_role`). Ditulis lewat loop TDD: test merah
+  dulu dengan bukti `201 alih-alih 422`, baru guard-nya dipasang. **Akar kenapa lolos lama:**
+  3 helper booking di test membuat "sopir" **tanpa role** — kini semua memakai
+  `UserFactory::driver()` (state baru, `Role::findOrCreate` jadi jalan dengan/tanpa seeder).
+  `BookingRateLimitTest` sempat ikut merah — itu bukti guard-nya menggigit, bukan gangguan.
+  +3 test → **194 Pest / 501 assert**; Vitest tetap **87** (FE tak berubah: pesan server lolos
+  lewat fallback `data.message` di `BookingForm`, pola sama dengan `truck_inactive`).
+  **Keputusan produk menyertainya:** `ADR-0006` — **CRUD sopir tidak dibangun di MVP**, sopir
+  dikelola admin lewat Admin User CRUD; transporter tetap melihat sopirnya via `/me/fleet`.
+  `PRD §3` dikoreksi dua sisi (IN dipersempit, OUT ditambah) karena aturan PRD "di luar IN
+  tidak dikerjakan tanpa memperbarui PRD" berlaku **dua arah**. Detail: `CODE-WALKTHROUGH §W.5`,
+  `BUSINESS-FLOW §3.2`.
 - [x] **CI GitHub Actions (2026-07-25) — menutup klaim kontrak yang selama ini tidak benar.**
   `CLAUDE.md` mencantumkan "CI: GitHub Actions" sejak awal, tapi **`.github/` tidak pernah ada**.
   Akibatnya nyata: 191 Pest + 87 Vitest hanya jalan bila ada yang ingat mengetik perintahnya —
@@ -186,20 +206,117 @@
   belum di-commit) — dikembalikan: `README.md` adalah konvensi GitHub agar isi folder ter-render
   otomatis sebagai indeks.
 
+## Senior review ronde 3 (2026-07-26) — temuan & keputusan
+> Audit kode + **dokumen** menyeluruh, semua gerbang dijalankan sendiri (bukan percaya catatan):
+> Pest 191/494 · Vitest 87 (20 file) · PHPStan lvl 8 **0 error** (207 file) · Pint bersih · vue-tsc bersih.
+> Angka yang tercatat di README/ONBOARDING/SETUP-GUIDE/HANDOVER **cocok dengan hasil run** — tak ada yang dibesarkan.
+- **[FIXED 2026-07-27 — P1] `driver_id` tidak divalidasi harus ber-role `driver`.**
+  *Fix:* `InvalidDriverException` (422 `driver_invalid_role`) + guard ketiga di
+  `BookAppointmentAction::assertFleetBelongsToCompany()` — `User::query()->whereKey(...)
+  ->role('driver','api')->exists()`, **setelah** cek kepemilikan. Query scope (bukan
+  `$driver->hasRole()`) karena `hasRole()` lazy-load relasi `roles` sementara
+  `preventLazyLoading` aktif di non-prod — sekaligus memakai sumber kebenaran yang sama
+  persis dengan `driversForCompany()`, jadi dropdown & penegakan tak bisa beda pendapat.
+  +3 test (2 Action incl. urutan guard, 1 endpoint) + `UserFactory::driver()`. Detail di
+  bawah ini adalah temuan aslinya, disimpan sebagai catatan kenapa fix-nya ada:
+  *Bukti (bukan teori):* probe test booking dengan `driver_id` milik user ber-role **`transporter`**
+  → **`201 Created`**. *Kelas bug identik dengan bug `INACTIVE` ronde lalu:* FE menyaring, API tidak.
+  `FleetRepository::driversForCompany()` menyaring `role('driver','api')`, tapi `BookAppointmentRequest`
+  (`driver_id` → `Rule::exists('users','id')->where('company_id')`) & `BookAppointmentAction::
+  assertFleetBelongsToCompany()` hanya cek `exists` + `company_id`. *Akibat:* `AppointmentReminderJob`
+  mengirim pengingat ke non-sopir; appointment itu **tak akan pernah muncul** di `/me/appointments/today`
+  (butuh `appointment.read.self`) → sopir asli tak lihat jadwalnya. **Bukan** kebocoran lintas-company —
+  scoping `company_id` tetap utuh. *Kenapa lolos test:* test booking yang ada memakai `User::factory()`
+  **tanpa assignRole**, jadi gap ini memang tak pernah tersentuh. *Fix yang disarankan:* guard role di
+  Action **setelah** cek kepemilikan — urutan yang sama seperti fix `INACTIVE` (kalau dibalik, beda pesan
+  error membocorkan keberadaan user company lain).
+- **[FIXED] Drift dokumen sisa dari audit `CLAUDE.md` (task #3 ditandai SELESAI padahal belum tuntas
+  dipropagasi).** Lihat entri changelog `2026-07-26` di bawah: `README` masih mengklaim Redis/Horizon
+  sebagai stack terpakai, dan §Perintah `CLAUDE.md` sendiri masih basi di 3 titik.
+- **[catatan, P4 — belum dikerjakan] Hygiene.** (1) `.claude/settings.local.json` **tracked di git**
+  (tak masuk `.gitignore`) & menumpuk 74 entri izin one-off, termasuk perintah `sed` berisi hitungan
+  test lama. (2) 3 dokumen yatim tak dirujuk peta README: `docs/VIBE-CODING.md` (isinya menyatakan
+  sendiri "File ini boleh dihapus"), `docs/SKILL.md` & `docs/security-reviewer.md` — dua terakhir
+  **definisi skill/agent Claude Code** (punya frontmatter `name:`/`tools:`) yang diparkir di `docs/`
+  sehingga tak teregistrasi apa pun; tempat yang benar `.claude/skills/<nama>/SKILL.md` &
+  `.claude/agents/` (lihat `tas-claude-code-guide.html` §07).
+- **[catatan] `DemoSeeder` tak punya truk `INACTIVE`** — keenam truk di-hardcode `'status' => 'ACTIVE'`.
+  Aturan bisnis + jalur 422 `truck_inactive` yang baru ditambahkan **tak bisa didemokan dari data demo**,
+  dan checklist anti-drift di bawah ("DemoSeeder menyentuh semua status & semua entitas") belum terpenuhi
+  untuk enum `TruckStatus`. Sengaja tidak diubah sesi ini: menyentuh seeder menuntut `migrate:fresh --seed`
+  yang **menghapus DB dev**.
+- **[diverifikasi BENAR, tak ada aksi]** Lock order konsisten (appointment → slot window; id disortir di
+  reschedule) → tak ada inversi deadlock. Idempotency scope `method|path` sesuai ADR. Cache explicit-key
+  sesuai kontrak. **43 route** cocok penuh dgn tabel endpoint `SETUP-GUIDE §10d`; 10 route SPA cocok dgn
+  `FRONTEND.md`; peta folder `ARCHITECTURE.md` cocok dgn `app/` aktual (termasuk sub-folder `Fleet/`).
+  CI workflow benar memanggil skrip yang sama dengan lokal. **ERD §4 ternyata SUDAH** memuat
+  `containers.slot_window_id` — TODO changelog `2026-06-27` sebenarnya sudah tuntas, hanya tak ditandai.
+
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (191 Pest / 87 Vitest + **CI hijau di GitHub**); terakhir: CI GitHub Actions dipasang & terverifikasi.
+- (kosong) — checkpoint hijau (194 Pest / 87 Vitest + **CI hijau di GitHub**); terakhir: bug P1 `driver_id` ditutup + ADR-0006 (sopir admin-only).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**). Berikutnya:
+
 1. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
 2. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
 3. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
-4. **CRUD sopir (sisa dari slice armada):** truk sudah selesai, **sopir belum**. Sopir = `User` ber-role `driver` → butuh email/password/assign-role, jadi overlap dengan Admin User CRUD (§V) yang sudah ada. Keputusan yang harus diambil dulu: transporter boleh bikin akun user sendiri (undangan? password sementara?) atau cukup admin yang buat. **Bukan lupa — ditunda sadar** karena ini keputusan produk, bukan sekadar kode.
+4. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
 5. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-07-27`: **Fix bug P1 `driver_invalid_role` + ADR-0006 (sopir admin-only) + KONTRAK PRD BERUBAH.**
+  *Kode BE:* `InvalidDriverException` **baru** (422 `driver_invalid_role`), guard ketiga di
+  `BookAppointmentAction::assertFleetBelongsToCompany()` — `->role('driver','api')->exists()`,
+  dipasang **setelah** cek kepemilikan (urutan sama dengan fix `INACTIVE`: kalau dibalik, beda
+  pesan error membocorkan keberadaan user company lain). Query scope dipilih alih-alih
+  `$driver->hasRole()` karena `hasRole()` lazy-load relasi `roles` sementara `preventLazyLoading`
+  aktif di non-prod — sekaligus memakai sumber kebenaran yang **sama persis** dengan
+  `FleetRepository::driversForCompany()`, jadi dropdown & penegakan mustahil beda pendapat.
+  *Test:* +3 (2 `Booking/BookAppointmentActionTest` incl. **urutan guard**, 1
+  `Booking/BookAppointmentEndpointTest` 422) → **194 Pest / 501 assert**. Vitest tetap **87**
+  (tak ada perubahan FE — pesan server lolos ke UI lewat fallback `data.message` di `BookingForm`,
+  pola yang sama dengan `truck_inactive`). *Infrastruktur test:* `UserFactory::driver()` **baru**
+  (assign role via `Role::findOrCreate('driver','api')` → jalan baik dengan maupun tanpa
+  `RolePermissionSeeder`); **3 helper booking lama membuat "sopir" tanpa role** — persis sebab
+  gap ini lolos sekian lama — kini memakai state itu (`bookingScenario`,
+  `transporterBookingContext`, `bookingRateLimitContext`; yang terakhir sempat merah dan itu
+  **bukti guard-nya menggigit**). *Docs:* `BUSINESS-FLOW §3.2` (langkah 4 + blok aturan baru) &
+  `§1` (baris matriks transporter), `CODE-WALKTHROUGH §W.5` **baru** (+§W.6 Test, penomoran
+  digeser), `SETUP-GUIDE` (tabel endpoint booking), hitungan test di README/ONBOARDING/
+  SETUP-GUIDE/HANDOVER → **194/501**. *Keputusan produk:* `adr/0006-driver-management-admin-only.md`
+  **baru** (+baris tabel `adr/README`) — **CRUD sopir tidak dibangun di MVP**, sopir dibuat admin
+  lewat Admin User CRUD; transporter tetap **melihat** sopirnya via `/me/fleet`. **`PRD §3`
+  dikoreksi** (baris IN transporter dipersempit ke "kelola truk + lihat sopir"; baris OUT baru
+  untuk CRUD sopir) — aturan PRD *"apa pun di luar IN tidak dikerjakan tanpa memperbarui PRD"*
+  berlaku dua arah: **mencoret** dari IN juga menuntut PRD diperbarui, bukan dibiarkan jadi janji
+  yang membusuk. Alasan keputusan: sopir = `User`, jadi self-service = **penerbitan akun login**
+  (permukaan privilege-escalation baru) sementara pola company-scoped CRUD-nya sudah tuntas
+  didemonstrasikan slice truk — risiko baru tanpa pola baru. Tidak menyentuh `CLAUDE.md`/seeder/
+  migrasi/FE.
+- `2026-07-26`: **KONTRAK BERUBAH — §Perintah `CLAUDE.md` dikoreksi + propagasi klaim Redis ke README.**
+  Ditemukan saat *Senior review ronde 3*: audit klaim `CLAUDE.md` (task #3) ditandai SELESAI padahal
+  koreksinya **berhenti di `CLAUDE.md` saja**. (1) `README §Stack` masih menulis `· Redis/Horizon ·`
+  polos sebagai stack terpakai — bertentangan dgn `CLAUDE.md §Stack` yang sudah dipisah target-vs-dev
+  di commit `4c652b7`. README adalah dokumen **#1 di urutan onboarding**, jadi pembaca baru justru kena
+  klaim yang salah lebih dulu. Kini README menyebut driver `database`/SQLite + menandai Redis/Horizon
+  sebagai *target* & menunjuk `CLAUDE.md §Stack`. (2) **§Perintah `CLAUDE.md` basi di 3 titik dan tak
+  pernah ikut terkoreksi:** `npm run dev | test | build` → script **`test` tidak ada** di `package.json`
+  (adanya `test:js`), jadi perintah di kontrak **gagal kalau dijalankan**; `npm run type-check` absen
+  padahal ia **gerbang CI** (§Stack kontrak ini sendiri mewajibkan gerbang baru ikut masuk workflow);
+  `php artisan horizon # queue worker (dev)` menyesatkan — Horizon butuh `ext-pcntl` yang tak ada di
+  mesin dev Windows (sudah dicatat di *Jebakan*), sementara perintah dev sebenarnya `composer dev`
+  justru tak tercantum. (3) **`CLAUDE.md` merujuk "skill `laravel-tdd`" yang tidak ada** — bukan di repo
+  (`.claude/` cuma berisi `settings.local.json`) maupun di environment; pointer menggantung di file yang
+  di-load **tiap sesi**. Rujukannya dihapus (langkah loop TDD-nya sudah ditulis lengkap tepat di bawahnya,
+  jadi tak ada informasi yang hilang). (4) `HANDOVER` rujukan silang basi: entri CRUD truk menunjuk
+  *Langkah berikutnya* `#3` untuk CRUD sopir, padahal kini item **`#4`** (`#3` = Redis/Docker) →
+  dibetulkan. Alasan sama dengan dua ronde sebelumnya: **kontrak yang memerintahkan perintah tak jalan
+  lebih berbahaya daripada status basi** — ia menghasilkan langkah salah, bukan sekadar info usang.
+  **Tidak menyentuh kode/seeder/test/migrasi** (murni dokumen). `tas-claude-code-guide.html` **sengaja
+  TIDAK diubah**: tabel skill-nya rekomendasi "aktifkan yang mana", bukan klaim isi repo — bukan drift.
 - `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` baris Redis ditandai TARGET + aturan cache diperbaiki.**
   (1) §Stack: `Queue/Cache/Session: Redis 7 + Horizon` → dipisah jadi **target produksi** vs **dev
   sekarang** (driver `database`, DB `sqlite`, `BROADCAST_CONNECTION=log`). Redis tetap tercatat sebagai
@@ -262,7 +379,7 @@
   Alasan: menutup task #3 "CRUD truk/sopir" (bagian truk) yang menggantung uncommitted; status truk
   yang tak ditegakkan itu **bug nyata** — endpoint hapus menyuruh pakai INACTIVE padahal INACTIVE
   tak menghentikan apa pun. Tidak menyentuh CLAUDE.md/seeder/migrasi. **Sopir belum** (lihat
-  *Langkah berikutnya* #3 — keputusan produk soal pembuatan akun user).
+  *Langkah berikutnya* #4 — keputusan produk soal pembuatan akun user).
 - `2026-07-25`: **Audit staleness dokumen + kode (pasca realtime).**
   *Docs:* selaraskan hitungan test current-state ke **174 Pest / 74 Vitest** (README, ONBOARDING,
   SETUP-GUIDE — entri changelog historis TIDAK diubah, itu snapshot masa lalu); hapus klaim usang

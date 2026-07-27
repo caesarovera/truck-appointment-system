@@ -26,7 +26,8 @@ function transporterBookingContext(int $capacity = 5, int $booked = 0, string $s
     $user->assignRole('transporter');
 
     $truck = Truck::factory()->create(['company_id' => $company->id]);
-    $driver = User::factory()->create(['company_id' => $company->id]);
+    // ->driver(): sopir wajib ber-role `driver`, bukan sekadar sekantor.
+    $driver = User::factory()->driver()->create(['company_id' => $company->id]);
     $window = SlotWindow::factory()->create([
         'capacity' => $capacity,
         'booked_count' => $booked,
@@ -125,6 +126,22 @@ it('rejects booking with an INACTIVE truck (422 truck_inactive)', function (): v
     postJson('/api/v1/appointments', $payload)
         ->assertStatus(422)
         ->assertJsonPath('error', 'truck_inactive');
+
+    expect(Appointment::query()->count())->toBe(0);
+});
+
+it('rejects booking when driver_id is not a driver (422 driver_invalid_role)', function (): void {
+    ['user' => $user, 'payload' => $payload] = transporterBookingContext();
+    Sanctum::actingAs($user);
+
+    // Se-company & lolos `Rule::exists`, tapi bukan sopir — klien bisa mengirim ini
+    // walau dropdown `/me/fleet` tak pernah menawarkannya. Kasus paling gampang
+    // terjadi tanpa niat jahat: transporter memilih dirinya sendiri.
+    $payload['driver_id'] = $user->id;
+
+    postJson('/api/v1/appointments', $payload)
+        ->assertStatus(422)
+        ->assertJsonPath('error', 'driver_invalid_role');
 
     expect(Appointment::query()->count())->toBe(0);
 });

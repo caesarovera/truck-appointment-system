@@ -33,7 +33,7 @@ Sukses teknis (karena ini juga proyek skill): race condition pada booking tidak 
 - Auth Sanctum token + 5 role & RBAC (lihat `BUSINESS-FLOW.md §1`).
 - Admin: CRUD master data (terminal, gate, perusahaan angkutan, user/role) dengan guard hapus saat masih ada dependen (409).
 - Planner: buka/tutup slot window + atur kuota; intervensi `appointment.override` (teraudit).
-- Transporter: lihat ketersediaan, booking, reschedule, cancel; kelola truk & sopir (company sendiri).
+- Transporter: lihat ketersediaan, booking, reschedule, cancel; **kelola truk** (company sendiri) + **lihat** daftar sopirnya (`GET /me/fleet`).
 - Driver: lihat jadwal hari ini + kode booking/QR + status gate.
 - Gate Officer: gate-in, gate-out, tandai no-show.
 - Slot berkuota dengan anti-race (`lockForUpdate`), Idempotency-Key, optimistic lock (`version`).
@@ -51,6 +51,7 @@ Sukses teknis (karena ini juga proyek skill): race condition pada booking tidak 
 - Prediksi beban berbasis ML, kuota dinamis.
 - Manajemen yard/posisi kontainer mendalam (di luar domain TAS).
 - Multi-bahasa.
+- **CRUD sopir oleh transporter** (create/update/delete akun sopir sendiri). Sopir = `User` ber-role `driver`, jadi ini penerbitan akun login — dibuat **admin** lewat Admin User CRUD. Alasan & kapan ditinjau ulang: [`adr/0006-driver-management-admin-only.md`](adr/0006-driver-management-admin-only.md).
 
 > Aturan: apa pun di luar daftar **IN** tidak dikerjakan tanpa memperbarui PRD ini lebih dulu (lalu propagasi sesuai `tas-claude-code-guide.html §11`).
 

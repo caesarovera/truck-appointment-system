@@ -11,6 +11,7 @@ use App\Events\AppointmentBooked;
 use App\Exceptions\DuplicateBookingException;
 use App\Exceptions\FleetOwnershipException;
 use App\Exceptions\InactiveTruckException;
+use App\Exceptions\InvalidDriverException;
 use App\Exceptions\SlotUnavailableException;
 use App\Models\Container;
 use App\Models\SlotWindow;
@@ -27,7 +28,8 @@ function bookingScenario(int $capacity = 5, int $booked = 0, string $status = 'O
     $company = TransportCompany::factory()->create();
     $actor = User::factory()->create(['company_id' => $company->id]);
     $truck = Truck::factory()->create(['company_id' => $company->id]);
-    $driver = User::factory()->create(['company_id' => $company->id]);
+    // ->driver(): sopir wajib ber-role `driver`, bukan sekadar sekantor.
+    $driver = User::factory()->driver()->create(['company_id' => $company->id]);
     $window = SlotWindow::factory()->create([
         'capacity' => $capacity,
         'booked_count' => $booked,
@@ -196,6 +198,50 @@ it('rejects booking with an INACTIVE truck', function (): void {
 
     expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
         ->toThrow(InactiveTruckException::class);
+
+    expect($window->fresh()->booked_count)->toBe(0);
+});
+
+it('rejects booking when driver_id is a co-worker who is not a driver', function (): void {
+    // `/me/fleet` sudah menyaring dropdown ke user ber-role `driver` saja, tapi
+    // penyaringan UI bukan penegakan: klien bisa mengirim id user mana pun se-company
+    // (mis. akun dispatcher/transporter itu sendiri). Kalau lolos, "sopir" appointment
+    // bukan sopir → reminder nyasar & jadwalnya tak pernah muncul di `/me/appointments/today`
+    // (butuh `appointment.read.self`), jadi sopir sungguhan tak pernah tahu.
+    ['actor' => $actor, 'window' => $window] = bookingScenario();
+    $bukanSopir = User::factory()->create(['company_id' => $actor->company_id]);
+
+    $data = new BookAppointmentData(
+        slotWindowId: $window->id,
+        truckId: Truck::factory()->create(['company_id' => $actor->company_id])->id,
+        driverId: $bukanSopir->id,
+        moveType: MoveType::DELIVERY,
+        containerNo: 'XXXU0000000',
+    );
+
+    expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
+        ->toThrow(InvalidDriverException::class);
+
+    expect($window->fresh()->booked_count)->toBe(0);
+});
+
+it('reports a foreign non-driver as ownership failure, not invalid driver', function (): void {
+    // Urutan guard sama seperti truk INACTIVE: kepemilikan DULU, baru kelayakan.
+    // Kalau dibalik, beda pesan error membocorkan keberadaan user company lain.
+    ['actor' => $actor, 'window' => $window] = bookingScenario();
+    $otherCompany = TransportCompany::factory()->create();
+    $foreignNonDriver = User::factory()->create(['company_id' => $otherCompany->id]);
+
+    $data = new BookAppointmentData(
+        slotWindowId: $window->id,
+        truckId: Truck::factory()->create(['company_id' => $actor->company_id])->id,
+        driverId: $foreignNonDriver->id,
+        moveType: MoveType::DELIVERY,
+        containerNo: 'XXXU0000000',
+    );
+
+    expect(fn () => app(BookAppointmentAction::class)->execute($actor, $data))
+        ->toThrow(FleetOwnershipException::class);
 
     expect($window->fresh()->booked_count)->toBe(0);
 });

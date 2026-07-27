@@ -29,7 +29,9 @@ $this->call([
 
 **Master data** (sejak admin CRUD: bisa dikelola via `/api/v1/admin/*` atau halaman `/admin` SPA — lihat `BUSINESS-FLOW.md §1` & `SETUP-GUIDE.md §10d`)
 - 1 Terminal (JICT) + 2 Gate (GATE-A, GATE-B).
-- 2 perusahaan angkutan, masing-masing 3 truk + 1–2 sopir.
+- 2 perusahaan angkutan, masing-masing **3 truk + 1 sopir** (`budi@majulog.test`, `andi@sinarkargo.test`).
+  - **Semua truk di-seed `ACTIVE`** → jalur error `422 truck_inactive` tak bisa didemokan langsung dari data demo; nonaktifkan satu truk lewat `PATCH /me/trucks/{id}` (atau halaman `/trucks`) dulu.
+  - Sopir di-seed dengan role `driver`. Sejak 2026-07-27 `driver_id` yang **bukan** ber-role `driver` ditolak `422 driver_invalid_role` — jadi memakai akun `dispatcher@*` sebagai sopir akan gagal (itu memang disengaja, lihat `BUSINESS-FLOW §3.2`).
 - Slot windows: kemarin (untuk data COMPLETED/NO_SHOW), **hari ini** (untuk uji gate-in/gate-out & sisa kuota), besok (untuk uji booking). 06:00–18:00 per jam, kapasitas 5/jam (sengaja kecil supaya gampang menguji kondisi penuh & race).
 - Satu window hari ini sengaja dibuat **hampir penuh** (sisa 1) → untuk demo race condition saat dua transporter booking bersamaan.
 

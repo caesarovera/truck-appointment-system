@@ -11,7 +11,7 @@ Dokumen ini detail dari `CLAUDE.md` dan menjawab **apa**-nya TAS. Konteks & bata
 | **System Admin** | `admin@tas.test` | Semua | Kelola user, master data, lihat semua audit |
 | **Slot Planner** | `planner@tas.test` | Semua slot/terminal | Buka/tutup jendela slot, atur kuota, monitor utilisasi |
 | **Gate Officer** | `gate@tas.test` | Terminal yang ditugaskan | Gate-in, gate-out, tandai no-show, lihat antrian hari ini |
-| **Transporter Admin** | `dispatcher@majulog.test` · `dispatcher@sinarkargo.test` | **Hanya company sendiri** | Booking, reschedule, cancel, kelola truk & sopir |
+| **Transporter Admin** | `dispatcher@majulog.test` · `dispatcher@sinarkargo.test` | **Hanya company sendiri** | Booking, reschedule, cancel, kelola **truk**; sopir hanya **dilihat** (dibuat admin — [ADR-0006](adr/0006-driver-management-admin-only.md)) |
 | **Driver** | `budi@majulog.test` · `andi@sinarkargo.test` | **Hanya appointment yang di-assign ke dirinya** | Lihat jadwal hari ini, kode booking/QR, status gate |
 
 Password semua akun demo: `password`.
@@ -101,7 +101,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 1. Transporter Admin lihat `GET /api/v1/slots/availability?gate=&date=` (data dari `Cache::flexible`).
 2. Pilih window, isi: move type (`DELIVERY`/`RECEIVAL`), nomor kontainer, truk, sopir.
 3. `POST /api/v1/appointments` dengan header `Idempotency-Key`.
-4. Sebelum transaksi: truk & sopir wajib milik company sendiri (`422 fleet_ownership`), lalu truk wajib berstatus `ACTIVE` (`422 truck_inactive`). Urutan cek disengaja — kepemilikan dulu supaya status truk company lain tak bocor lewat pesan error yang berbeda.
+4. Sebelum transaksi: truk & sopir wajib milik company sendiri (`422 fleet_ownership`), lalu **kelayakan** — truk wajib berstatus `ACTIVE` (`422 truck_inactive`) dan `driver_id` wajib user ber-role `driver` (`422 driver_invalid_role`). Urutan cek disengaja — kepemilikan dulu supaya keberadaan & kondisi armada company lain tak bocor lewat pesan error yang berbeda.
 5. `BookAppointmentAction` dalam `DB::transaction(attempts:3)`:
    a. `SlotWindow::where(id)->lockForUpdate()->first()`.
    b. Jika `booked_count >= capacity`, `status != OPEN`, atau window **sudah berakhir** (`date+end_time` lewat; window berjalan masih boleh) → tolak `409 Conflict`.
@@ -111,6 +111,8 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 > Dua transporter berebut slot terakhir: hanya satu lolos karena `lockForUpdate`; yang lain dapat `409`. Unique constraint `(slot_window_id, container_no)` aktif sebagai jaring terakhir.
 
 > **Status truk (`ACTIVE`/`INACTIVE`) = kontrol penjadwalan, bukan label.** Truk `INACTIVE` (rusak, dijual, izin mati) tak muncul di `GET /me/fleet` (pengisi dropdown booking) **dan** ditolak `BookAppointmentAction`. Ini jalur "pensiunkan truk" resmi: truk yang sudah punya riwayat appointment tak bisa di-hapus (`409 entity_in_use`, FK `RESTRICT` menjaga audit trail) — set `INACTIVE`. Appointment yang sudah ada tidak terpengaruh; hanya booking baru yang dicegah.
+
+> **`driver_id` wajib benar-benar sopir (fix 2026-07-27).** Sopir = `User` ber-role `driver` (§1). `GET /me/fleet` sudah lama menyaring dropdown ke role itu, tapi **penyaringan UI bukan penegakan**: `POST /appointments` menerima id user mana pun se-company — termasuk akun transporter itu sendiri. Kini ditolak `422 driver_invalid_role`. Kenapa penting: appointment ber-"sopir" non-sopir membuat `AppointmentReminderJob` mengirim pengingat ke orang yang salah, dan jadwal itu **tak akan pernah muncul** di `GET /me/appointments/today` (butuh `appointment.read.self`) — sopir sungguhan tak pernah tahu ia dijadwalkan. Isolasi antar-company tetap utuh (`company_id` tak pernah longgar); yang bocor adalah makna "sopir".
 
 ### 3.3 Transporter reschedule / cancel
 - **Reschedule:** kirim `version` terakhir. `RescheduleAppointmentAction` lock kedua window (lama & baru), cek `version` cocok (kalau tidak → `409` optimistic lock gagal), window tujuan harus belum berakhir (guard yang sama dengan booking), pindahkan kuota, `version++`. Event `AppointmentRescheduled` → reminder lama dibatalkan, reminder baru dijadwalkan.

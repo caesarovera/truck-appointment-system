@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -39,5 +40,19 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Sopir sungguhan: user ber-role `driver` (guard `api`).
+     *
+     * Dipakai di mana pun test butuh `driver_id` yang sah — BookAppointmentAction
+     * menolak user yang cuma sekantor tapi bukan sopir. `findOrCreate` supaya state
+     * ini jalan baik di test yang menjalankan RolePermissionSeeder maupun yang tidak.
+     */
+    public function driver(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->assignRole(Role::findOrCreate('driver', 'api'));
+        });
     }
 }

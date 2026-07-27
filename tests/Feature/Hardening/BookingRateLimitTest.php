@@ -24,7 +24,8 @@ function bookingRateLimitContext(): array
     return [
         'user' => $user,
         'truck' => Truck::factory()->create(['company_id' => $company->id]),
-        'driver' => User::factory()->create(['company_id' => $company->id]),
+        // ->driver(): sopir wajib ber-role `driver`, bukan sekadar sekantor.
+        'driver' => User::factory()->driver()->create(['company_id' => $company->id]),
         'window' => SlotWindow::factory()->create(['capacity' => 100, 'booked_count' => 0, 'status' => 'OPEN']),
     ];
 }
