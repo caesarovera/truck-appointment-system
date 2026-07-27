@@ -10,8 +10,10 @@ cegah penumpukan, audit penuh.
 Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA terpisah).
 
 ## Stack
-**Backend:** Laravel 12 · PHP 8.3+ · Sanctum · Redis/Horizon · Reverb (WebSocket) ·
+**Backend:** Laravel 12 · PHP 8.3+ · Sanctum · Reverb (WebSocket) ·
 Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
+Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horizon masih
+*target* produksi — belum dipakai**, lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 

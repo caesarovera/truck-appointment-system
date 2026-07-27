@@ -79,10 +79,11 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 composer test            # pest --parallel
 composer analyse         # phpstan level 8
 composer fix             # pint
+composer dev             # serve + queue:listen + pail + vite (dev harian)
 php artisan migrate:fresh --seed   # reset + demo data (lihat docs/DUMMY-DATA.md)
-php artisan horizon      # queue worker (dev)
-php artisan reverb:start # websocket (dev)
-npm run dev | test | build
+php artisan reverb:start # websocket (dev, jalan native — TIDAK butuh Docker)
+php artisan horizon      # dashboard queue — butuh ext-pcntl, TIDAK jalan di dev Windows
+npm run dev | test:js | type-check | build   # `type-check` & `build` ikut gerbang CI
 ```
 
 ## Cara Eksekusi — Vibe Coding di Claude Code
@@ -104,7 +105,7 @@ Alur: brainstorm di mobile (claude.ai) → eksekusi presisi di Claude Code. CLAU
 7. Event/Listener + Job + Policy + channel Reverb.
 8. Frontend Vue belakangan, setelah API stabil & ber-test.
 
-**Loop per Action (TDD, wajib — lihat skill laravel-tdd):**
+**Loop per Action (TDD, wajib):**
 ```
 1. Tulis Pest test DULU: happy path + edge (kuota penuh → 409, double-submit + Idempotency-Key, optimistic clash version).
 2. Implement Action sampai hijau. Hormati layer & state machine.
