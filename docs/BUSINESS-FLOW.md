@@ -145,6 +145,13 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 - Transporter: `GET /api/v1/me/reports/utilization?gate=&date=` → sama, tapi hitungan per status hanya milik company sendiri (angka company lain tidak bocor; lihat matriks §1).
 - Semua perubahan status & gate event tercatat lewat **Spatie Activity Log** (sumber kebenaran audit trail). Transporter hanya lihat log company sendiri.
 
+> **Apa yang benar-benar direkam** (`Appointment::getActivitylogOptions`, dikunci `tests/Feature/Audit/ActivityLogTest.php`): log name `appointment`, kolom **`status`, `slot_window_id`, `version`** saja, `logOnlyDirty` + `dontSubmitEmptyLogs`.
+> - **Pembuatan** appointment ikut tercatat (`event: created`) — itu titik awal rantai audit, yang menjawab "siapa yang membooking slot ini".
+> - **Gate-in menghasilkan DUA entri** (`CONFIRMED→ARRIVED`, `ARRIVED→IN_PROGRESS`): MVP menjalankan keduanya dalam satu aksi, tapi audit tetap menyimpan transisi perantaranya.
+> - **Reschedule tak mengubah status** — yang terekam perpindahan `slot_window_id` + kenaikan `version`.
+> - **`causer` = user yang login; NULL berarti tindakan sistem** (mis. `NoShowSweepJob`). Ini yang membedakan "planner membatalkan" dari "sistem menyapu no-show", termasuk saat planner memakai `appointment.override`.
+> - **Di luar cakupan (sadar, bukan lupa):** ganti truk/sopir pada appointment yang sama **tidak** terekam — `truck_id`/`driver_id` tak masuk `logOnly`. Kalau suatu saat audit perlu menjawab "siapa menukar sopirnya", daftar itu harus dilebarkan; test batas cakupan akan gugur dan memaksa perubahannya jadi keputusan sadar.
+
 ---
 
 ## 4. Entitas inti (untuk ERD di Claude Code)

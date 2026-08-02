@@ -39,6 +39,7 @@
 - [V. Admin CRUD master data (terminal/gate/company/user)](#v-admin-crud-master-data-terminalgatecompanyuser)
 - [W. CRUD armada truk transporter (`/me/trucks`)](#w-crud-armada-truk-transporter-metrucks)
 - [X. Toleransi jendela waktu gate-in](#x-toleransi-jendela-waktu-gate-in)
+- [Y. Menguji audit trail (Activity Log)](#y-menguji-audit-trail-activity-log)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -1831,6 +1832,69 @@ lama tak valid, yang salah biasanya **default factory**-nya, bukan test-nya.
 
 +7 test (2 penolakan, 2 batas inklusif, 1 toleransi dari config, 1 idempoten-setelah-lewat,
 1 urutan guard) → **201 Pest**.
+
+---
+
+## Y. Menguji audit trail (Activity Log)
+
+`Appointment` memakai `LogsActivity` sejak awal dan DoD `CLAUDE.md` mensyaratkan "perubahan
+status tercatat di Activity Log". Yang tak pernah ada: **satu pun test**. Konsekuensinya bukan
+teoretis — hapus `use LogsActivity;` dari model dan seluruh gerbang (Pest, PHPStan, Pint, CI)
+**tetap hijau** sementara audit trail diam-diam kosong. Untuk fitur yang perannya justru
+menjawab "siapa melakukan apa" saat ada sengketa, itu kegagalan yang baru ketahuan persis di
+saat paling mahal.
+
+### Y.1 Yang dikunci
+
+`tests/Feature/Audit/ActivityLogTest.php` (7 test) mengunci empat hal, semuanya lewat endpoint
+sungguhan (bukan `save()` langsung) supaya jalur auth ikut teruji:
+
+| Kejadian | Yang diperiksa |
+|---|---|
+| Booking | entri `created`, `status: CONFIRMED`, causer = transporter |
+| Gate-in | **dua** entri (`CONFIRMED→ARRIVED`, `ARRIVED→IN_PROGRESS`), causer = officer |
+| Gate-out | `IN_PROGRESS→COMPLETED` |
+| Cancel | `→CANCELLED`, causer = transporter |
+| Reschedule | `slot_window_id` pindah + `version` naik (status **tidak** berubah) |
+| No-show sweep | `→NO_SHOW`, **causer NULL** |
+| Batas cakupan | ubah `truck_id` saja → **tak ada** entri baru |
+
+Dua di antaranya mengunci klaim yang selama ini hanya hidup sebagai komentar:
+- **`recordGateIn` sengaja dua `save()`.** Komentarnya berbunyi "Dua save = dua entri Activity
+  Log → audit transisi tetap utuh". Klaim itu tak pernah diverifikasi; sekarang iya.
+- **causer NULL = tindakan sistem.** Itulah yang membedakan "planner membatalkan" dari "sistem
+  menyapu no-show". Kalau suatu saat ada yang "merapikan" ini jadi user sistem, test gugur —
+  dan memang harus, karena artinya semantik audit berubah.
+
+### Y.2 Jebakan: test negatif yang tak menjaga apa pun
+
+Test batas cakupan ("ubah `truck_id` → tak ada entri baru") awalnya **lolos bahkan saat
+logging dimatikan total** — `0 == 0`. Test negatif selalu punya penyakit ini: ia tak bisa
+membedakan "benar tidak mencatat" dari "tidak mencatat apa pun sama sekali". Perbaikannya satu
+baris jangkar sebelum aksinya:
+
+```php
+expect($before)->toBeGreaterThan(0);   // buktikan dulu ADA yang dijaga
+```
+
+### Y.3 Verifikasi bahwa gerbangnya benar-benar menggigit
+
+Test coverage yang lulus belum tentu menjaga apa pun. Karena seluruh nilai slice ini justru
+"apakah gerbangnya menggigit", itu **dibuktikan dengan mutasi**, bukan diasumsikan: cabut
+`use LogsActivity;` dari `Appointment`, jalankan, kembalikan.
+
+```
+tanpa trait  → 7 failed
+dengan trait → 7 passed
+```
+
+Sebelum baris jangkar di Y.2, hasilnya **6 failed / 1 passed** — dan test yang lolos itulah
+yang menunjukkan lubangnya. Kalau menambah test untuk sesuatu yang selama ini tak terjaga,
+langkah ini yang membedakan "menambah 7 test" dari "menambah 7 test yang berguna".
+
+> Cakupan audit **tidak dilebarkan** di slice ini: ganti truk/sopir masih tak terekam
+> (`BUSINESS-FLOW §3.7`). Itu keputusan produk, bukan bug — dan sekarang batasnya tertulis
+> sekaligus ter-test, jadi melebarkannya harus disengaja.
 
 ---
 

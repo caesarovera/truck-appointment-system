@@ -10,17 +10,36 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-02` · Sesi: **Senior review ronde 4 (audit tasklist) + 2 fix P1 (loop TDD): toleransi jendela gate-in & reminder saat reschedule.** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi ini**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Sisanya tercatat di *Senior review ronde 4* di bawah, **bukan** dianggap selesai. Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
+- Update terakhir: `2026-08-02` · Sesi: **Senior review ronde 4 (audit tasklist) + 3 temuan ditutup: toleransi jendela gate-in (P1), reminder saat reschedule (P1), test audit trail (P2).** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi ini**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Sisanya tercatat di *Senior review ronde 4* di bawah, **bukan** dianggap selesai. Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
 - Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
 - Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **205 pass / 523 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **212 pass / 553 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Test audit trail Activity Log (2026-08-02).** Menutup temuan P2 *ronde 4*: `Appointment`
+  memakai `LogsActivity` sejak awal dan DoD `CLAUDE.md` mensyaratkan "perubahan status tercatat
+  di Activity Log", tapi **nol test** menjaganya — hapus trait-nya dan semua gerbang tetap hijau
+  sementara audit trail diam-diam kosong. **7 test** di `tests/Feature/Audit/ActivityLogTest.php`,
+  semuanya lewat **endpoint sungguhan** (bukan `save()` langsung) supaya jalur auth ikut teruji:
+  booking (`created` + causer transporter), gate-in (**dua** entri), gate-out, cancel, reschedule
+  (`slot_window_id`+`version`, status tak berubah), no-show sweep (**causer NULL** = tindakan
+  sistem), dan batas cakupan. Dua klaim yang selama ini cuma hidup sebagai komentar kini terkunci:
+  `recordGateIn` sengaja dua `save()` supaya transisi perantara tak hilang, dan causer NULL yang
+  membedakan tindakan sistem dari manusia. **Gerbangnya dibuktikan menggigit lewat mutasi**, bukan
+  diasumsikan: cabut `use LogsActivity;` → **7 failed**, kembalikan → **7 passed**. Mutasi itu
+  sekaligus menemukan lubang di test saya sendiri — test negatif "ubah `truck_id` → tak ada entri"
+  awalnya **lolos walau logging mati total** (`0 == 0`), diperbaiki dengan satu baris jangkar
+  `expect($before)->toBeGreaterThan(0)`. Tanpa langkah mutasi, lubang itu ikut ter-commit.
+  **Tak ada kode produksi yang berubah** — murni menambal gerbang. +7 test → **212 Pest / 553 assert**.
+  **Temuan yang TIDAK diperbaiki (sengaja):** ganti truk/sopir pada appointment yang sama tak
+  terekam (`truck_id`/`driver_id` di luar `logOnly`), jadi audit tak bisa menjawab "siapa menukar
+  sopirnya" — keputusan produk, kini tertulis di `BUSINESS-FLOW §3.7` **dan** ter-test batasnya,
+  supaya melebarkannya harus disengaja. Detail: `CODE-WALKTHROUGH §Y`.
 - [x] **Reminder ikut pindah saat reschedule (2026-08-02).** Menutup temuan P1 kedua
   *Senior review ronde 4*: `§3.3` selalu menjanjikan reminder ikut berpindah, tapi listener
   satu-satunya hanya mendengarkan `AppointmentBooked`. Appointment yang digeser tetap
@@ -337,11 +356,12 @@
   (Admin ✅ / Planner sebagian / Transporter company sendiri), `§3.7` menjanjikan "transporter
   hanya lihat log company sendiri", `PRD §3` IN-scope menyebut audit trail. Rute audit: **nol**.
   Log-nya direkam (`Appointment` + `LogsActivity`), tak pernah bisa dibaca siapa pun.
-- **[TERBUKA — P2] Activity Log tak punya satu pun test.** `grep -rl activity tests/` = kosong,
-  padahal DoD `CLAUDE.md` mensyaratkan "perubahan status tercatat di Activity Log". Kalau trait
-  `LogsActivity` atau `logOnly([...])` di `Appointment` hilang besok, **semua gerbang tetap
-  hijau**. Ini gerbang yang bolong, bukan sekadar fitur kurang — kerjakan sebelum menumpuk
-  fitur di atasnya.
+- **[FIXED 2026-08-02 — P2] Activity Log tak punya satu pun test.** Gerbang yang bolong: hapus
+  trait `LogsActivity` dan semua gerbang tetap hijau. Ditutup dengan 7 test + **verifikasi mutasi**
+  (cabut trait → 7 failed). Detail di entri *Sudah selesai* teratas. Satu pelajaran yang layak
+  dibawa: langkah mutasi menemukan bahwa salah satu test baru itu sendiri **tidak menjaga apa pun**
+  (test negatif yang lolos walau logging mati) — menambah test tanpa membuktikannya menggigit
+  hanya memindahkan rasa aman, bukan menciptakannya.
 - **[TERBUKA — P2] Gate Officer tak bisa menandai no-show manual.** Matriks `§1` baris "Tandai
   no-show" memberi ✅ ke gate-officer. `MarkNoShowAction` ada tapi **hanya** dipanggil
   `NoShowSweepJob`; tak ada route, tak ada ability di `AppointmentPolicy`. Praktisnya petugas
@@ -359,7 +379,7 @@
   `'status' => 'ACTIVE'`) — jalur 422 `truck_inactive` tak bisa didemokan dari data demo.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (205 Pest / 87 Vitest + **CI hijau di GitHub untuk kedua commit, masing-masing punya run sendiri**); terakhir: kedua temuan P1 ronde 4 ditutup (toleransi jendela gate-in, reminder saat reschedule).
+- (kosong) — checkpoint hijau (212 Pest / 87 Vitest + **CI hijau di GitHub untuk kedua commit, masing-masing punya run sendiri**); terakhir: kedua temuan P1 ronde 4 ditutup (toleransi jendela gate-in, reminder saat reschedule).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
@@ -368,23 +388,30 @@
 > di depan item infrastruktur. Alasannya sama dengan alasan CI didahulukan atas e2e (ADR-0005):
 > menambah lapisan baru di atas fondasi yang gerbangnya bolong = urutan terbalik.
 
-1. **Test Activity Log (P2, ronde 4).** Menambal gerbang yang bolong — DoD `CLAUDE.md`
-   mensyaratkannya tapi nol test menjaganya. Kerjakan **sebelum** endpoint audit, supaya
-   endpoint itu dibangun di atas jaminan yang teruji.
-2. **Endpoint audit log (P2, ronde 4)** — `audit.read` sudah diberikan ke planner & transporter
+1. **Endpoint audit log (P2, ronde 4)** — `audit.read` sudah diberikan ke planner & transporter
    tapi tak ada rute; scoping company transporter lewat Policy (pola `/me/reports/utilization`).
-3. **Putuskan: no-show manual, QR, `dwell_time` (P2/P3, ronde 4).** Empat janji kontrak tanpa
+2. **Putuskan: no-show manual, QR, `dwell_time` (P2/P3, ronde 4).** Empat janji kontrak tanpa
    kode. Bangun **atau** persempit scope lewat ADR — ADR-0006 sudah jadi preseden bagus. Yang
    penting kontrak berhenti menjanjikan yang tak dibangun; keduanya jawaban yang sah.
-4. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
-5. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
-6. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
-7. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
-8. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
+3. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
+4. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
+5. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
+6. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
+7. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-02` (3): **Test audit trail Activity Log.** Kode produksi: **tak ada** (murni menambal
+  gerbang). Test: `tests/Feature/Audit/ActivityLogTest.php` (baru, 7 test). Docs:
+  `BUSINESS-FLOW §3.7` (blockquote baru — **apa** yang direkam: log name, 3 kolom, entri `created`,
+  gate-in dua entri, semantik causer NULL, dan **batas cakupan**: ganti truk/sopir tak terekam),
+  `CODE-WALKTHROUGH §Y` (baru: tabel yang dikunci, jebakan test negatif, verifikasi mutasi) + TOC,
+  `HANDOVER` §Status/§Sudah selesai/§ronde 4 (temuan jadi FIXED)/§Langkah berikutnya (item 1
+  selesai, sisanya naik satu). Seeder: tak ada. **Alasan:** DoD mensyaratkan audit trail tapi nol
+  test menjaganya — dan `§3.7` menyebut Activity Log sebagai sumber kebenaran audit tanpa pernah
+  menyatakan apa yang sebenarnya direkam, jadi batas cakupannya tak bisa diketahui tanpa membaca
+  kode model.
 - `2026-08-02` (2): **Reminder ikut pindah saat reschedule.** Kode: `SchedulesAppointmentReminder`
   (contract baru), `AppointmentBooked`/`AppointmentRescheduled` mengimplementasikannya,
   `ScheduleAppointmentReminder` type-hint interface + pakai `startsAt()`, `AppointmentReminderJob`
