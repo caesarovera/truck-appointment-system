@@ -1709,6 +1709,98 @@ ini lolos begitu lama.
 
 ---
 
+## X. Toleransi jendela waktu gate-in
+
+Sampai slice ini `GateInAction` hanya bertanya "status-nya CONFIRMED?" — **tidak pernah
+melihat jam**. Appointment untuk minggu depan bisa gate-in hari ini. Bukan cuma cacat
+kosmetik: kuota jam 08:00 bisa dipakai truk yang muncul jam 20:00, jadi angka utilisasi
+per window (§Q) melaporkan sesuatu yang tak pernah terjadi — dan meratakan kedatangan,
+satu-satunya alasan TAS ada, berhenti berlaku.
+
+Ini **kelas bug ketiga yang sama** setelah `INACTIVE` (§W) dan `driver_invalid_role` (§W.5):
+aturannya tertulis di `BUSINESS-FLOW`, dipagari di tempat lain, tapi tak pernah ditegakkan
+di Action.
+
+### X.1 Guard-nya: dua batas, keduanya inklusif
+
+```php
+$now = Carbon::now();
+$earliest = $window->startsAt()->subMinutes((int) config('tas.gate_in.early_minutes', 30));
+$latest = $window->endsAt()->addMinutes((int) config('tas.gate_in.late_minutes', 30));
+
+if ($now->lessThan($earliest))    { throw GateInWindowException::tooEarly(); }
+if ($now->greaterThan($latest))   { throw GateInWindowException::tooLate(); }
+```
+
+`SlotWindow::startsAt()` dibuat sebagai cermin `endsAt()` yang sudah ada — sumber kebenaran
+`date + time` yang sama dengan deadline no-show dan guard booking, supaya ketiganya tak bisa
+beda pendapat soal "kapan window ini". `lessThan`/`greaterThan` (bukan `lte`/`gte`) membuat
+batasnya **inklusif**: truk yang tiba tepat di menit toleransi masih diterima. Dua test batas
+mengunci itu.
+
+### X.2 Urutan guard: idempoten → state → waktu
+
+```php
+if ($locked->isGatedIn())            { return [$locked, false]; }   // 1
+if (! $locked->status->canGateIn())  { throw ...cannotGateIn(); }   // 2
+$this->assertWithinGateInWindow($locked);                            // 3
+```
+
+Urutannya bukan selera:
+1. **Idempoten dulu.** Truk yang sudah di dalam harus tetap 200 walau retry-nya datang
+   berjam-jam kemudian. Kalau guard waktu naik ke atas, double-tap petugas gate yang telat
+   berubah jadi error untuk truk yang jelas-jelas sudah masuk.
+2. **State sebelum waktu.** `CANCELLED` yang datang kepagian dilaporkan `invalid_state`,
+   bukan `gate_in_too_early` — pelanggaran yang lebih mendasar yang dilaporkan.
+
+Sama seperti fix `INACTIVE`/`driver_invalid_role`, urutan ini **dikunci test tersendiri**
+supaya refactor berikutnya tak diam-diam membaliknya.
+
+### X.3 Exception terpisah, bukan `InvalidAppointmentStateException`
+
+`GateInWindowException` punya dua named constructor (`tooEarly`/`tooLate`) yang membawa
+`errorCode` sendiri lewat constructor property, dan `render()`-nya 409 — sama seperti
+`SlotUnavailableException::expired()`. Kenapa tidak menumpang exception state yang sudah ada:
+di sini **status-nya sah**, yang salah cuma jam. Petugas gate perlu bisa membedakan "belum
+waktunya, suruh tunggu di luar" dari "appointment ini memang tak bisa masuk".
+
+Frontend **tidak diubah**: `extractError` di `GateDashboardPage` sudah fallback ke
+`data.message`, jadi kedua pesan baru lolos ke layar tanpa mapping tambahan — pola yang sama
+dengan `truck_inactive` (§W).
+
+### X.4 Kenapa tidak cukup mengandalkan `NoShowSweepJob`
+
+Sweep menandai `NO_SHOW` di `window.end + grace`, jadi sekilas gate-in telat "sudah" tertutup.
+Tidak: sweep itu **eventual** (tiap 5 menit) dan **diam total kalau worker queue mati**,
+sementara endpoint gate-in tetap melayani. Guard yang benar harus sinkron, di dalam transaksi
+yang sama. Karena itu default `late_minutes` sengaja **sama** dengan `no_show_grace_minutes`
+(30): keduanya tenggat yang sama dilihat dari dua sisi. Kalau `late` > `grace`, sweep keburu
+menang dan penolakannya berubah jadi `invalid_state`; kalau lebih kecil, ada zona mati sampai
+sweep berikutnya jalan. Komentar di `config/tas.php` mengingatkan untuk mengubah keduanya
+bersamaan.
+
+### X.5 Test: waktu dibekukan, factory dapat state baru
+
+`GateInTest` memakai `travelTo(today()->setTime(10, 0))` di `beforeEach` — guard berbasis jam
+harus diuji dengan jam yang deterministik, dan tengah hari menjauhkan test dari batas tengah
+malam. Default `SlotWindowFactory` adalah **besok** (dibuat begitu supaya "valid untuk
+di-book"), yang justru berarti **terlalu awal untuk gate-in** — jadi seluruh test gate-in lama
+akan merah. Perbaikannya bukan menambal tiap test, tapi state factory baru:
+
+```php
+SlotWindow::factory()->ongoing()   // date=hari ini, start=1 jam lalu, end=1 jam lagi
+```
+
+`ongoing()` menjepit jamnya di dalam hari yang sama (`isSameDay`) karena `start_time`/`end_time`
+tak membawa tanggal — tanpa jepitan itu, test yang jalan dekat tengah malam jadi flaky. Pola
+yang sama dengan `UserFactory::driver()` di §W.5: kalau sebuah guard baru membuat banyak test
+lama tak valid, yang salah biasanya **default factory**-nya, bukan test-nya.
+
++7 test (2 penolakan, 2 batas inklusif, 1 toleransi dari config, 1 idempoten-setelah-lewat,
+1 urutan guard) → **201 Pest**.
+
+---
+
 ## Frontend (Vue SPA)
 
 Penjelasan kode frontend dipisah ke **`docs/FRONTEND.md`** (arsitektur SPA, pola

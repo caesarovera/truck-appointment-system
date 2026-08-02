@@ -482,7 +482,7 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | token | Policy `update` | pindah window (body: `slot_window_id`, `version`) |
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |
-| `POST` | `/api/v1/appointments/{id}/gate-in` | token | Policy `process` | gate-in (CONFIRMED→IN_PROGRESS), idempoten |
+| `POST` | `/api/v1/appointments/{id}/gate-in` | token | Policy `process` | gate-in (CONFIRMED→IN_PROGRESS), idempoten; di luar toleransi jendela → 409 `gate_in_too_early` / `gate_in_too_late` (`config/tas.php` → `gate_in`) |
 | `POST` | `/api/v1/appointments/{id}/gate-out` | token | Policy `process` | gate-out (IN_PROGRESS→COMPLETED), idempoten |
 | `POST` | `/api/v1/slots` | token | `slot.manage` | planner buka window (body: `gate`, `date`, `start_time`, `end_time`, `capacity`) |
 | `POST` | `/api/v1/slots/{slotWindow}/close` | token | `slot.manage` | planner tutup window (status CLOSED, idempoten) |

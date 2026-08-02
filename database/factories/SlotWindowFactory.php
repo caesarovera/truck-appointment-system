@@ -38,6 +38,29 @@ class SlotWindowFactory extends Factory
         return $this->state(fn (): array => ['status' => SlotWindowStatus::CLOSED]);
     }
 
+    /**
+     * Window yang SEDANG berjalan (mulai 1 jam lalu, berakhir 1 jam lagi).
+     *
+     * Default factory sengaja "besok" supaya valid untuk di-book, tapi besok =
+     * terlalu awal untuk gate-in (GateInAction menegakkan toleransi jam, lihat
+     * BUSINESS-FLOW §3.5). Test gate-in memakai state ini sebagai "valid by default".
+     * Jam dijepit di dalam hari yang sama karena start_time/end_time tak membawa
+     * tanggal — tanpa jepitan itu test yang jalan dekat tengah malam jadi flaky.
+     */
+    public function ongoing(): static
+    {
+        return $this->state(function (): array {
+            $start = now()->subHour();
+            $end = now()->addHour();
+
+            return [
+                'date' => today()->toDateString(),
+                'start_time' => $start->isSameDay(today()) ? $start->format('H:i:s') : '00:00:00',
+                'end_time' => $end->isSameDay(today()) ? $end->format('H:i:s') : '23:59:59',
+            ];
+        });
+    }
+
     /** Window with exactly one slot left — for race-condition tests. */
     public function nearlyFull(): static
     {

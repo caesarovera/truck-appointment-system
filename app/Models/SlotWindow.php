@@ -59,6 +59,12 @@ class SlotWindow extends Model
         return $this->status === SlotWindowStatus::OPEN;
     }
 
+    /** Momen window mulai (date + start_time) — basis toleransi early gate-in. */
+    public function startsAt(): Carbon
+    {
+        return $this->date->copy()->setTimeFromTimeString($this->start_time);
+    }
+
     /** Momen window berakhir (date + end_time) — basis deadline no-show & guard booking. */
     public function endsAt(): Carbon
     {

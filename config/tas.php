@@ -26,6 +26,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Toleransi gate-in (menit)
+    |--------------------------------------------------------------------------
+    | Truk hanya boleh masuk di SEKITAR jendelanya (BUSINESS-FLOW §2 & §3.5):
+    | mulai `early_minutes` sebelum window.start sampai `late_minutes` setelah
+    | window.end. Di luar itu ditolak 409 gate_in_too_early / gate_in_too_late.
+    | Tanpa ini status CONFIRMED saja sudah cukup — appointment minggu depan bisa
+    | gate-in hari ini dan kuota jam sibuk terpakai truk yang datang kapan saja.
+    |
+    | `late_minutes` default SAMA dengan no_show_grace_minutes: keduanya
+    | menggambarkan tenggat yang sama dari dua sisi. Kalau dibuat lebih besar dari
+    | grace, NoShowSweepJob keburu menandai NO_SHOW → penolakannya berubah jadi
+    | invalid_state; kalau lebih kecil, ada zona mati sampai sweep berikutnya
+    | jalan. Ubah keduanya bersamaan.
+    */
+    'gate_in' => [
+        'early_minutes' => (int) env('TAS_GATE_IN_EARLY_MINUTES', 30),
+        'late_minutes' => (int) env('TAS_GATE_IN_LATE_MINUTES', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reminder lead time (menit)
     |--------------------------------------------------------------------------
     | Seberapa lama sebelum window.start sopir diingatkan (H-2 jam = 120 menit

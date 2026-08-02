@@ -82,7 +82,7 @@ Status final (tidak bisa transisi lagi): `COMPLETED`, `CANCELLED`, `NO_SHOW`.
 
 Aturan transisi (tegakkan di Action, bukan di Controller):
 - `BOOKED/CONFIRMED → CANCELLED`: hanya sebelum gate-in. **Kuota dikembalikan** (`booked_count--` dalam transaksi).
-- `CONFIRMED → ARRIVED`: hanya Gate Officer, hanya pada hari & window yang sesuai (boleh ada toleransi early/late dari config).
+- `CONFIRMED → ARRIVED`: hanya Gate Officer, hanya pada hari & window yang sesuai. Toleransi early/late dari `config/tas.php → gate_in` (default 30 menit di kedua sisi); di luar itu ditolak `409 gate_in_too_early` / `gate_in_too_late`. Ditegakkan `GateInAction`, **bukan** hanya dipagari UI.
 - `CONFIRMED → NO_SHOW`: otomatis oleh `NoShowSweepJob` setelah `window.end + grace_period`. **Kuota dikembalikan.**
 - Reschedule = pindah ke slot window lain: lepas kuota window lama, ambil kuota window baru, `version++`. Keduanya dalam **satu** transaksi ber-lock.
 
@@ -127,9 +127,13 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 1. Scan QR / input kode booking → `GET /api/v1/appointments/{id}` (cek terminal cocok).
 2. Verifikasi truk & kontainer fisik.
 3. `POST /api/v1/appointments/{id}/gate-in` + `Idempotency-Key`.
-4. `GateInAction`: cek state `CONFIRMED` & window valid (toleransi early/late) → buat `gate_transactions` (`type=IN`), status → `ARRIVED`. Saat proses bongkar/muat dimulai di dalam terminal, status → `IN_PROGRESS` (sesuai §2). Untuk MVP keduanya boleh terjadi berurutan dalam satu aksi.
+4. `GateInAction`: cek state `CONFIRMED`, lalu **toleransi jendela waktu** — truk hanya diterima antara `window.start − early` dan `window.end + late` (`config/tas.php → gate_in`, default 30/30 menit, batas inklusif). Di luar itu → `409 gate_in_too_early` / `gate_in_too_late`. Lolos → buat `gate_transactions` (`type=IN`), status → `ARRIVED`. Saat proses bongkar/muat dimulai di dalam terminal, status → `IN_PROGRESS` (sesuai §2). Untuk MVP keduanya boleh terjadi berurutan dalam satu aksi.
 5. Event `TruckGatedIn` → broadcast antrian, `ProcessGateEventJob` push ke TOS terminal (idempoten, cek state).
 > No-show: kalau driver tak datang sampai `window.end + grace`, `NoShowSweepJob` set `NO_SHOW` & balikin kuota — gate-in setelah itu ditolak.
+
+> **Urutan guard gate-in (dikunci test).** Idempoten dulu → state → waktu. Truk yang **sudah** di dalam tak boleh berubah jadi error hanya karena retry-nya telat (double-tap petugas gate itu normal), dan status yang salah adalah pelanggaran lebih mendasar daripada jam kedatangan — makanya `CANCELLED` yang datang kepagian tetap dilaporkan `invalid_state`, bukan `gate_in_too_early`.
+
+> **Kenapa guard waktu harus di Action, bukan cukup `NoShowSweepJob`.** Sweep itu *eventual* (tiap 5 menit) dan **diam total kalau worker queue mati**, sementara endpoint gate-in tetap melayani. Tanpa guard sinkron, status `CONFIRMED` saja sudah cukup untuk masuk: appointment minggu depan bisa gate-in hari ini, dan kuota jam sibuk terpakai truk yang datang kapan saja — persis yang seharusnya dicegah TAS. Default `late` sengaja **sama** dengan `no_show_grace_minutes`: keduanya menggambarkan tenggat yang sama dari dua sisi, jadi ubah bersamaan.
 
 ### 3.6 Gate Officer: gate-out
 1. Setelah bongkar/muat selesai → `POST /api/v1/appointments/{id}/gate-out`.
