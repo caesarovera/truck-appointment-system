@@ -18,11 +18,20 @@ use Throwable;
 
 /**
  * Kirim pengingat H-2 jam ke sopir (CLAUDE.md hardening Queue). Dijadwalkan
- * delayed oleh ScheduleAppointmentReminder saat AppointmentBooked.
+ * delayed oleh ScheduleAppointmentReminder saat booking DAN reschedule.
  *
- * ShouldBeUnique (uniqueId = appointment id) → satu reminder pending per
- * appointment, kebal double-tap booking. Saat eksekusi cek status terkini:
- * kalau sudah cancel/no-show/selesai, tak ada notifikasi (tahan reschedule).
+ * Job membawa `slotWindowId` yang ia jadwalkan — bukan cuma appointment id —
+ * karena dua hal bergantung padanya:
+ *  1. `uniqueId()` ikut ber-window. ShouldBeUnique memegang lock selama job masih
+ *     PENDING di queue (baru dilepas saat diproses). Kalau kuncinya cuma
+ *     appointment id, reminder baru hasil reschedule DIBUANG DIAM-DIAM karena
+ *     job lama masih menunggu — dan sopir tak pernah diingatkan sama sekali.
+ *  2. Guard basi di handle(). Job yang sudah antre tak bisa ditarik kembali dari
+ *     queue, jadi reminder untuk window lama harus membatalkan dirinya sendiri
+ *     saat sadar appointment-nya sudah pindah.
+ *
+ * Saat eksekusi juga cek status terkini: cancel/no-show/selesai → tak ada
+ * notifikasi.
  */
 final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
 {
@@ -36,11 +45,14 @@ final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [30, 60, 120];
 
-    public function __construct(public readonly int $appointmentId) {}
+    public function __construct(
+        public readonly int $appointmentId,
+        public readonly int $slotWindowId,
+    ) {}
 
     public function uniqueId(): string
     {
-        return (string) $this->appointmentId;
+        return $this->appointmentId.':'.$this->slotWindowId;
     }
 
     public function handle(): void
@@ -51,8 +63,15 @@ final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        // Hanya ingatkan bila masih menunggu kedatangan; cancel/reschedule-pergi/
-        // no-show/sudah gate-in → diam.
+        // Appointment sudah pindah window sejak job ini dijadwalkan (reschedule):
+        // reminder ini basi — jamnya jam window lama. Reminder untuk window baru
+        // sudah dijadwalkan listener, jadi cukup diam.
+        if ($appointment->slot_window_id !== $this->slotWindowId) {
+            return;
+        }
+
+        // Hanya ingatkan bila masih menunggu kedatangan; cancel/no-show/sudah
+        // gate-in → diam.
         if (! in_array($appointment->status, [AppointmentStatus::BOOKED, AppointmentStatus::CONFIRMED], true)) {
             return;
         }

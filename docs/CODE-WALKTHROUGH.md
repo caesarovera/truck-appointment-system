@@ -38,6 +38,7 @@
 - [U. Read endpoints persona (booking list + gate queue)](#u-read-endpoints-persona-booking-list--gate-queue)
 - [V. Admin CRUD master data (terminal/gate/company/user)](#v-admin-crud-master-data-terminalgatecompanyuser)
 - [W. CRUD armada truk transporter (`/me/trucks`)](#w-crud-armada-truk-transporter-metrucks)
+- [X. Toleransi jendela waktu gate-in](#x-toleransi-jendela-waktu-gate-in)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -1147,7 +1148,9 @@ final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
     {
         $appointment = Appointment::query()->with(['driver','slotWindow'])->find($this->appointmentId);
         if ($appointment === null) return;
-        // Hanya ingatkan bila masih menunggu kedatangan (tahan reschedule/cancel/no-show).
+        // Sudah pindah window sejak job dijadwalkan → reminder ini basi, diam.
+        if ($appointment->slot_window_id !== $this->slotWindowId) return;
+        // Hanya ingatkan bila masih menunggu kedatangan (tahan cancel/no-show/gate-in).
         if (! in_array($appointment->status, [AppointmentStatus::BOOKED, AppointmentStatus::CONFIRMED], true)) {
             return;
         }
@@ -1155,19 +1158,49 @@ final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
     }
 }
 ```
-- **`ShouldBeUnique` + `uniqueId` = appointment id:** booking yang dobel-tap tidak
-  menjadwalkan dua reminder.
-- **Cek status saat job berjalan** (bukan saat dijadwalkan) membuat reminder *self-healing*:
-  kalau appointment sudah batal/pindah, job diam.
+- **Cek status saat job berjalan** (bukan saat dijadwalkan): appointment yang keburu
+  batal/no-show/masuk gate → job diam.
+- **Job membawa `slotWindowId`, bukan cuma appointment id.** Lihat O.3.
 
-Dijadwalkan **delayed** oleh listener saat booking:
+Dijadwalkan **delayed** oleh listener saat booking **dan reschedule**:
 ```php
-// ScheduleAppointmentReminder::handle(AppointmentBooked $event)
-$remindAt = $window->date->copy()->setTimeFromTimeString($window->start_time)
-    ->subMinutes((int) config('tas.reminder_lead_minutes', 120));
-AppointmentReminderJob::dispatch($appointment->id)
+// ScheduleAppointmentReminder::handle(SchedulesAppointmentReminder $event)
+$remindAt = $window->startsAt()->subMinutes((int) config('tas.reminder_lead_minutes', 120));
+AppointmentReminderJob::dispatch($appointment->id, $window->id)
     ->delay($remindAt->isFuture() ? $remindAt : Carbon::now());     // mepet → kirim segera
 ```
+
+### O.3 Reminder ikut pindah saat reschedule
+
+`BUSINESS-FLOW §3.3` selalu menjanjikan reminder ikut berpindah, tapi cukup lama listener-nya
+hanya mendengarkan `AppointmentBooked`. Akibatnya appointment yang digeser tetap `CONFIRMED`,
+jadi reminder-nya meledak di jam window **lama** dan window baru tak pernah dapat reminder —
+sopir yang jadwalnya dipindah tidak diingatkan.
+
+**Satu listener, dua event, lewat interface.** `ScheduleAppointmentReminder` kini
+type-hint `SchedulesAppointmentReminder`; `AppointmentBooked` & `AppointmentRescheduled`
+mengimplementasikannya. Pola yang sama persis dengan `AffectsSlotAvailability` (§M) — Laravel
+menjalankan listener yang terdaftar untuk **interface** yang diimplementasikan event
+(`Dispatcher::addInterfaceListeners`), jadi auto-discovery tetap jalan tanpa registrasi manual.
+Interface baru, **bukan** menumpang `AffectsSlotAvailability` yang sudah ada: cancel, no-show,
+dan buka/tutup window juga mengimplementasikannya, dan tak satu pun boleh menjadwalkan reminder.
+
+**Jebakan yang membuat "tinggal dispatch ulang" tidak cukup.** `ShouldBeUnique` memegang
+lock-nya selama job masih **pending** di queue — baru dilepas saat job *diproses*
+(`PendingDispatch::shouldDispatch()` yang mengambil lock, `CallQueuedHandler` yang melepas).
+Kalau `uniqueId()` tetap cuma appointment id, reminder baru hasil reschedule **dibuang
+diam-diam** oleh Laravel karena job lama masih menunggu. Fix-nya akan terlihat benar di kode
+dan tak berfungsi sama sekali di queue sungguhan. Karena itu `uniqueId()` = `{appointmentId}:{slotWindowId}`.
+
+**Job lama tidak dibatalkan — ia membatalkan dirinya sendiri.** Job yang sudah antre tak bisa
+ditarik kembali dari queue, jadi guard `slot_window_id !== $this->slotWindowId` di `handle()`
+yang menetralkannya. Perhatikan penulisan dokumen di `BUSINESS-FLOW §3.3`: "dibatalkan" itu
+imprecise dan sudah dikoreksi jadi "dinetralkan" — dokumen harus menggambarkan mekanisme yang
+benar-benar ada, kalau tidak orang berikutnya akan mencari kode pembatalan yang tak pernah ada.
+
+**Catatan test:** `QUEUE_CONNECTION=sync` di `phpunit.xml` berarti lock unique langsung lepas,
+jadi jebakan di atas **tak bisa** ditangkap test perilaku — dikunci lewat assertion langsung
+atas `uniqueId()`. +5 test → **205 Pest**.
 
 ---
 

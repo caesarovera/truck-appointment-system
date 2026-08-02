@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Events;
 
 use App\Contracts\AffectsSlotAvailability;
+use App\Contracts\SchedulesAppointmentReminder;
 use App\Models\Appointment;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /** Dipancarkan setelah reschedule commit. Kuota pindah dari window lama ke baru. */
-final class AppointmentRescheduled implements AffectsSlotAvailability
+final class AppointmentRescheduled implements AffectsSlotAvailability, SchedulesAppointmentReminder
 {
     use Dispatchable;
     use SerializesModels;
@@ -25,5 +26,10 @@ final class AppointmentRescheduled implements AffectsSlotAvailability
     public function windowIdsToRefresh(): array
     {
         return [$this->fromWindowId, $this->toWindowId];
+    }
+
+    public function appointmentToRemind(): Appointment
+    {
+        return $this->appointment;
     }
 }

@@ -10,17 +10,39 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-02` · Sesi: **Senior review ronde 4 (audit tasklist) + fix P1 toleransi jendela gate-in (loop TDD).** Audit menemukan 7 janji kontrak yang tak pernah dibangun — yang terberat ditutup sesi ini lewat test-dulu: test merah dengan **200 alih-alih 409**, baru guard-nya dipasang. Sisanya tercatat di *Senior review ronde 4* di bawah, **bukan** dianggap selesai. Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
+- Update terakhir: `2026-08-02` · Sesi: **Senior review ronde 4 (audit tasklist) + 2 fix P1 (loop TDD): toleransi jendela gate-in & reminder saat reschedule.** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi ini**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Sisanya tercatat di *Senior review ronde 4* di bawah, **bukan** dianggap selesai. Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
 - Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
 - Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **201 pass / 519 assert** · `composer analyse` → ✅ PHPStan lvl 8 (208 file, 0 error) · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **205 pass / 523 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau** — run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) di commit `f6495a0`: **kedua job + SEMUA step** sukses (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build). Run sebelumnya `5976732` juga sukses. Yang paling berarti: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Reminder ikut pindah saat reschedule (2026-08-02).** Menutup temuan P1 kedua
+  *Senior review ronde 4*: `§3.3` selalu menjanjikan reminder ikut berpindah, tapi listener
+  satu-satunya hanya mendengarkan `AppointmentBooked`. Appointment yang digeser tetap
+  `CONFIRMED`, jadi reminder meledak di jam window **lama** dan window baru tak pernah dapat
+  reminder — **sopir yang jadwalnya dipindah tidak diingatkan sama sekali**. **Fix:** contract
+  `SchedulesAppointmentReminder` (diimplementasikan `AppointmentBooked` + `AppointmentRescheduled`),
+  `ScheduleAppointmentReminder` type-hint interface itu → satu listener melayani dua event, pola
+  sama dengan `AffectsSlotAvailability`. Interface **baru**, bukan menumpang `AffectsSlotAvailability`:
+  cancel/no-show/buka-tutup-window juga mengimplementasikannya dan tak satu pun boleh menjadwalkan
+  reminder. **Jebakan yang membuat "tinggal dispatch ulang" TIDAK cukup:** `ShouldBeUnique`
+  memegang lock selama job masih **pending** di queue (baru lepas saat diproses) — dengan
+  `uniqueId()` = appointment id saja, reminder baru hasil reschedule **dibuang diam-diam** oleh
+  Laravel dan fix-nya akan terlihat benar di kode tapi mati di queue sungguhan. Karena itu job
+  membawa `slotWindowId` dan `uniqueId()` = `{appointmentId}:{slotWindowId}`. Job lama **tidak
+  dibatalkan** (job yang sudah antre tak bisa ditarik dari queue) melainkan **menetralkan dirinya
+  sendiri** lewat guard `slot_window_id !== $this->slotWindowId` di `handle()` — `BUSINESS-FLOW §3.3`
+  ikut dikoreksi dari "dibatalkan" jadi "dinetralkan" supaya orang berikutnya tak mencari kode
+  pembatalan yang tak pernah ada. Ikutan bersih: listener kini memakai `SlotWindow::startsAt()`
+  (helper dari slice gate-in) menggantikan hitungan `date+start_time` manual — satu sumber kebenaran.
+  **Catatan test:** `QUEUE_CONNECTION=sync` bikin lock unique langsung lepas, jadi jebakan
+  ShouldBeUnique **tak bisa** ditangkap test perilaku — dikunci lewat assertion langsung atas
+  `uniqueId()`. +5 test → **205 Pest / 523 assert**. Detail: `CODE-WALKTHROUGH §O.3`.
 - [x] **Toleransi jendela waktu gate-in (2026-08-02).** Menutup temuan P1 terberat
   *Senior review ronde 4*: `GateInAction` hanya bertanya "status CONFIRMED?" dan **tak pernah
   melihat jam** — appointment minggu depan bisa gate-in hari ini. `config/tas.php` bahkan tak
@@ -303,13 +325,13 @@
   Hanya `status->canGateIn()`; tak ada cek tanggal/jam, dan `config/tas.php` tak punya kunci
   toleransi — padahal `BUSINESS-FLOW §2`/`§3.5` + `PRD §4` menjanjikannya. Detail fix ada di
   entri *Sudah selesai* teratas.
-- **[TERBUKA — P1] Reminder hilang saat reschedule.** `§3.3` menjanjikan "reminder lama
-  dibatalkan, reminder baru dijadwalkan". Kenyataan: `ScheduleAppointmentReminder` **hanya**
-  mendengarkan `AppointmentBooked`; tak ada listener untuk `AppointmentRescheduled`.
-  `AppointmentReminderJob` memang cek status terkini — itu menyelamatkan cancel/no-show, tapi
-  **bukan** reschedule: status tetap `CONFIRMED`, jadi reminder meledak pada jadwal window
-  **lama**, dan window baru tak pernah dapat reminder sama sekali. Sopir yang jadwalnya dipindah
-  = tidak diingatkan. Perbaikan kecil (listener + `ShouldBeUnique` sudah per-appointment).
+- **[FIXED 2026-08-02 — P1] Reminder hilang saat reschedule.** `§3.3` menjanjikan reminder ikut
+  berpindah; kenyataannya `ScheduleAppointmentReminder` **hanya** mendengarkan `AppointmentBooked`,
+  jadi appointment yang digeser tetap `CONFIRMED` dan reminder-nya meledak di jam window **lama**
+  sementara window baru tak pernah dapat reminder. Detail fix ada di entri *Sudah selesai* teratas.
+  Satu catatan yang perlu diingat dari perbaikannya: dugaan awal "perbaikan kecil, `ShouldBeUnique`
+  sudah per-appointment" **salah** — justru `ShouldBeUnique` per-appointment itulah yang akan
+  membuang reminder baru diam-diam. Asumsi itu ketahuan karena diuji, bukan karena dibaca ulang.
 - **[TERBUKA — P2] `audit.read` diberikan, endpoint audit tidak ada.** Planner & transporter
   dapat `audit.read` di `RolePermissionSeeder`, matriks `§1` punya baris "Lihat audit log"
   (Admin ✅ / Planner sebagian / Transporter company sendiri), `§3.7` menjanjikan "transporter
@@ -337,7 +359,7 @@
   `'status' => 'ACTIVE'`) — jalur 422 `truck_inactive` tak bisa didemokan dari data demo.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (201 Pest / 87 Vitest); terakhir: guard toleransi jendela gate-in ditutup (ronde 4 temuan P1). **CI belum diverifikasi untuk commit ini** (belum di-push).
+- (kosong) — checkpoint hijau (205 Pest / 87 Vitest); terakhir: kedua temuan P1 ronde 4 ditutup (toleransi jendela gate-in, reminder saat reschedule). **CI belum diverifikasi untuk kedua commit ini** (belum di-push).
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
@@ -346,26 +368,35 @@
 > di depan item infrastruktur. Alasannya sama dengan alasan CI didahulukan atas e2e (ADR-0005):
 > menambah lapisan baru di atas fondasi yang gerbangnya bolong = urutan terbalik.
 
-1. **Reminder saat reschedule (P1, ronde 4).** Listener untuk `AppointmentRescheduled` yang
-   menjadwalkan ulang `AppointmentReminderJob` ke window baru. Slice kecil, TDD: test merah
-   dulu dengan bukti reminder tetap di jam window lama.
-2. **Test Activity Log (P2, ronde 4).** Menambal gerbang yang bolong — DoD `CLAUDE.md`
+1. **Test Activity Log (P2, ronde 4).** Menambal gerbang yang bolong — DoD `CLAUDE.md`
    mensyaratkannya tapi nol test menjaganya. Kerjakan **sebelum** endpoint audit, supaya
    endpoint itu dibangun di atas jaminan yang teruji.
-3. **Endpoint audit log (P2, ronde 4)** — `audit.read` sudah diberikan ke planner & transporter
+2. **Endpoint audit log (P2, ronde 4)** — `audit.read` sudah diberikan ke planner & transporter
    tapi tak ada rute; scoping company transporter lewat Policy (pola `/me/reports/utilization`).
-4. **Putuskan: no-show manual, QR, `dwell_time` (P2/P3, ronde 4).** Empat janji kontrak tanpa
+3. **Putuskan: no-show manual, QR, `dwell_time` (P2/P3, ronde 4).** Empat janji kontrak tanpa
    kode. Bangun **atau** persempit scope lewat ADR — ADR-0006 sudah jadi preseden bagus. Yang
    penting kontrak berhenti menjanjikan yang tak dibangun; keduanya jawaban yang sah.
-5. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
-6. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
-7. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
-8. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
-9. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
+4. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
+5. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
+6. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
+7. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
+8. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-02` (2): **Reminder ikut pindah saat reschedule.** Kode: `SchedulesAppointmentReminder`
+  (contract baru), `AppointmentBooked`/`AppointmentRescheduled` mengimplementasikannya,
+  `ScheduleAppointmentReminder` type-hint interface + pakai `startsAt()`, `AppointmentReminderJob`
+  (+`slotWindowId` di constructor, `uniqueId()` ber-window, guard basi di `handle()`),
+  `AppointmentReminderTest` (+5 test). Docs: `BUSINESS-FLOW §3.3` (**koreksi kata**: "reminder lama
+  dibatalkan" → "dinetralkan" — job antre tak bisa ditarik dari queue, jadi tak ada kode pembatalan
+  yang bisa dicari orang berikutnya), `CODE-WALKTHROUGH §O` (snippet job & listener diperbarui) +
+  **§O.3 baru** (interface listener, jebakan ShouldBeUnique, kenapa job menetralkan diri sendiri) +
+  **TOC** (entri §X yang tertinggal dari commit sebelumnya ikut ditambahkan), `HANDOVER`
+  §Status/§Sudah selesai/§ronde 4 (temuan jadi FIXED)/§Langkah berikutnya (item 1 selesai, sisanya
+  naik satu). Seeder: tak ada. **Alasan:** kontrak menjanjikan perilaku yang tak pernah ada
+  kodenya, dan sopir yang jadwalnya digeser tidak diingatkan sama sekali.
 - `2026-08-02`: **Toleransi jendela gate-in jadi nyata + audit tasklist ronde 4.** Kode:
   `config/tas.php` (blok `gate_in` baru), `SlotWindow::startsAt()`, `GateInWindowException` (baru),
   guard di `GateInAction`, `SlotWindowFactory::ongoing()` (baru), `GateInTest` (+7 test, jam
