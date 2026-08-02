@@ -480,6 +480,7 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/slots/availability?gate={id}&date=YYYY-MM-DD` | token | `slot.read` | sisa kuota slot |
 | `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`); truk INACTIVE → 422 `truck_inactive`; `driver_id` bukan user ber-role `driver` → 422 `driver_invalid_role` |
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |
+| `GET`  | `/api/v1/appointments/{id}/audit` | token | `audit.read` **+** Policy `view` | jejak audit appointment (urut kronologis). Dua lapis: gate-officer & driver LOLOS Policy tapi ditolak 403 karena tak punya `audit.read`. `causer: null` = tindakan sistem |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | token | Policy `update` | pindah window (body: `slot_window_id`, `version`) |
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |
 | `POST` | `/api/v1/appointments/{id}/gate-in` | token | Policy `process` | gate-in (CONFIRMED→IN_PROGRESS), idempoten; di luar toleransi jendela → 409 `gate_in_too_early` / `gate_in_too_late` (`config/tas.php` → `gate_in`) |

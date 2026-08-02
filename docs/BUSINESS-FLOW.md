@@ -144,6 +144,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 - Planner: `GET /api/v1/reports/utilization?gate=&date=` → kuota vs terpakai vs no-show.
 - Transporter: `GET /api/v1/me/reports/utilization?gate=&date=` → sama, tapi hitungan per status hanya milik company sendiri (angka company lain tidak bocor; lihat matriks §1).
 - Semua perubahan status & gate event tercatat lewat **Spatie Activity Log** (sumber kebenaran audit trail). Transporter hanya lihat log company sendiri.
+- Dibaca lewat `GET /api/v1/appointments/{id}/audit` — otorisasi **dua lapis**: permission `audit.read` (FormRequest) **+** `AppointmentPolicy::view` (isolasi company/terminal). Gate-officer & driver lolos Policy untuk appointment mereka sendiri tapi **tidak** punya `audit.read`, sesuai matriks §1 — trail memuat nama orang yang mengubah, bukan cuma data appointment-nya.
 
 > **Apa yang benar-benar direkam** (`Appointment::getActivitylogOptions`, dikunci `tests/Feature/Audit/ActivityLogTest.php`): log name `appointment`, kolom **`status`, `slot_window_id`, `version`** saja, `logOnlyDirty` + `dontSubmitEmptyLogs`.
 > - **Pembuatan** appointment ikut tercatat (`event: created`) — itu titik awal rantai audit, yang menjawab "siapa yang membooking slot ini".

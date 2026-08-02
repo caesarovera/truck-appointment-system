@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\Admin\UpdateCompanyController;
 use App\Http\Controllers\Api\V1\Admin\UpdateGateController;
 use App\Http\Controllers\Api\V1\Admin\UpdateTerminalController;
 use App\Http\Controllers\Api\V1\Admin\UpdateUserController;
+use App\Http\Controllers\Api\V1\AppointmentAuditController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
@@ -75,6 +76,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('appointments', BookAppointmentController::class)
             ->middleware(['throttle:booking', 'idempotency']);
         Route::get('appointments/{appointment}', ShowAppointmentController::class)
+            ->middleware('can:view,appointment');
+        // Audit trail 1 appointment (audit.read + Policy view) — matriks §1.
+        Route::get('appointments/{appointment}/audit', AppointmentAuditController::class)
             ->middleware('can:view,appointment');
         Route::post('appointments/{appointment}/reschedule', RescheduleAppointmentController::class)
             ->middleware(['can:update,appointment', 'idempotency']);

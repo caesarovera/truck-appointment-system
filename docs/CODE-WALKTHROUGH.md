@@ -40,6 +40,7 @@
 - [W. CRUD armada truk transporter (`/me/trucks`)](#w-crud-armada-truk-transporter-metrucks)
 - [X. Toleransi jendela waktu gate-in](#x-toleransi-jendela-waktu-gate-in)
 - [Y. Menguji audit trail (Activity Log)](#y-menguji-audit-trail-activity-log)
+- [Z. Endpoint audit trail (otorisasi dua lapis)](#z-endpoint-audit-trail-otorisasi-dua-lapis)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -1895,6 +1896,69 @@ langkah ini yang membedakan "menambah 7 test" dari "menambah 7 test yang berguna
 > Cakupan audit **tidak dilebarkan** di slice ini: ganti truk/sopir masih tak terekam
 > (`BUSINESS-FLOW §3.7`). Itu keputusan produk, bukan bug — dan sekarang batasnya tertulis
 > sekaligus ter-test, jadi melebarkannya harus disengaja.
+
+---
+
+## Z. Endpoint audit trail (otorisasi dua lapis)
+
+`GET /api/v1/appointments/{id}/audit`. Menutup baris matriks §1 "Lihat audit log" yang selama
+ini **cuma desain**: permission `audit.read` sudah lama diberikan ke planner & transporter di
+`RolePermissionSeeder`, tapi tak ada satu pun rute yang memakainya. Log direkam sejak awal dan
+tak pernah bisa dibaca siapa pun.
+
+### Z.1 Kenapa per-appointment, bukan endpoint daftar
+
+Bentuknya sengaja "jejak SATU appointment", bukan `/audit?company=&from=`. Alasannya bukan
+kesederhanaan tapi **keamanan**: dengan menempel pada appointment, isolasi datanya memakai
+`AppointmentPolicy::view` yang **sudah ada dan sudah ber-test** (transporter company sendiri,
+planner/admin lintas company). Endpoint daftar akan menuntut permukaan scoping BARU — dan
+scoping baru adalah tempat kebocoran antar-tenant lahir.
+
+### Z.2 Dua lapis, dan lapis kedua yang benar-benar bekerja
+
+```php
+// route
+Route::get('appointments/{appointment}/audit', AppointmentAuditController::class)
+    ->middleware('can:view,appointment');          // lapis 1: isolasi per-record
+
+// AppointmentAuditRequest
+public function authorize(): bool
+{
+    return (bool) $this->user()?->can('audit.read');   // lapis 2: siapa boleh melihat AUDIT
+}
+```
+
+Lapis 1 saja **tidak cukup**, dan ini bukan teori: **gate-officer** (terminalnya cocok) dan
+**driver** (appointment-nya sendiri) sama-sama LOLOS `Policy::view`. Matriks §1 tidak memberi
+mereka "Lihat audit log" — karena trail memuat **nama orang yang mengubah**, bukan cuma data
+appointment-nya. Tanpa lapis 2, sopir bisa membaca siapa saja yang menyentuh jadwalnya.
+Dua test khusus mengunci itu, dan namanya sengaja menyebut "even though the policy would let
+them view it" supaya niatnya tak hilang saat orang lain membacanya.
+
+### Z.3 Bentuk respons
+
+```json
+{"data":[{"id":1,"event":"created","changes":{"old":{},"new":{"status":"CONFIRMED"}},
+          "causer":{"id":5,"name":"…"},"created_at":"…"}]}
+```
+
+- `changes.old` kosong pada `created` — belum ada keadaan sebelumnya.
+- **`causer: null` = tindakan sistem** (mis. `NoShowSweepJob`), diekspos apa adanya karena
+  perbedaan "sistem menyapu no-show" vs "seseorang membatalkan" adalah inti nilai audit trail
+  saat dipakai menyelesaikan sengketa.
+- `AuditRepository` meng-`with('causer')` — **wajib, bukan optimasi**: Resource membaca nama
+  causer sementara `preventLazyLoading` aktif di non-prod.
+- Disaring ke `log_name = 'appointment'` supaya endpoint ini tak pernah membocorkan log domain
+  lain kalau kelak ada model lain yang diaudit.
+
+### Z.4 Jebakan PHPStan
+
+`Activity::$properties` **nullable** menurut Spatie, jadi `$this->properties->toArray()` gagal
+di level 8 (`method.nonObject`). `?->toArray() ?? []` — bukan sekadar menyenangkan analyzer:
+entri log tanpa properti memang sah.
+
+> **Tidak ada UI-nya** di slice ini — endpoint dulu, halaman menyusul (pola yang sama dengan
+> `/me/reports/utilization` yang BE-nya mendahului FE).
 
 ---
 
