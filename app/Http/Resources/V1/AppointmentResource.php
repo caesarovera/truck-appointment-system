@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\V1;
 
 use App\Models\Appointment;
+use App\Services\AppointmentQrTokenService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,10 @@ final class AppointmentResource extends JsonResource
         return [
             'id' => $this->id,
             'booking_code' => $this->booking_code,
+            // Token QR ter-sign (BUSINESS-FLOW §3.4) — butuh slotWindow untuk
+            // hitung TTL, jadi cuma muncul kalau relasi itu di-eager-load
+            // (sama seperti gate_in_at/gate_out_at di bawah).
+            'qr_token' => $this->whenLoaded('slotWindow', fn () => app(AppointmentQrTokenService::class)->generate($this->resource)),
             'status' => $this->status->value,
             'move_type' => $this->move_type->value,
             'version' => $this->version,

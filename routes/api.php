@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\Admin\UpdateRolePermissionsController;
 use App\Http\Controllers\Api\V1\Admin\UpdateTerminalController;
 use App\Http\Controllers\Api\V1\Admin\UpdateUserController;
 use App\Http\Controllers\Api\V1\AppointmentAuditController;
+use App\Http\Controllers\Api\V1\AppointmentQrImageController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\Api\V1\RescheduleAppointmentController;
 use App\Http\Controllers\Api\V1\ShowAppointmentController;
 use App\Http\Controllers\Api\V1\SlotAvailabilityController;
 use App\Http\Controllers\Api\V1\UtilizationReportController;
+use App\Http\Controllers\Api\V1\VerifyAppointmentQrController;
 use Illuminate\Support\Facades\Route;
 
 // Versi baru = folder/grup baru, jangan mutasi v1 (CLAUDE.md).
@@ -79,6 +81,12 @@ Route::prefix('v1')->group(function (): void {
         // Booking lebih ketat dari `api` (anti bot borong slot).
         Route::post('appointments', BookAppointmentController::class)
             ->middleware(['throttle:booking', 'idempotency']);
+        // Verifikasi QR (token ter-sign, BUSINESS-FLOW §3.4/§3.5) — segmen statis
+        // 'qr' WAJIB didaftarkan sebelum 'appointments/{appointment}' di bawah,
+        // supaya tak ketabrak wildcard route-model-binding. Otorisasi Policy
+        // dicek manual di controller (id baru diketahui setelah token didekode).
+        Route::get('appointments/qr/{token}/image', AppointmentQrImageController::class);
+        Route::get('appointments/qr/{token}', VerifyAppointmentQrController::class);
         Route::get('appointments/{appointment}', ShowAppointmentController::class)
             ->middleware('can:view,appointment');
         // Audit trail 1 appointment (audit.read + Policy view) — matriks §1.

@@ -35,7 +35,9 @@ it('returns only the driver own appointments scheduled for today', function (): 
         ->assertJsonPath('data.0.id', $mine->id)
         ->assertJsonPath('data.0.booking_code', $mine->booking_code)
         // Gate di-eager-load → driver tahu gate tujuan.
-        ->assertJsonPath('data.0.slot_window.gate.name', 'Gate A');
+        ->assertJsonPath('data.0.slot_window.gate.name', 'Gate A')
+        // QR = token ter-sign (BUSINESS-FLOW §3.4), bukan booking_code polos.
+        ->assertJsonPath('data.0.qr_token', fn (string $token) => str_contains($token, '.'));
 });
 
 it('forbids a user without the self-read scope (transporter) — 403', function (): void {
