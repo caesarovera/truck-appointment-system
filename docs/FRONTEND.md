@@ -272,18 +272,25 @@ Rute (semua `requiresAuth` kecuali `/login`): `/login`, `/` (dashboard), `/slots
 `/bookings`, `/trucks`, `/today`, `/gate`, `/planner`, `/planner/gate-history`, `/reports`,
 `/admin`.
 
-Navigasi saat ini **hanya** lewat kartu link di Dashboard, masing-masing di-gate
-`auth.can(perm)`:
+Navigasi lewat **dua tempat sekaligus**: kartu link di Dashboard (pintu masuk besar)
+**dan** `AppNav` (navbar lintas-halaman, §4). Keduanya harus gating identik — 2026-08-13
+ketahuan (dilaporkan user, dua kali di sesi yang sama) keduanya sempat **tak identik**:
+`AppNav` sudah dibetulkan duluan lalu `DashboardPage` menyusul dengan pola yang sama.
+Gating **bukan cuma** `auth.can(perm)` — admin punya SEMUA permission (`RolePermissionSeeder`)
+tapi tak punya `company_id`/`terminal_id`/role `driver`, jadi 4 link butuh guard identitas
+tambahan supaya tak tampil untuk admin walau endpoint di baliknya pasti 403/kosong:
 
-| Link | Izin | Persona |
-|------|------|---------|
-| Ketersediaan Slot | `slot.read` | transporter/planner/gate-officer |
-| Booking Saya | `appointment.write` | transporter |
-| Armada Truk | `fleet.manage` | transporter |
-| Jadwal Hari Ini | `appointment.read.self` | driver |
-| Dashboard Gate | `gate.process` | gate-officer |
-| Kelola Slot | `slot.manage` | planner |
-| Master Data | `terminal.manage` | admin |
+| Link | Izin | Guard tambahan | Persona |
+|------|------|-----------------|---------|
+| Ketersediaan Slot | `slot.read` | — | transporter/planner/gate-officer |
+| Booking Saya | `appointment.write` | `company_id != null` | transporter |
+| Armada Truk | `fleet.manage` | `company_id != null` | transporter |
+| Laporan Perusahaan | `report.read` | `company_id != null` | transporter |
+| Jadwal Hari Ini | `appointment.read.self` | `hasRole('driver')` | driver |
+| Dashboard Gate | `gate.process` | `terminal_id != null` | gate-officer |
+| Kelola Slot | `slot.manage` | — | planner |
+| Riwayat Gate | `slot.manage` | — | planner |
+| Master Data | `terminal.manage` | — | admin |
 
 > **Layout/nav bersama sudah ada** (2026-07-08): `AppLayout` + `AppNav` sebagai parent
 > route — lihat §2 router. Kartu-kartu Dashboard tetap dipertahankan sebagai pintu masuk
