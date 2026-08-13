@@ -2,9 +2,11 @@
 
 > Dokumen ini menjelaskan **setiap potongan kode** yang dibuat (foundation + seluruh
 > slice backend MVP: booking, auth, policy, reschedule/cancel, gate-in/out,
-> no-show/reminder, realtime, endpoint pendukung, slot-window management, **hardening
-> rate-limit**, **read referensi & persona**, **admin CRUD master data**, **CRUD armada
-> truk transporter**), lengkap dengan **alasan (kenapa)** dan
+> no-show/reminder (manual + otomatis), realtime, endpoint pendukung, slot-window
+> management, **hardening rate-limit**, **read referensi & persona**, **admin CRUD
+> master data (+ edit permission role)**, **CRUD armada truk transporter**, **toleransi
+> jendela gate-in**, **audit trail (Activity Log + endpoint)**, **dwell_minutes**,
+> **riwayat gate-in/out lintas-status**), lengkap dengan **alasan (kenapa)** dan
 > **contoh**. Sasaran: kamu bisa membaca kode TAS dan paham *kenapa* ditulis begitu,
 > bukan sekadar *apa*-nya. **Kode frontend (Vue SPA) ada di `docs/FRONTEND.md`.**
 >
@@ -36,7 +38,7 @@
 - [S. Slice Hardening (rate limiting)](#s-slice-hardening-rate-limiting)
 - [T. Read Referensi (gates + fleet)](#t-slice-read-referensi-gates--fleet)
 - [U. Read endpoints persona (booking list + gate queue)](#u-read-endpoints-persona-booking-list--gate-queue)
-- [V. Admin CRUD master data (terminal/gate/company/user)](#v-admin-crud-master-data-terminalgatecompanyuser)
+- [V. Admin CRUD master data (terminal/gate/company/user/role)](#v-admin-crud-master-data-terminalgatecompanyuserrole)
 - [W. CRUD armada truk transporter (`/me/trucks`)](#w-crud-armada-truk-transporter-metrucks)
 - [X. Toleransi jendela waktu gate-in](#x-toleransi-jendela-waktu-gate-in)
 - [Y. Menguji audit trail (Activity Log)](#y-menguji-audit-trail-activity-log)
@@ -1594,12 +1596,14 @@ company) lalu balikan `AppointmentResource::collection`. Filter status ber-`Rule
 
 ---
 
-## V. Admin CRUD master data (terminal/gate/company/user)
+## V. Admin CRUD master data (terminal/gate/company/user/role)
 
 CRUD master data untuk role **admin** (`BUSINESS-FLOW.md §1`). Beda dengan slice domain
 (booking/gate) yang penuh lock & state machine, ini CRUD lurus — tapi tetap **menghormati
 layer yang sama**: controller invokable tipis → Action 1-tugas → Repository ber-interface
-→ Resource keluar. Empat entitas: `Terminal`, `Gate`, `TransportCompany`, `User`.
+→ Resource keluar. Empat entitas CRUD penuh: `Terminal`, `Gate`, `TransportCompany`,
+`User`; ditambah **V.6** — bukan CRUD, cuma edit permission dari role yang sudah ada
+(lihat kenapa di §V.6).
 
 ### V.1 Permission & route group
 Permission baru di `RolePermissionSeeder` (guard `api`): `terminal.manage`, `gate.manage`,
@@ -1682,7 +1686,7 @@ entitas (list/create/show/update/delete, **409 saat ada dependen**, 422 self-del
 **`$this->seed(RolePermissionSeeder::class)`** (method TestCase), bukan global `seed()`
 yang hanya tersedia di arrow function `fn () => seed(...)`.
 
-> **Frontend admin** (AdminPage 4-tab, `useAdmin` composable, invalidasi cache): di
+> **Frontend admin** (AdminPage 5-tab sejak §V.6, `useAdmin` composable, invalidasi cache): di
 > `docs/FRONTEND.md §4`.
 
 ### V.6 Role & Izin — edit permission, BUKAN CRUD role (2026-08-13)

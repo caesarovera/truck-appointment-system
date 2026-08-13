@@ -668,14 +668,18 @@ composer.json       scripts: test / analyse / fix / lint
 ---
 
 ### Status & langkah berikutnya
-**Backend MVP API + SPA 4 persona + admin CRUD + CRUD armada truk sudah lengkap & hijau**
-(status hidup: `HANDOVER.md`). Backend: data layer → booking (anti-race) → auth Sanctum +
-Policy → reschedule/cancel → gate-in/out → job no-show/reminder → realtime broadcast
-(+ seam TOS) → endpoint pendukung (me/today + utilisasi) → slot-window open/close →
-rate-limit hardening → master data CRUD admin → armada truk transporter (+ penegakan
-status INACTIVE & penegakan role sopir saat booking). Frontend: SPA Vue untuk transporter,
-driver, gate-officer, planner, + halaman admin & armada. Penjelasan tiap slice:
-`docs/CODE-WALKTHROUGH.md` (§J–§W backend) & `docs/FRONTEND.md` (SPA).
+**Backend MVP API + SPA 4 persona + admin CRUD (termasuk edit permission role) + CRUD
+armada truk + riwayat gate-in/out sudah lengkap & hijau** (status hidup: `HANDOVER.md` —
+angka test di situ, bukan di sini, karena akan basi lagi tiap sesi). Backend: data layer
+→ booking (anti-race) → auth Sanctum + Policy → reschedule/cancel → gate-in/out → job
+no-show/reminder (+ tandai no-show manual) → realtime broadcast (+ seam TOS) → endpoint
+pendukung (me/today + utilisasi) → slot-window open/close → rate-limit hardening →
+master data CRUD admin (+ tab Role & Izin) → armada truk transporter → toleransi jendela
+gate-in → audit trail (Activity Log + endpoint) → riwayat gate-in/out lintas-status.
+Frontend: SPA Vue untuk transporter, driver, gate-officer, planner, + halaman admin,
+armada, riwayat gate. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md` (§J–§Z backend)
+& `docs/FRONTEND.md` (SPA). **Sisa terbuka:** QR (satu-satunya janji kontrak tanpa kode
+dari audit ronde 4) — lihat `HANDOVER.md` §Langkah berikutnya.
 
 **CRUD sopir untuk transporter sengaja TIDAK dibangun** — sopir dibuat admin lewat Admin
 User CRUD. Alasan & kapan ditinjau ulang: [`adr/0006`](adr/0006-driver-management-admin-only.md).

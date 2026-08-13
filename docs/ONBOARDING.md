@@ -284,7 +284,7 @@ php artisan migrate:fresh --seed     # skema baru + data demo
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
 composer fix                         # Pint (format)
 composer analyse                     # PHPStan level 8
-composer test                        # Pest (194 hijau)
+composer test                        # Pest (244 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
 ./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
 
 # Menjalankan app
@@ -292,7 +292,7 @@ php artisan serve                    # shell + API (buka http://localhost:8000)
 npm run dev                          # Vite HMR (terminal lain)
 
 # Frontend
-npm run test:js                      # Vitest (87 hijau)
+npm run test:js                      # Vitest (107 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
