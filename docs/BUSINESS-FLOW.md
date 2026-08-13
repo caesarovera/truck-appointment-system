@@ -45,7 +45,7 @@ driver       → appointment.read.self
 | Reschedule / cancel appointment | ✅ | ⚠️ override¹ | — | ✅ (company sendiri) | — |
 | Assign sopir & truk ke appointment | ✅ | — | — | ✅ | — |
 | Gate-in / gate-out | ✅ | — | ✅ | — | — |
-| Tandai no-show | ✅ (auto job) | — | ✅ | — | — |
+| Tandai no-show (manual) + sweep otomatis² | ✅ | — | ✅ | — | — |
 | Lihat jadwal pribadi + QR | — | — | — | — | ✅ |
 | Lihat audit log | ✅ | sebagian | — | company sendiri | — |
 | Laporan utilisasi | ✅ | ✅ | — | company sendiri | — |
@@ -55,6 +55,7 @@ Aturan kritikal yang harus ditegakkan Policy/Gate Laravel:
 - Driver hanya melihat appointment di mana `driver_id = auth()->id()`.
 - Gate Officer hanya boleh proses appointment di terminal tempat ia ditugaskan.
 - ¹ Planner **tidak** punya `appointment.write` (booking self-service). Reschedule/cancel oleh planner hanya lewat `appointment.override` — administratif, boleh lintas-company, **wajib teraudit**. Bukan untuk operasional harian.
+- ² `POST /api/v1/appointments/{id}/no-show` (manual, Policy `process`) **dan** `NoShowSweepJob` (otomatis, tiap 5 menit, causer NULL) sama-sama berlaku — lihat §3.5.
 
 ---
 
@@ -129,7 +130,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 3. `POST /api/v1/appointments/{id}/gate-in` + `Idempotency-Key`.
 4. `GateInAction`: cek state `CONFIRMED`, lalu **toleransi jendela waktu** — truk hanya diterima antara `window.start − early` dan `window.end + late` (`config/tas.php → gate_in`, default 30/30 menit, batas inklusif). Di luar itu → `409 gate_in_too_early` / `gate_in_too_late`. Lolos → buat `gate_transactions` (`type=IN`), status → `ARRIVED`. Saat proses bongkar/muat dimulai di dalam terminal, status → `IN_PROGRESS` (sesuai §2). Untuk MVP keduanya boleh terjadi berurutan dalam satu aksi.
 5. Event `TruckGatedIn` → broadcast antrian, `ProcessGateEventJob` push ke TOS terminal (idempoten, cek state).
-> No-show: kalau driver tak datang sampai `window.end + grace`, `NoShowSweepJob` set `NO_SHOW` & balikin kuota — gate-in setelah itu ditolak.
+> No-show: kalau driver tak datang sampai `window.end + grace`, `NoShowSweepJob` set `NO_SHOW` & balikin kuota — gate-in setelah itu ditolak. Petugas gate juga bisa menandai **manual** lewat `POST /api/v1/appointments/{id}/no-show` (Policy `process`, scope sama dgn gate-in/out) — dipakai saat sudah jelas truk tak akan datang sebelum grace habis (mis. transporter telepon konfirmasi batal), tanpa menunggu sweep 5-menitan. Sweep tetap jalan sebagai jaring otomatis; keduanya sama-sama lewat `MarkNoShowAction` (`canMarkNoShow()`: hanya `BOOKED`/`CONFIRMED`).
 
 > **Urutan guard gate-in (dikunci test).** Idempoten dulu → state → waktu. Truk yang **sudah** di dalam tak boleh berubah jadi error hanya karena retry-nya telat (double-tap petugas gate itu normal), dan status yang salah adalah pelanggaran lebih mendasar daripada jam kedatangan — makanya `CANCELLED` yang datang kepagian tetap dilaporkan `invalid_state`, bukan `gate_in_too_early`.
 

@@ -10,18 +10,32 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-13` · Sesi: **`dwell_time` (P3, ronde 4) ditutup — `AppointmentResource` sekarang mengekspos `dwell_minutes`.** `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru, konsisten dgn `preventLazyLoading`) — null selama relasi belum di-eager-load atau gate-out belum terjadi; angka menit saat keduanya ada. 3 test Unit (`AppointmentDwellTimeTest`) + 1 test Feature (`GateOutTest`, jam dibekukan `travelTo` → assert `data.dwell_minutes`). **QR & no-show manual masih terbuka** — lihat *Senior review ronde 4* & *Langkah berikutnya*.
+- Update terakhir: `2026-08-13` · Sesi: **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→**229 Pest**). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
 - Sesi sebelumnya: `2026-08-02` · **Senior review ronde 4 (audit tasklist) + 4 temuan ditutup: toleransi jendela gate-in (P1), reminder saat reschedule (P1), test audit trail (P2), endpoint audit log (P2).** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi itu**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
 - Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
 - Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **223 pass / 579 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
+- Build backend: `composer test` → ✅ **229 pass / 593 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
 - Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **No-show manual gate-officer (2026-08-13).** Menutup temuan P2 *ronde 4*: matriks §1
+  "Tandai no-show" memberi ✅ ke gate-officer, tapi `MarkNoShowAction` **hanya** dipanggil
+  `NoShowSweepJob` — tak ada route, tak ada ability di `AppointmentPolicy` untuk petugas gate
+  menandai manual. `POST /api/v1/appointments/{id}/no-show` (baru): `MarkNoShowController` reuse
+  `MarkNoShowAction` **apa adanya** (tak ada perubahan Action/state machine), route pakai
+  ability `process` yang sama dgn gate-in/out (bukan ability baru — scope aktornya identik:
+  gate-officer di terminal appointment, admin via `before()`) + middleware `idempotency`.
+  **Sengaja tak ditambah guard idempoten no-op** seperti gate-in/out — panggilan kedua setelah
+  status berubah tetap 409 `invalid_state`, mengikuti pola `reschedule`/`cancel`, bukan
+  `gate-in`/`gate-out`; perlindungan double-tap cukup dari middleware `idempotency`. 6 test
+  Feature (`tests/Feature/Gate/MarkNoShowTest.php`: BOOKED & CONFIRMED bisa ditandai, kuota
+  balik, 409 kalau sudah gate-in/completed/cancelled, 403 lintas-terminal & non-gate-officer).
+  Docs: `BUSINESS-FLOW §3.5` (blockquote no-show + matriks §1 baris "Tandai no-show" +
+  footnote²), `CODE-WALKTHROUGH §N.6` (baru).
 - [x] **`dwell_time` diekspos sebagai `dwell_minutes` (2026-08-13).** Menutup bagian `dwell_time`
   dari temuan P3 *ronde 4* (janji kontrak `BUSINESS-FLOW §3.6` "hitung dwell_time" tanpa kode).
   `Appointment::dwellMinutes(): ?int` — dihitung dari `gateIn->processed_at` ke
@@ -396,10 +410,9 @@
   dibawa: langkah mutasi menemukan bahwa salah satu test baru itu sendiri **tidak menjaga apa pun**
   (test negatif yang lolos walau logging mati) — menambah test tanpa membuktikannya menggigit
   hanya memindahkan rasa aman, bukan menciptakannya.
-- **[TERBUKA — P2] Gate Officer tak bisa menandai no-show manual.** Matriks `§1` baris "Tandai
-  no-show" memberi ✅ ke gate-officer. `MarkNoShowAction` ada tapi **hanya** dipanggil
-  `NoShowSweepJob`; tak ada route, tak ada ability di `AppointmentPolicy`. Praktisnya petugas
-  gate harus menunggu grace period lewat.
+- **[FIXED 2026-08-13 — P2] Gate Officer sekarang bisa menandai no-show manual.**
+  `POST /api/v1/appointments/{id}/no-show`, reuse `MarkNoShowAction` + ability `process`.
+  Lihat *Sudah selesai* & `CODE-WALKTHROUGH §N.6`.
 - **[FIXED 2026-08-13 — P3] `dwell_time` diekspos sebagai `AppointmentResource.dwell_minutes`.**
   Dihitung dari `gate_transactions.processed_at` (IN→OUT) yang sudah ada sejak slice gate-in/out;
   tidak butuh migrasi baru. Lihat *Sudah selesai* & `CODE-WALKTHROUGH §N.5`.
@@ -427,11 +440,12 @@
 > di depan item infrastruktur. Alasannya sama dengan alasan CI didahulukan atas e2e (ADR-0005):
 > menambah lapisan baru di atas fondasi yang gerbangnya bolong = urutan terbalik.
 
-1. **Putuskan: no-show manual, QR (P2/P3, ronde 4).** `dwell_time` sudah **[FIXED 2026-08-13]**.
-   Sisa dua janji kontrak tanpa kode: no-show manual (`MarkNoShowAction` sudah ada, tinggal
-   wiring route+Policy — kecil) dan QR (perlu klarifikasi scope dulu — lihat *Senior review
-   ronde 4*). Bangun **atau** persempit scope lewat ADR — ADR-0006 sudah jadi preseden bagus.
-   Yang penting kontrak berhenti menjanjikan yang tak dibangun; keduanya jawaban yang sah.
+1. **Putuskan: QR (P3, ronde 4) — satu-satunya sisa janji kontrak tanpa kode.**
+   `dwell_time` **[FIXED 2026-08-13]**, no-show manual **[FIXED 2026-08-13]**. QR perlu
+   klarifikasi scope dulu sebelum kode: representasi visual `booking_code` yang sudah ada
+   (murni FE, kecil) vs token ter-sign + endpoint verifikasi baru (lebih besar) — lihat
+   *Senior review ronde 4*. Bangun sesuai jawabannya, **atau** persempit scope lewat ADR
+   seperti preseden ADR-0006.
 2. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
 3. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
 4. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
@@ -441,7 +455,17 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
-- `2026-08-13`: **`dwell_time` (ronde 4, P3) ditutup.** Kode: `Appointment::dwellMinutes()`
+- `2026-08-13` (2): **No-show manual gate-officer (ronde 4, P2) ditutup.** Kode:
+  `MarkNoShowController` (baru), route `POST appointments/{id}/no-show`
+  (`routes/api.php`) reuse ability `process` + middleware `idempotency` — **tak ada**
+  perubahan `MarkNoShowAction`/`AppointmentPolicy`. Test: `tests/Feature/Gate/MarkNoShowTest.php`
+  (baru, 6 test). Docs: `BUSINESS-FLOW §1` (matriks baris "Tandai no-show" + footnote²) & `§3.5`
+  (blockquote no-show diperluas), `CODE-WALKTHROUGH §N.6` (baru), `HANDOVER`
+  §Status/§Sudah selesai/§Senior review ronde 4 (temuan FIXED)/§Langkah berikutnya (item 1
+  dipersempit ke QR saja — satu-satunya sisa). Seeder: tak ada. **Alasan:** matriks §1 sudah
+  lama menjanjikan ✅ ke gate-officer tapi `MarkNoShowAction` cuma bisa dipanggil `NoShowSweepJob`
+  — petugas gate harus menunggu grace period lewat walau sudah tahu truk tak akan datang.
+- `2026-08-13` (1): **`dwell_time` (ronde 4, P3) ditutup.** Kode: `Appointment::dwellMinutes()`
   (baru), `AppointmentResource` (+`dwell_minutes`). Test: `tests/Unit/AppointmentDwellTimeTest.php`
   (baru, 3 test) + `GateOutTest` (+1 test). Docs: `BUSINESS-FLOW §3.6` (nama field diklarifikasi),
   `CODE-WALKTHROUGH §N.5` (baru), `HANDOVER` §Status/§Sudah selesai/§Senior review ronde 4

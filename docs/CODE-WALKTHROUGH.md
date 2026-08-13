@@ -1095,6 +1095,22 @@ Dipanggil telanjang di `AppointmentResource` (`'dwell_minutes' => $this->dwellMi
 jadi lapis `whenLoaded` di Resource cuma akan menduplikasi guard yang sama. Tidak ada kolom/
 migrasi baru: datanya sudah ada di `gate_transactions.processed_at` sejak slice gate-in/out.
 
+### N.6 No-show manual — reuse `MarkNoShowAction`, `process` ability
+`MarkNoShowAction` sudah ada sejak slice sweep (bagian O), dipanggil per appointment oleh
+`NoShowSweepJob`. Endpoint manual (`BUSINESS-FLOW §3.5`) cuma menambah jalur HTTP kedua ke
+Action yang sama — **tidak** ada perubahan di Action/state machine:
+```php
+Route::post('appointments/{appointment}/no-show', MarkNoShowController::class)
+    ->middleware(['can:process,appointment', 'idempotency']);
+```
+`can:process` = ability yang sama dgn gate-in/out (gate-officer di terminal appointment, admin
+via `before()`) — bukan ability baru, karena aktor & scope-nya identik. Bedanya dgn gate-in/out:
+`MarkNoShowAction` **tidak** punya guard idempoten no-op (`isGatedIn`-style) — panggilan kedua
+setelah status berubah akan 409 `invalid_state`, bukan 200 no-op. Ini sengaja dibiarkan
+mengikuti pola `reschedule`/`cancel` (bukan `gate-in`/`gate-out`): perlindungan double-tap
+cukup lewat middleware `idempotency` (replay Idempotency-Key sama), tanpa menambah cabang baru
+ke Action yang sudah ber-test lewat sweep job.
+
 ---
 
 ## O. Slice Job No-show & Reminder (scheduler + queue)

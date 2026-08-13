@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
 use App\Http\Controllers\Api\V1\GateQueueController;
 use App\Http\Controllers\Api\V1\ListGatesController;
+use App\Http\Controllers\Api\V1\MarkNoShowController;
 use App\Http\Controllers\Api\V1\MyAppointmentsController;
 use App\Http\Controllers\Api\V1\MyFleetController;
 use App\Http\Controllers\Api\V1\MyTodayAppointmentsController;
@@ -89,6 +90,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('appointments/{appointment}/gate-in', GateInController::class)
             ->middleware(['can:process,appointment', 'idempotency']);
         Route::post('appointments/{appointment}/gate-out', GateOutController::class)
+            ->middleware(['can:process,appointment', 'idempotency']);
+        // Tandai no-show manual (BUSINESS-FLOW §3.5) — sama scope otorisasi dgn
+        // gate-in/out; NoShowSweepJob tetap jalan sbg jaring otomatis (grace period).
+        Route::post('appointments/{appointment}/no-show', MarkNoShowController::class)
             ->middleware(['can:process,appointment', 'idempotency']);
 
         // Endpoint pendukung
