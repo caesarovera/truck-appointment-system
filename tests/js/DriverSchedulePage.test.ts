@@ -10,8 +10,12 @@ const state = {
 };
 
 vi.mock('@/composables/useTodaySchedule', () => ({ useTodaySchedule: () => state }));
+// AppointmentQrCode dites terpisah (AppointmentQrCode.test.ts) — di sini cukup
+// pastikan halaman merender/tak merender komponennya, bukan isi QR-nya.
+vi.mock('qrcode', () => ({ default: { toCanvas: vi.fn().mockResolvedValue(undefined) } }));
 
 import DriverSchedulePage from '@/pages/DriverSchedulePage.vue';
+import AppointmentQrCode from '@/components/AppointmentQrCode.vue';
 
 function appointment(id: number, startTime: string, gateName: string): Appointment {
     const slotWindow: SlotWindow = {
@@ -67,6 +71,20 @@ describe('DriverSchedulePage', () => {
         expect(rows[0].text()).toContain('08:00');
         expect(rows[0].text()).toContain('Gate A');
         expect(rows[1].text()).toContain('10:00');
+    });
+
+    it('shows the QR code only when the backend provided a qr_token', () => {
+        const withToken = appointment(1, '08:00:00', 'Gate A');
+        withToken.qr_token = 'signed.token';
+        const withoutToken = appointment(2, '10:00:00', 'Gate B');
+
+        state.appointments.value = [withToken, withoutToken];
+
+        const wrapper = mountPage();
+        const rows = wrapper.findAll('[data-testid="schedule-row"]');
+
+        expect(rows[0].findComponent(AppointmentQrCode).exists()).toBe(true);
+        expect(rows[1].findComponent(AppointmentQrCode).exists()).toBe(false);
     });
 
     it('shows an error alert when the query fails', () => {

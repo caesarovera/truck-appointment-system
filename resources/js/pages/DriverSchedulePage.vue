@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import { useTodaySchedule } from '@/composables/useTodaySchedule';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import AppointmentQrCode from '@/components/AppointmentQrCode.vue';
 
 const { appointments, isLoading, isError } = useTodaySchedule();
 
@@ -35,7 +36,7 @@ const today = new Date().toISOString().slice(0, 10);
                 <li
                     v-for="a in sorted"
                     :key="a.id"
-                    class="bg-white rounded-lg border p-4 flex items-center justify-between"
+                    class="bg-white rounded-lg border p-4 flex items-center justify-between gap-4"
                     data-testid="schedule-row"
                 >
                     <div class="space-y-1">
@@ -49,8 +50,11 @@ const today = new Date().toISOString().slice(0, 10);
                             {{ a.move_type }} · {{ a.booking_code }}
                             <template v-if="a.containers[0]"> · {{ a.containers[0].container_no }}</template>
                         </p>
+                        <span class="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700 inline-block">{{ a.status }}</span>
                     </div>
-                    <span class="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{{ a.status }}</span>
+                    <!-- Tunjukkan ini di gate (BUSINESS-FLOW §3.4) — hanya muncul kalau
+                         backend eager-load slot_window (butuh itu utk hitung TTL token). -->
+                    <AppointmentQrCode v-if="a.qr_token" :qr-token="a.qr_token" />
                 </li>
             </ul>
         </main>

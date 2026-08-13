@@ -10,6 +10,7 @@
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
+        "@types/qrcode": "^1.5.6",
         "@vitejs/plugin-vue": "^5.2.4",
         "@vue/test-utils": "^2.4.11",
         "@vue/tsconfig": "^0.9.1",
@@ -28,6 +29,7 @@
         "laravel-echo": "^2.4.0",
         "pinia": "^3.0.4",
         "pusher-js": "^8.6.0",
+        "qrcode": "^1.5.4",
         "vue": "^3.5.39",
         "vue-router": "^4.6.4"
     }

@@ -224,6 +224,9 @@ export interface UpdateUserPayload {
 export interface Appointment {
     id: number;
     booking_code: string;
+    // Token QR ter-sign (BUSINESS-FLOW §3.4) — sama syarat eager-load dgn
+    // gate_in_at/dwell_minutes di bawah (butuh slot_window untuk hitung TTL).
+    qr_token?: string | null;
     status: string;
     move_type: MoveType;
     version: number;
