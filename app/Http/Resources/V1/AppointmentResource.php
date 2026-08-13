@@ -30,6 +30,7 @@ final class AppointmentResource extends JsonResource
             // Jejak gate (muncul setelah gate-in/out di-eager-load).
             'gate_in_at' => $this->whenLoaded('gateIn', fn () => $this->gateIn?->processed_at),
             'gate_out_at' => $this->whenLoaded('gateOut', fn () => $this->gateOut?->processed_at),
+            'dwell_minutes' => $this->dwellMinutes(),
             'created_at' => $this->created_at,
         ];
     }

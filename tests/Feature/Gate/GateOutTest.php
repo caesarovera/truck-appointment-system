@@ -18,6 +18,7 @@ use Laravel\Sanctum\Sanctum;
 
 use function Pest\Laravel\postJson;
 use function Pest\Laravel\seed;
+use function Pest\Laravel\travelTo;
 
 beforeEach(fn () => seed(RolePermissionSeeder::class));
 
@@ -77,6 +78,31 @@ it('is idempotent: a second gate-out does not create a duplicate transaction', f
         ->assertJsonPath('data.status', 'COMPLETED');
 
     expect(GateTransaction::query()->where('appointment_id', $appointment->id)->where('type', 'OUT')->count())->toBe(1);
+});
+
+it('returns dwell_minutes computed from gate-in to gate-out (BUSINESS-FLOW §3.6)', function (): void {
+    $terminal = Terminal::factory()->create();
+    $gate = Gate::factory()->create(['terminal_id' => $terminal->id]);
+    $window = SlotWindow::factory()->create(['gate_id' => $gate->id, 'capacity' => 5, 'booked_count' => 1]);
+    $company = TransportCompany::factory()->create();
+    $appointment = Appointment::factory()->create([
+        'company_id' => $company->id,
+        'slot_window_id' => $window->id,
+        'status' => 'IN_PROGRESS',
+    ]);
+
+    travelTo(today()->setTime(9, 0));
+    GateTransaction::factory()->create(['appointment_id' => $appointment->id, 'processed_at' => now()]);
+
+    $officer = User::factory()->create(['terminal_id' => $terminal->id]);
+    $officer->assignRole('gate-officer');
+    Sanctum::actingAs($officer);
+
+    travelTo(today()->setTime(9, 45));
+
+    postJson("/api/v1/appointments/{$appointment->id}/gate-out")
+        ->assertOk()
+        ->assertJsonPath('data.dwell_minutes', 45);
 });
 
 it('refuses to gate-out an appointment that is not in progress (409)', function (): void {

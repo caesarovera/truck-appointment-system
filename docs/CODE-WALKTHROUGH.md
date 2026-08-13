@@ -1076,6 +1076,25 @@ Route::post('appointments/{appointment}/gate-in', GateInController::class)
 listener `ProcessGateEventOnTos` menangkap keduanya lewat type-hint interface lalu
 mendorong `ProcessGateEventJob` (detail efek eksternal di bagian P).
 
+### N.5 `dwell_minutes` — dihitung, bukan disimpan (BUSINESS-FLOW §3.6)
+```php
+// Appointment::dwellMinutes()
+public function dwellMinutes(): ?int
+{
+    if (! $this->relationLoaded('gateIn') || ! $this->relationLoaded('gateOut')) {
+        return null;                          // hindari lazy-load tak sengaja
+    }
+    if (! $this->gateIn || ! $this->gateOut) {
+        return null;                          // belum gate-out
+    }
+    return (int) $this->gateIn->processed_at->diffInMinutes($this->gateOut->processed_at);
+}
+```
+Dipanggil telanjang di `AppointmentResource` (`'dwell_minutes' => $this->dwellMinutes()`) —
+**bukan** `whenLoaded()`, karena method itu sendiri sudah menjaga relasi belum dimuat → null,
+jadi lapis `whenLoaded` di Resource cuma akan menduplikasi guard yang sama. Tidak ada kolom/
+migrasi baru: datanya sudah ada di `gate_transactions.processed_at` sejak slice gate-in/out.
+
 ---
 
 ## O. Slice Job No-show & Reminder (scheduler + queue)

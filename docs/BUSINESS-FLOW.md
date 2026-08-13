@@ -137,8 +137,13 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 
 ### 3.6 Gate Officer: gate-out
 1. Setelah bongkar/muat selesai → `POST /api/v1/appointments/{id}/gate-out`.
-2. `GateOutAction`: cek state `IN_PROGRESS` → `gate_transactions` (`type=OUT`), status → `COMPLETED`, hitung `dwell_time`.
+2. `GateOutAction`: cek state `IN_PROGRESS` → `gate_transactions` (`type=OUT`), status → `COMPLETED`.
 3. Event `TruckGatedOut` → broadcast, update metrik utilisasi.
+
+> **`dwell_time`:** bukan kolom tersimpan — `AppointmentResource.dwell_minutes` dihitung on-the-fly
+> dari `gate_in_at`/`gate_out_at` (`Appointment::dwellMinutes()`), null selagi truk belum gate-out
+> atau relasi gate belum di-eager-load. Muncul di respons `gate-in`/`gate-out` (keduanya
+> `->load(['gateIn','gateOut'])`) dan endpoint manapun yang eager-load kedua relasi itu.
 
 ### 3.7 Monitoring & audit
 - Planner: `GET /api/v1/reports/utilization?gate=&date=` → kuota vs terpakai vs no-show.

@@ -74,6 +74,25 @@ class Appointment extends Model
         return in_array($this->status, [AppointmentStatus::ARRIVED, AppointmentStatus::IN_PROGRESS], true);
     }
 
+    /**
+     * Durasi truk di terminal (gate-in → gate-out), dalam menit (BUSINESS-FLOW §3.6).
+     * Null bila `gateIn`/`gateOut` belum di-eager-load, atau gate-out belum terjadi.
+     * Sengaja dihitung dari relasi yang sudah dimuat (bukan query baru) supaya
+     * konsisten dengan `preventLazyLoading` non-production.
+     */
+    public function dwellMinutes(): ?int
+    {
+        if (! $this->relationLoaded('gateIn') || ! $this->relationLoaded('gateOut')) {
+            return null;
+        }
+
+        if (! $this->gateIn || ! $this->gateOut) {
+            return null;
+        }
+
+        return (int) $this->gateIn->processed_at->diffInMinutes($this->gateOut->processed_at);
+    }
+
     /** @return BelongsTo<TransportCompany, $this> */
     public function company(): BelongsTo
     {
