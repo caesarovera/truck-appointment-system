@@ -31,6 +31,7 @@ const slotWindow: SlotWindow = {
     booked_count: 3,
     remaining: 7,
     status: 'OPEN',
+    ended: false,
 };
 
 const mountForm = () => mount(BookingForm, { props: { slotWindow } });
@@ -95,7 +96,24 @@ describe('BookingForm', () => {
         expect(wrapper.emitted('booked')?.[0]?.[0]).toMatchObject({ booking_code: 'TAS-XYZ12345' });
     });
 
-    it('maps a 409 slot_unavailable error to a friendly message', async () => {
+    it('shows the backend message for a 409 slot_unavailable (distinguishes full/closed/expired)', async () => {
+        booking.mutateAsync.mockRejectedValue({
+            isAxiosError: true,
+            response: { data: { error: 'slot_unavailable', message: 'Slot window sudah berakhir.' } },
+        });
+
+        const wrapper = mountForm();
+        await fillValidForm(wrapper);
+        await wrapper.find('form').trigger('submit.prevent');
+        await flushPromises();
+
+        // Bukan teks generik "penuh atau ditutup" — pesan spesifik dari backend
+        // yang membedakan penyebabnya (SlotUnavailableException::expired()).
+        expect(wrapper.find('[role="alert"]').text()).toBe('Slot window sudah berakhir.');
+        expect(wrapper.emitted('booked')).toBeUndefined();
+    });
+
+    it('falls back to a generic message when slot_unavailable has no message', async () => {
         booking.mutateAsync.mockRejectedValue({
             isAxiosError: true,
             response: { data: { error: 'slot_unavailable' } },
@@ -106,7 +124,6 @@ describe('BookingForm', () => {
         await wrapper.find('form').trigger('submit.prevent');
         await flushPromises();
 
-        expect(wrapper.find('[role="alert"]').text()).toContain('Slot sudah penuh');
-        expect(wrapper.emitted('booked')).toBeUndefined();
+        expect(wrapper.find('[role="alert"]').text()).toContain('Slot tidak tersedia');
     });
 });

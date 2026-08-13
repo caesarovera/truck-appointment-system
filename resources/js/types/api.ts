@@ -41,6 +41,9 @@ export interface SlotWindow {
     booked_count: number;
     remaining: number;
     status: SlotWindowStatus;
+    // true = window.end sudah lewat walau status masih OPEN — booking ditolak
+    // 409 server-side (BookAppointmentAction); FE pakai ini untuk badge/tombol.
+    ended: boolean;
     // Hanya hadir saat relasi gate di-eager-load (mis. jadwal driver).
     gate?: Gate | null;
 }

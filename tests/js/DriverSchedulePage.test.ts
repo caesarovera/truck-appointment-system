@@ -24,6 +24,7 @@ function appointment(id: number, startTime: string, gateName: string): Appointme
         booked_count: 1,
         remaining: 9,
         status: 'OPEN',
+        ended: false,
         gate: { id: 1, terminal_id: 1, code: 'GATE-A', name: gateName },
     };
 

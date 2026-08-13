@@ -24,6 +24,10 @@ final class SlotWindowResource extends JsonResource
             'booked_count' => $this->booked_count,
             'remaining' => $this->remaining(),
             'status' => $this->status->value,
+            // Window OPEN tapi window.end sudah lewat: masih ada kuota di DB, tapi
+            // TIDAK bisa dibooking (BookAppointmentAction menolak 409 slot_unavailable).
+            // FE pakai ini supaya badge "Tersedia" tak menyesatkan (BUSINESS-FLOW §3.2).
+            'ended' => $this->hasEnded(),
             // Hanya muncul bila relasi gate di-eager-load (mis. jadwal driver) —
             // driver perlu tahu gate tujuan. Tak menambah query di endpoint lain.
             'gate' => $this->whenLoaded('gate', fn () => GateResource::make($this->gate)),

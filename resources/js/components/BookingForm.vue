@@ -56,7 +56,9 @@ async function submit(): Promise<void> {
 function extractError(e: unknown): string {
     if (isAxiosError(e)) {
         const data = e.response?.data as { error?: string; message?: string } | undefined;
-        if (data?.error === 'slot_unavailable') return 'Slot sudah penuh atau ditutup.';
+        // Backend sudah kirim pesan spesifik per alasan (penuh/ditutup/berakhir —
+        // lihat SlotUnavailableException) — jangan ditimpa teks generik di sini.
+        if (data?.error === 'slot_unavailable') return data?.message ?? 'Slot tidak tersedia.';
         if (data?.error === 'duplicate_booking') return 'Kontainer ini sudah dibooking di window tersebut.';
         return data?.message ?? 'Booking gagal. Periksa data lalu coba lagi.';
     }

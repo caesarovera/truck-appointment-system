@@ -10,18 +10,39 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-13` · Sesi: **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→**229 Pest**). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
+- Update terakhir: `2026-08-13` (2) · Sesi: **Bug ditemukan saat verifikasi realtime manual → fix: badge "Tersedia" & pesan error booking tak bedakan window yang sudah berakhir.** `SlotWindowResource` diam-diam tak pernah expose bahwa window `OPEN` bisa saja `window.end`-nya sudah lewat (`SlotWindow::hasEnded()` sudah ada sejak ronde 2, cuma dipakai `BookAppointmentAction`) — akibatnya FE `/slots` menampilkan badge **"Tersedia"** + tombol Booking untuk window yang **pasti** ditolak 409 server-side, dan pesan error-nya generik ("penuh atau ditutup") walau backend sudah kirim alasan spesifik. Fix: `SlotWindowResource` + `ended`, FE badge baru **"Berakhir"** (menang atas sisa kuota) + tombol Booking disembunyikan, `BookingForm` pakai `message` asli dari backend alih-alih teks hardcode. 2 test Pest + 3 test Vitest baru (229→**231 Pest**, +2 Vitest → **89 Vitest**). Lihat *Sudah selesai*.
+- Sesi sebelumnya: `2026-08-13` (1) · **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→229 Pest). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
 - Sesi sebelumnya: `2026-08-02` · **Senior review ronde 4 (audit tasklist) + 4 temuan ditutup: toleransi jendela gate-in (P1), reminder saat reschedule (P1), test audit trail (P2), endpoint audit log (P2).** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi itu**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
 - Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
 - Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **229 pass / 593 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **87 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build backend: `composer test` → ✅ **231 pass / 597 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
+- Build frontend: `npm run test:js` → ✅ **89 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Badge "Tersedia" & pesan error booking dibedakan dari window yang sudah berakhir
+  (2026-08-13).** Bug ditemukan saat verifikasi realtime manual (§Langkah berikutnya #2):
+  `SlotWindow::hasEnded()` sudah ditegakkan `BookAppointmentAction` sejak ronde 2, tapi
+  **tak pernah diekspos ke API** — `SlotWindowResource` cuma punya `remaining`/`status`.
+  Akibatnya window `OPEN` yang `window.end`-nya sudah lewat tetap tampil badge **"Tersedia"**
+  + tombol Booking di `/slots`, dan begitu diklik selalu 409 dengan pesan generik ("Slot sudah
+  penuh atau ditutup") walau `SlotUnavailableException` sebenarnya sudah kirim pesan spesifik
+  (`full()`/`closed()`/`expired()`). Fix: `SlotWindowResource` +`ended` (dari `hasEnded()`,
+  murni baca kolom yang sudah dimuat — bukan query baru); `SlotAvailabilityPage` badge baru
+  **"Berakhir"** (menang atas sisa kuota — window besok kuota penuh tapi tanggalnya sudah
+  lewat tetap "Berakhir") + tombol Booking disembunyikan bila `ended`; `BookingForm` pakai
+  `message` asli dari backend utk `slot_unavailable` alih-alih teks hardcode generik. 2 test
+  Pest baru (`SlotAvailabilityTest`: window berakhir → `ended:true`, window belum mulai →
+  `ended:false`) + 3 test Vitest (badge "Berakhir" + tombol tersembunyi, pesan backend tampil
+  verbatim, fallback generik kalau `message` kosong). **Pola bug ini segolongan dengan beberapa
+  temuan *Senior review* sebelumnya** (mis. `TruckStatus::INACTIVE` yang cuma disaring
+  repository tapi tak dicek Action, `driver_id` role): aturan ditegakkan di satu tempat tapi
+  tak pernah dicerminkan ke representasi lain yang seharusnya ikut tunduk — di sini bukan dua
+  layer backend, tapi Action (benar) vs Resource/FE (ketinggalan), kelasnya tetap sama:
+  kontrak yang "sudah ditegakkan" ternyata cuma ditegakkan sebagian.
 - [x] **No-show manual gate-officer (2026-08-13).** Menutup temuan P2 *ronde 4*: matriks §1
   "Tandai no-show" memberi ✅ ke gate-officer, tapi `MarkNoShowAction` **hanya** dipanggil
   `NoShowSweepJob` — tak ada route, tak ada ability di `AppointmentPolicy` untuk petugas gate
@@ -446,7 +467,7 @@
    (murni FE, kecil) vs token ter-sign + endpoint verifikasi baru (lebih besar) — lihat
    *Senior review ronde 4*. Bangun sesuai jawabannya, **atau** persempit scope lewat ADR
    seperti preseden ADR-0006.
-2. **Verifikasi realtime end-to-end di browser** (sisa dari wiring): set `BROADCAST_CONNECTION=reverb` di `.env`, `composer dev` (server+queue:listen+vite) + `php artisan reverb:start` (**Windows native, TANPA Docker**). Buka `/slots` di 2 browser (2 akun transporter, `docs/DUMMY-DATA.md`) → booking di satu → sisa kuota di lain berubah sendiri. Kode klien sudah siap (`echo.ts`/`useRealtime`); yang belum: dilihat mata di browser. Optional: swap `LoggingGateEventGateway` → TOS riil.
+2. **[SELESAI 2026-08-13] Verifikasi realtime end-to-end di browser.** `BROADCAST_CONNECTION=reverb`, `composer dev` + `php artisan reverb:start`, booking di satu browser (`dispatcher@majulog.test`) → sisa kuota berubah sendiri **tanpa refresh** di browser lain (`dispatcher@sinarkargo.test`) — **dikonfirmasi manual oleh user**. Verifikasi ini sekaligus menemukan 2 bug nyata (dicatat terpisah di *Sudah selesai*): (a) `DemoSeeder` pakai `Carbon::today()` saat di-seed → data demo jadi basi kalau DB tak di-`migrate:fresh --seed` ulang belakangan (bukan bug kode, tapi jebakan operasional — lihat §Jebakan); (b) badge "Tersedia" & pesan error tak bedakan window yang sudah berakhir. `BROADCAST_CONNECTION` dev **masih `reverb`** selesai sesi ini (dipakai ulang utk verifikasi fix badge "Berakhir") — kembalikan ke `log` (default `CLAUDE.md §Stack`) begitu sesi testing selesai. Swap ke TOS riil (`LoggingGateEventGateway`) masih opsional, belum dikerjakan.
 3. **Polish UI — sisa: e2e happy-path → DITUNDA SADAR (ADR-0005).** Loading skeleton **DONE**. E2E tidak dikerjakan karena menambah lapisan uji keempat di atas fondasi yang (waktu itu) belum punya penegak otomatis = urutan terbalik; CI didahulukan. **Prasyarat sebelum e2e dipasang** (supaya tak jadi utang baru): (a) `.env.e2e` + DB terpisah — dev pakai file SQLite, `migrate:fresh --seed` untuk e2e akan menghapus data dev; (b) `data-testid` di `LoginPage.vue` & `BookingForm.vue` (keduanya kini **0**, padahal justru jalur happy-path). Pemicu mengerjakannya ada di ADR-0005 → *Kapan ditinjau ulang*.
 4. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
 5. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
@@ -455,6 +476,21 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-13` (3): **Fix: badge "Tersedia" & pesan error booking tak bedakan window yang
+  sudah berakhir.** Ditemukan saat verifikasi realtime manual (bukan dari audit dokumen —
+  dari user benar-benar coba booking dan bingung kenapa ditolak). Kode:
+  `SlotWindowResource` (+`ended`), `SlotAvailabilityPage.vue` (badge "Berakhir" + tombol
+  Booking disembunyikan), `BookingForm.vue` (pakai `message` backend, bukan teks hardcode).
+  Test: `tests/Feature/Slots/SlotAvailabilityTest.php` (+2), `tests/js/SlotAvailabilityPage.test.ts`
+  (+1), `tests/js/BookingForm.test.ts` (1 diganti jadi 2 — pesan spesifik + fallback generik).
+  231 Pest / 89 Vitest hijau, PHPStan lvl 8 bersih, vue-tsc bersih, `npm run build` sukses.
+  Docs: `HANDOVER` §Status/§Sudah selesai/§Langkah berikutnya (item 2 realtime jadi SELESAI)/
+  §Jebakan (realtime terverifikasi + `DemoSeeder` basi dicatat terpisah). **Tidak** menyentuh
+  `BUSINESS-FLOW`/`CODE-WALKTHROUGH` — ini bugfix representasi (Resource/FE), bukan aturan
+  bisnis baru; `SlotWindow::hasEnded()` sendiri sudah didokumentasikan sejak ronde 2. Seeder:
+  tak ada. **Alasan:** `hasEnded()` ditegakkan `BookAppointmentAction` sejak lama tapi tak
+  pernah dicerminkan ke API/FE — window `OPEN` yang sudah lewat `window.end` tampak "Tersedia"
+  dan bisa diklik, tapi selalu 409 dengan pesan generik yang menyembunyikan sebab aslinya.
 - `2026-08-13` (2): **No-show manual gate-officer (ronde 4, P2) ditutup.** Kode:
   `MarkNoShowController` (baru), route `POST appointments/{id}/no-show`
   (`routes/api.php`) reuse ability `process` + middleware `idempotency` — **tak ada**
@@ -812,12 +848,26 @@
   Horizon hanya dashboard pemantau. Jadi **realtime TIDAK butuh Docker**. Docker tetap relevan nanti
   utk paritas produksi (Redis `Cache::tags`, Horizon, MySQL) — sesi tersendiri. `composer install` di
   Windows tetap perlu `--ignore-platform-req` selama Horizon terpasang.
-- **Realtime: server + klien sudah tersambung (2026-07-25); tinggal verifikasi mata di browser.**
-  `ShouldBroadcast` event + listener + channel auth (`auth:sanctum`) + klien Echo (`echo.ts`/`useRealtime`)
-  semua jadi & ber-test. Untuk menyalakan: (1) `BROADCAST_CONNECTION=reverb` di `.env` (default masih
-  `log` supaya dev Windows tak butuh worker); (2) `php artisan reverb:start` (native) + `composer dev`
+- **Realtime: TERVERIFIKASI end-to-end di browser (2026-08-13).** `ShouldBroadcast` event + listener +
+  channel auth (`auth:sanctum`) + klien Echo (`echo.ts`/`useRealtime`) — booking di satu browser
+  (`dispatcher@majulog.test`) memicu sisa kuota berubah **tanpa refresh** di browser lain
+  (`dispatcher@sinarkargo.test`), dikonfirmasi manual oleh user. Cara menyalakan: (1)
+  `BROADCAST_CONNECTION=reverb` di `.env` (default dev tetap `log` — jangan lupa `php artisan
+  config:clear` setelah ganti, config di-cache); (2) `php artisan reverb:start` (native) + `composer dev`
   (queue:listen jalan — **`ShouldBroadcast` ke queue dulu, tanpa worker event DIAM tanpa error**);
-  (3) buka SPA. Push TOS masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
+  (3) buka SPA di 2 profil/browser beda, login 2 akun transporter beda, gate+tanggal sama. **Reverb
+  sempat exit sendiri (code 0, tanpa error)** saat `migrate:fresh` dijalankan bersamaan — restart manual
+  `php artisan reverb:start` kalau kejadian lagi; penyebab pastinya belum ditelusuri (mungkin re-lock
+  file DB atau proses ter-drop bersama `migrate:fresh` di Windows). Push TOS masih
+  `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
+- **`DemoSeeder` pakai `Carbon::today()` — data demo basi kalau DB tak di-seed ulang.** Ditemukan
+  2026-08-13 saat verifikasi realtime: window contoh dibuat relatif ke tanggal **saat `--seed`
+  dijalankan**, bukan tanggal absolut. DB yang di-seed sebulan lalu (mis. 2026-07-06) tidak akan
+  punya window untuk hari ini — `/slots` tampak kosong padahal bukan bug. **Bukan bug kode** (ini
+  memang perilaku `Carbon::today()` yang disengaja — factory lain di proyek ini, mis.
+  `SlotWindowFactory`, punya alasan serupa untuk pakai tanggal relatif), tapi jebakan operasional:
+  kalau demo/testing manual terasa aneh ("kok slot-nya kosong terus"), jalankan
+  `php artisan migrate:fresh --seed` dulu **sebelum** curiga ke kode.
 - **Cek status CI tanpa `gh` — `gh` TIDAK terpasang di mesin dev ini** (sudah dicek: tak ada di
   PATH PowerShell maupun 3 lokasi instalasi umum). Itu **bukan** alasan untuk bilang "status CI tak
   bisa diverifikasi": repo ini **publik**, jadi REST API GitHub terbaca tanpa token/autentikasi.

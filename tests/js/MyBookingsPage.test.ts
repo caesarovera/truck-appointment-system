@@ -33,6 +33,7 @@ function appointment(overrides: Partial<Appointment>): Appointment {
             booked_count: 3,
             remaining: 7,
             status: 'OPEN',
+            ended: false,
         },
         truck: { id: 1, plate_no: 'B 9011 XX', status: 'ACTIVE' },
         driver: { id: 2, name: 'Budi' },

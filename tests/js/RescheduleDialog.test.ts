@@ -30,6 +30,7 @@ function slotWindow(overrides: Partial<SlotWindow>): SlotWindow {
         booked_count: 3,
         remaining: 7,
         status: 'OPEN',
+        ended: false,
         ...overrides,
     };
 }

@@ -54,6 +54,7 @@ function window(overrides: Partial<SlotWindow>): SlotWindow {
         booked_count: 3,
         remaining: 7,
         status: 'OPEN',
+        ended: false,
         ...overrides,
     };
 }
@@ -106,6 +107,21 @@ describe('SlotAvailabilityPage', () => {
         expect(wrapper.text()).toContain('08:00–09:00');
         expect(wrapper.text()).toContain('Tersedia'); // window 1: remaining > 0
         expect(wrapper.text()).toContain('Penuh'); // window 2: remaining 0
+    });
+
+    it('flags an ended window as "Berakhir" and hides the Booking button even with quota left', () => {
+        canPermissions = ['appointment.write'];
+        state.windows.value = [
+            window({ id: 1, start_time: '08:00:00', end_time: '09:00:00', remaining: 4, ended: true }),
+        ];
+
+        const wrapper = mountPage();
+
+        // "Ended" menang atas sisa kuota: bukan "Tersedia" walau remaining > 0,
+        // dan tombol Booking tak muncul (backend akan menolak 409 kalau dipaksa).
+        expect(wrapper.text()).toContain('Berakhir');
+        expect(wrapper.text()).not.toContain('Tersedia');
+        expect(wrapper.find('[data-testid="book-button"]').exists()).toBe(false);
     });
 
     it('shows an empty state when there are no open windows', () => {

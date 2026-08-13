@@ -33,6 +33,18 @@ function onBooked(appointment: BookedAppointment): void {
     lastBooking.value = appointment;
     selected.value = null;
 }
+
+// Urutan cek: ended dulu (window.end sudah lewat menang atas sisa kuota — window
+// besok dgn kuota penuh tetap "Berakhir" kalau tanggalnya sudah lewat), baru kuota.
+function badgeLabel(w: SlotWindow): string {
+    if (w.ended) return 'Berakhir';
+    return w.remaining > 0 ? 'Tersedia' : 'Penuh';
+}
+
+function badgeClass(w: SlotWindow): string {
+    if (w.ended) return 'bg-gray-100 text-gray-600';
+    return w.remaining > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+}
 </script>
 
 <template>
@@ -92,16 +104,16 @@ function onBooked(appointment: BookedAppointment): void {
                         <span class="font-medium text-gray-900">{{ w.start_time.slice(0, 5) }}–{{ w.end_time.slice(0, 5) }}</span>
                         <span
                             class="text-xs rounded-full px-2 py-0.5"
-                            :class="w.remaining > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                            :class="badgeClass(w)"
                         >
-                            {{ w.remaining > 0 ? 'Tersedia' : 'Penuh' }}
+                            {{ badgeLabel(w) }}
                         </span>
                     </div>
                     <p class="text-sm text-gray-600">
                         Sisa <strong>{{ w.remaining }}</strong> dari {{ w.capacity }} slot
                     </p>
                     <button
-                        v-if="canBook && w.remaining > 0"
+                        v-if="canBook && w.remaining > 0 && !w.ended"
                         type="button"
                         class="w-full rounded-md bg-indigo-600 text-white py-1.5 text-sm font-medium hover:bg-indigo-700"
                         data-testid="book-button"
