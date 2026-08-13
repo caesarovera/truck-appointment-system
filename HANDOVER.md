@@ -10,7 +10,8 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-13` (2) · Sesi: **Bug ditemukan saat verifikasi realtime manual → fix: badge "Tersedia" & pesan error booking tak bedakan window yang sudah berakhir.** `SlotWindowResource` diam-diam tak pernah expose bahwa window `OPEN` bisa saja `window.end`-nya sudah lewat (`SlotWindow::hasEnded()` sudah ada sejak ronde 2, cuma dipakai `BookAppointmentAction`) — akibatnya FE `/slots` menampilkan badge **"Tersedia"** + tombol Booking untuk window yang **pasti** ditolak 409 server-side, dan pesan error-nya generik ("penuh atau ditutup") walau backend sudah kirim alasan spesifik. Fix: `SlotWindowResource` + `ended`, FE badge baru **"Berakhir"** (menang atas sisa kuota) + tombol Booking disembunyikan, `BookingForm` pakai `message` asli dari backend alih-alih teks hardcode. 2 test Pest + 3 test Vitest baru (229→**231 Pest**, +2 Vitest → **89 Vitest**). Lihat *Sudah selesai*.
+- Update terakhir: `2026-08-13` (3) · Sesi: **Bug kedua dari sesi verifikasi manual: admin bisa buka 4 menu operasional (Booking Saya/Armada/Gate/Jadwal Hari Ini) yang semuanya gagal atau kosong.** `AppNav` menggate link cuma pakai `can(permission)`, dan admin punya SEMUA permission (`RolePermissionSeeder`) — tapi 3 endpoint di baliknya (`MyFleetController`/`MyAppointmentsController`/`GateQueueController`) `abort_if(company_id/terminal_id === null)` 403 karena admin **tak** punya identitas company/terminal. `/today` beda: backend-nya tak 403, cuma balikin list kosong (admin bukan `driver_id` appointment mana pun) — bukan error, tapi menu tak relevan. Fix: `AppNav` link `/bookings`/`/trucks` tambah cek `company_id != null` (pola sama dgn `/reports` yang sudah ada), `/gate` cek `terminal_id != null`, `/today` cek `hasRole('driver')`. 2 test Vitest baru (231→89 Vitest tetap sama filenya, `AppNav.test.ts` +2 → **91 Vitest**). Lihat *Sudah selesai*.
+- Sesi sebelumnya: `2026-08-13` (2) · **Bug ditemukan saat verifikasi realtime manual → fix: badge "Tersedia" & pesan error booking tak bedakan window yang sudah berakhir.** `SlotWindowResource` diam-diam tak pernah expose bahwa window `OPEN` bisa saja `window.end`-nya sudah lewat (`SlotWindow::hasEnded()` sudah ada sejak ronde 2, cuma dipakai `BookAppointmentAction`) — akibatnya FE `/slots` menampilkan badge **"Tersedia"** + tombol Booking untuk window yang **pasti** ditolak 409 server-side, dan pesan error-nya generik ("penuh atau ditutup") walau backend sudah kirim alasan spesifik. Fix: `SlotWindowResource` + `ended`, FE badge baru **"Berakhir"** (menang atas sisa kuota) + tombol Booking disembunyikan, `BookingForm` pakai `message` asli dari backend alih-alih teks hardcode. 2 test Pest + 3 test Vitest baru (229→**231 Pest**, +2 Vitest → **89 Vitest**). Lihat *Sudah selesai*.
 - Sesi sebelumnya: `2026-08-13` (1) · **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→229 Pest). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
 - Sesi sebelumnya: `2026-08-02` · **Senior review ronde 4 (audit tasklist) + 4 temuan ditutup: toleransi jendela gate-in (P1), reminder saat reschedule (P1), test audit trail (P2), endpoint audit log (P2).** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi itu**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
 - Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
@@ -18,11 +19,28 @@
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
 - Build backend: `composer test` → ✅ **231 pass / 597 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **89 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build frontend: `npm run test:js` → ✅ **91 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **`AppNav` sembunyikan link operasional yang pasti gagal untuk admin (2026-08-13).**
+  Dilaporkan langsung oleh user (bukan dari audit): login admin, klik "Booking Saya"/
+  "Armada"/"Gate" → 3 warning "Gagal memuat...", dan "Jadwal Hari Ini" tampil tapi selalu
+  kosong tanpa penjelasan. Sebab: `AppNav` gate link cuma pakai `can(permission)`, dan
+  admin (`RolePermissionSeeder`) punya **semua** permission by design — tapi 3 endpoint di
+  baliknya `abort_if($user->company_id/terminal_id === null, 403)` karena admin memang
+  tak punya identitas company/terminal (bukan bug backend, itu tepat sesuai desain: admin
+  ≠ transporter/gate-officer). `/today` beda lagi: `todayForDriver(admin.id, …)` tak pernah
+  403, cuma balikin list kosong karena admin bukan `driver_id` appointment mana pun. Fix
+  di `AppNav.vue`: `/bookings` & `/trucks` tambah cek `auth.user?.company_id != null`
+  (pola yang sudah ada di `/reports`), `/gate` cek `terminal_id != null`, `/today` cek
+  `auth.hasRole('driver')` (satu-satunya link ber-role, dijelaskan di komentar kenapa beda
+  dari yang lain). 3 test Vitest baru di `AppNav.test.ts` (admin tak melihat 4 link itu
+  sekaligus, driver asli tetap melihat "Jadwal Hari Ini"). Segolongan dengan bug
+  `dwell_time`/badge "Tersedia" sebelumnya: aturan sudah benar di satu layer (backend),
+  tak dicerminkan ke layer lain (nav FE) — recurring pattern di proyek ini, ketiganya
+  ditemukan hari yang sama lewat pemakaian nyata, bukan audit dokumen.
 - [x] **Badge "Tersedia" & pesan error booking dibedakan dari window yang sudah berakhir
   (2026-08-13).** Bug ditemukan saat verifikasi realtime manual (§Langkah berikutnya #2):
   `SlotWindow::hasEnded()` sudah ditegakkan `BookAppointmentAction` sejak ronde 2, tapi
@@ -476,6 +494,19 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-13` (4): **Fix: `AppNav` menampilkan 4 link operasional yang pasti gagal/kosong
+  untuk admin.** Dilaporkan langsung oleh user: login admin → klik Booking Saya/Armada/Gate
+  → 3 warning "Gagal memuat..."; Jadwal Hari Ini tampil tapi selalu kosong. Kode:
+  `AppNav.vue` (`/bookings`+`/trucks` cek `company_id != null`, `/gate` cek
+  `terminal_id != null`, `/today` cek `hasRole('driver')` — satu-satunya guard berbasis
+  role, dikomentari kenapa beda). Test: `tests/js/AppNav.test.ts` (+3: admin tak melihat
+  4 link sekaligus, driver asli tetap melihat Jadwal Hari Ini). 91 Vitest hijau, vue-tsc
+  bersih, `npm run build` sukses (backend tak disentuh — 231 Pest tetap). Docs: `HANDOVER`
+  §Status/§Sudah selesai, `docs/FRONTEND.md` (baris `AppNav` diperluas). **Alasan:**
+  admin (`RolePermissionSeeder`) sengaja punya semua permission, tapi 3 endpoint di balik
+  link itu 403 tanpa `company_id`/`terminal_id` (desain yang benar — admin bukan
+  transporter/gate-officer/driver) dan `AppNav` cuma gate per permission, tak pernah cek
+  identitas itu di 3 dari 4 link (`/reports` sudah lebih dulu benar).
 - `2026-08-13` (3): **Fix: badge "Tersedia" & pesan error booking tak bedakan window yang
   sudah berakhir.** Ditemukan saat verifikasi realtime manual (bukan dari audit dokumen —
   dari user benar-benar coba booking dan bingung kenapa ditolak). Kode:

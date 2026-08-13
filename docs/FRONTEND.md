@@ -79,9 +79,14 @@ Semua halaman ber-auth adalah **children** dari satu parent route `/` ber-kompon
 `components/AppLayout.vue` (= `AppNav` + `RouterView`). `requiresAuth` cukup ditaruh
 di parent — Vue Router **menggabungkan meta parent ke child**, jadi tiap halaman baru
 otomatis terlindungi tanpa mengulang meta. `AppNav` = satu-satunya sumber daftar link
-(gating per **permission**, bukan nama role — cermin otorisasi server; link `/reports`
-juga cek `company_id`, cermin aturan 403-nya). Halaman tidak lagi punya link
-"← Dashboard" sendiri.
+(gating per **permission**, bukan nama role — cermin otorisasi server). Beberapa link
+butuh guard identitas tambahan karena admin punya SEMUA permission tapi tak punya
+`company_id`/`terminal_id` — endpoint di baliknya 403 tanpa itu: `/reports`/`/bookings`/
+`/trucks` cek `company_id`, `/gate` cek `terminal_id`. `/today` beda lagi — backend-nya
+tak 403 admin (list kosong, bukan error), jadi satu-satunya link yang gating tambahannya
+`hasRole('driver')`, bukan cek identitas (2026-08-13, ditemukan lewat laporan user
+langsung: admin bisa buka 4 menu operasional itu dan semuanya gagal/membingungkan).
+Halaman tidak lagi punya link "← Dashboard" sendiri.
 
 ### `app.ts` — bootstrap
 Pasang Pinia, Router, **VueQueryPlugin**, lalu wiring hook 401 (`setUnauthorizedHandler`
