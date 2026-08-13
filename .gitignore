@@ -5,12 +5,16 @@
 /public/build
 /public/hot
 /public/storage
+/test-results
+/playwright-report
+/blob-report
 /storage/*.key
 /storage/pail
 /vendor
 .env
 .env.backup
 .env.production
+.env.e2e
 .phpactor.json
 .phpunit.result.cache
 Homestead.json

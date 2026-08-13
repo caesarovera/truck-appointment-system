@@ -41,7 +41,7 @@ function extractError(e: unknown): string {
         <form class="w-full max-w-sm bg-white rounded-xl shadow p-8 space-y-5" @submit.prevent="submit">
             <h1 class="text-xl font-semibold text-gray-900">Masuk — TAS</h1>
 
-            <p v-if="error" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-2">
+            <p v-if="error" role="alert" data-testid="login-error" class="text-sm text-red-600 bg-red-50 rounded-md p-2">
                 {{ error }}
             </p>
 
@@ -52,6 +52,7 @@ function extractError(e: unknown): string {
                     type="email"
                     required
                     autocomplete="username"
+                    data-testid="login-email"
                     class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </label>
@@ -63,6 +64,7 @@ function extractError(e: unknown): string {
                     type="password"
                     required
                     autocomplete="current-password"
+                    data-testid="login-password"
                     class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </label>
@@ -70,6 +72,7 @@ function extractError(e: unknown): string {
             <button
                 type="submit"
                 :disabled="submitting"
+                data-testid="login-submit"
                 class="w-full rounded-md bg-indigo-600 text-white py-2 font-medium hover:bg-indigo-700 disabled:opacity-50"
             >
                 {{ submitting ? 'Memproses…' : 'Masuk' }}

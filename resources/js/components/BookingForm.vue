@@ -76,7 +76,7 @@ function extractError(e: unknown): string {
                 <button type="button" class="text-gray-400 hover:text-gray-700" @click="emit('cancel')">✕</button>
             </header>
 
-            <p v-if="error" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-2">{{ error }}</p>
+            <p v-if="error" role="alert" data-testid="booking-error" class="text-sm text-red-600 bg-red-50 rounded-md p-2">{{ error }}</p>
 
             <label class="block space-y-1">
                 <span class="text-sm font-medium text-gray-700">Truk</span>
@@ -84,6 +84,7 @@ function extractError(e: unknown): string {
                     v-model.number="truckId"
                     :disabled="fleetLoading"
                     required
+                    data-testid="booking-truck"
                     class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                     <option :value="null" disabled>Pilih truk</option>
@@ -97,6 +98,7 @@ function extractError(e: unknown): string {
                     v-model.number="driverId"
                     :disabled="fleetLoading"
                     required
+                    data-testid="booking-driver"
                     class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                     <option :value="null" disabled>Pilih sopir</option>
@@ -136,6 +138,7 @@ function extractError(e: unknown): string {
                     required
                     maxlength="20"
                     placeholder="mis. MAUU1234567"
+                    data-testid="booking-container-no"
                     class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </label>
@@ -152,12 +155,18 @@ function extractError(e: unknown): string {
             </label>
 
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" class="rounded-md px-4 py-2 text-sm text-gray-600 hover:text-gray-900" @click="emit('cancel')">
+                <button
+                    type="button"
+                    data-testid="booking-cancel"
+                    class="rounded-md px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                    @click="emit('cancel')"
+                >
                     Batal
                 </button>
                 <button
                     type="submit"
                     :disabled="booking.isPending.value"
+                    data-testid="booking-submit"
                     class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                 >
                     {{ booking.isPending.value ? 'Memproses…' : 'Booking' }}

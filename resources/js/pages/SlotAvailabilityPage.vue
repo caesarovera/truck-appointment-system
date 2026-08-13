@@ -77,7 +77,7 @@ function badgeClass(w: SlotWindow): string {
                 <span v-if="isFetching" class="text-sm text-gray-500 pb-2">Memuat…</span>
             </form>
 
-            <p v-if="lastBooking" role="status" class="text-sm text-green-700 bg-green-50 rounded-md p-3">
+            <p v-if="lastBooking" role="status" data-testid="booking-success" class="text-sm text-green-700 bg-green-50 rounded-md p-3">
                 Booking berhasil — kode <strong>{{ lastBooking.booking_code }}</strong> ({{ lastBooking.status }}).
             </p>
 

@@ -72,6 +72,12 @@ Tambahkan **e2e** saat salah satu terjadi:
 Prasyarat sebelum e2e dipasang (supaya tak jadi utang baru): `.env.e2e` + DB terpisah agar DB
 dev tak terhapus, dan `data-testid` di `LoginPage`/`BookingForm`.
 
+**[2026-08-14] Trigger poin 2 (persiapan rilis) terpenuhi — e2e dipasang, lokal-only.**
+Prasyarat di atas selesai (`.env.e2e.example`, `data-testid` di `LoginPage.vue`/`BookingForm.vue`),
+Playwright + 1 smoke test happy-path (login→booking) ditambahkan, lihat
+`docs/SETUP-GUIDE.md §15`. **CI wiring TIDAK ikut** — keputusan terpisah, biaya browser
+binary (~140 MB) + waktu run tiap push belum sepadan sebelum benar-benar dibutuhkan di CI.
+
 Tinjau ulang **workflow-nya sendiri** saat: menambah gerbang kualitas baru, pindah dari SQLite
 ke MySQL untuk test, atau menaikkan versi PHP/Node di mesin dev (versi di workflow sengaja
 dipatok menyamai mesin dev: PHP 8.3, Node 22).

@@ -799,3 +799,50 @@ Kegagalan yang khas dan artinya:
 | Semua job merah tepat setelah ganti versi PHP/Node lokal | versi di workflow belum ikut dinaikkan (§14b) |
 
 > Alasan lengkap kenapa CI didahulukan dan kenapa **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.
+
+## 15. E2E (Playwright) — lokal-only
+
+Prasyarat `ADR-0005` (`.env.e2e` + DB terpisah, `data-testid` di jalur happy-path) selesai
+2026-08-14, trigger "persiapan rilis". **Belum masuk CI** (biaya browser binary ~140 MB +
+waktu run tiap push) — keputusan sadar, sesi terpisah kalau nanti dibutuhkan sebelum rilis
+beneran.
+
+### 15a. Setup sekali
+
+```bash
+cp .env.e2e.example .env.e2e
+php artisan key:generate --env=e2e
+npm run test:e2e:install      # unduh Chromium (~115 MB), sekali per mesin
+```
+
+### 15b. Jalankan
+
+```bash
+npm run test:e2e
+```
+
+`globalSetup` (`tests/e2e/global-setup.ts`) otomatis: bikin file
+`database/database.e2e.sqlite` kalau belum ada, `npm run build` (asset produksi — bukan Vite
+dev server, `playwright.config.ts` cuma boot **1** proses: `php artisan serve --env=e2e`),
+lalu `migrate:fresh --seed --env=e2e`. **DB e2e terpisah total dari DB dev** (`database/database.sqlite`)
+— jalanin `test:e2e` kapan pun tak pernah menghapus data dev.
+
+### 15c. Cakupan saat ini
+
+1 smoke test (`tests/e2e/booking-happy-path.spec.ts`): login transporter → `/slots` → booking
+slot → assert pesan sukses. **Bukan suite e2e penuh** — scope sengaja dipersempit ke 1
+happy-path (lihat `HANDOVER.md` §Langkah berikutnya #3). `data-testid` yang sudah ada:
+`login-*` (`LoginPage.vue`), `booking-*` (`BookingForm.vue`), `slot-card`/`book-button`/
+`booking-success` (`SlotAvailabilityPage.vue`, sudah ada sejak sebelumnya).
+
+### Jebakan
+
+- **Lupa `touch` file sqlite** → migrate gagal "unable to open database file". `global-setup.ts`
+  sudah menangani ini otomatis; kalau menjalankan `artisan migrate` manual ke `.env.e2e` di
+  luar Playwright, buat filenya dulu.
+- **`.env.e2e` tanpa `APP_KEY`** → `global-setup.ts` gagal cepat dengan pesan jelas, bukan error
+  Laravel yang membingungkan.
+- **Konfigurasi Windows/git-bash:** `php artisan serve --env=e2e` memuat `.env.e2e` lewat 2
+  mekanisme sekaligus — flag `--env` (bikin `ServeCommand` mengawasi file itu utk auto-reload)
+  **dan** env var `APP_ENV=e2e` yang di-set `playwright.config.ts` (dipakai proses PHP yang
+  sungguhan di-spawn utk memilih file dotenv). Keduanya perlu ada; salah satu saja tidak cukup.
