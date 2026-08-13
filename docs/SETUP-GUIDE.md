@@ -480,6 +480,8 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/slots/availability?gate={id}&date=YYYY-MM-DD` | token | `slot.read` | sisa kuota slot |
 | `POST` | `/api/v1/appointments` | token | `appointment.write` | booking (kirim `Idempotency-Key`); truk INACTIVE → 422 `truck_inactive`; `driver_id` bukan user ber-role `driver` → 422 `driver_invalid_role` |
 | `GET`  | `/api/v1/appointments/{id}` | token | Policy `view` | detail appointment (scope per role) |
+| `GET`  | `/api/v1/appointments/qr/{token}` | token | Policy `view` (dicek manual di controller) | verifikasi QR gate-in — `{token}` = `qr_token` ter-sign dari `AppointmentResource`, bukan id polos; 403 `invalid_qr_token` bila diutak-atik/kedaluwarsa |
+| `GET`  | `/api/v1/appointments/qr/{token}/image` | token | sama seperti di atas | PNG QR **on-demand** (cetak/email) — di-generate di memori per request, TIDAK PERNAH disimpan ke storage |
 | `GET`  | `/api/v1/appointments/{id}/audit` | token | `audit.read` **+** Policy `view` | jejak audit appointment (urut kronologis). Dua lapis: gate-officer & driver LOLOS Policy tapi ditolak 403 karena tak punya `audit.read`. `causer: null` = tindakan sistem |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | token | Policy `update` | pindah window (body: `slot_window_id`, `version`) |
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |

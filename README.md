@@ -17,11 +17,11 @@ Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horiz
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 
-Status: backend MVP API lengkap & ber-test (**244 Pest**); SPA mencakup UI **4 persona**
+Status: backend MVP API lengkap & ber-test (**260 Pest**); SPA mencakup UI **4 persona**
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
 company/user/**role & izin**) + **CRUD armada truk transporter** + **riwayat gate-in/out**
-+ **realtime kuota/antrian live (Reverb + Echo)** (**107 Vitest**). Detail hidup:
-[`HANDOVER.md`](HANDOVER.md).
++ **QR gate-in (token ter-sign)** + **realtime kuota/antrian live (Reverb + Echo)**
+(**111 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
 
 **CI:** tiap push ke `main` & tiap PR menjalankan ulang semua gerbang di mesin bersih —
 backend (Pint · PHPStan lvl 8 · Pest) dan frontend (Vitest · vue-tsc · build) sebagai dua job

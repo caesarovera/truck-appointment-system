@@ -43,6 +43,7 @@
 - [X. Toleransi jendela waktu gate-in](#x-toleransi-jendela-waktu-gate-in)
 - [Y. Menguji audit trail (Activity Log)](#y-menguji-audit-trail-activity-log)
 - [Z. Endpoint audit trail (otorisasi dua lapis)](#z-endpoint-audit-trail-otorisasi-dua-lapis)
+- [AA. QR gate-in (token ter-sign + verifikasi + gambar on-demand)](#aa-qr-gate-in-token-ter-sign--verifikasi--gambar-on-demand)
 - [Frontend (Vue SPA) → `docs/FRONTEND.md`](#frontend-vue-spa)
 
 ---
@@ -2069,6 +2070,57 @@ entri log tanpa properti memang sah.
 
 > **Tidak ada UI-nya** di slice ini — endpoint dulu, halaman menyusul (pola yang sama dengan
 > `/me/reports/utilization` yang BE-nya mendahului FE).
+
+---
+
+## AA. QR gate-in (token ter-sign + verifikasi + gambar on-demand)
+
+Menutup temuan ronde 4: `BUSINESS-FLOW`/`PRD` sudah lama menyebut QR "berisi appointment id
+ter-sign", tapi nol implementasi (`grep -i qr` = 0 hit). Dua keputusan desain dulu, sebelum kode:
+
+1. **Bentuk token — mandiri, bukan signed URL Laravel.** `URL::temporarySignedRoute` sudah ada
+   bawaan, tapi hasilnya URL penuh (terikat `APP_URL`, kurang pas jadi konten QR yang pendek).
+   `AppointmentQrTokenService` pakai skema sendiri: `base64url("{id}|{expires_at}")` + `.` +
+   `hash_hmac('sha256', payload, APP_KEY)` — pola tanda tangan yang **sama** dengan signed URL
+   Laravel, dikemas sebagai string mandiri. `verify()` timing-safe (`hash_equals`), dan
+   membedakan 3 kegagalan (`InvalidQrTokenException::malformed/tampered/expired`) meski
+   semuanya di-render jadi 403 `invalid_qr_token` yang sama — bedanya cuma pesan.
+2. **Simpan gambar atau tidak?** User secara eksplisit minta rencana anti-"server penuh".
+   Jawabannya: **jangan pernah simpan gambar sama sekali** (bukan "hapus yang lama secara
+   berkala"). QR = data turunan yang bisa dihitung ulang kapan saja dari `qr_token`, jadi tak
+   ada alasan menyimpannya. Dua permukaan dibangun, keduanya nol-storage:
+   - **Render utama (opsi A):** `AppointmentQrCode.vue` (FE) — canvas digambar client-side dari
+     `qr_token` pakai lib `qrcode`. Backend tak pernah dikirimi/mengirim gambar untuk jalur ini.
+   - **Endpoint gambar (opsi B, cetak/email):** `GET /appointments/qr/{token}/image` — PNG
+     dibuat `endroid/qr-code` **di memori per request**, langsung di-`response()`-kan, **tidak
+     pernah** `Storage::put()`. QrImageTest mengetes ini secara eksplisit: `Storage::fake('local')`
+     lalu assert direktori tetap kosong setelah request sukses — bukan cuma percaya komentar.
+
+**Kenapa TTL token = `slotWindow.endsAt() + gate_in.late_minutes`** (config yang **sudah ada**,
+dipakai ulang, bukan kunci baru): titik itu **sudah** merupakan batas gate-in yang sebenarnya
+(`GateInAction` menolak `gate_in_too_late` persis di titik yang sama, §X). Token QR yang masih
+"valid" tapi gate-in-nya pasti ditolak cuma bikin bingung; menyamakan TTL berarti kedaluwarsa QR
+dan penolakan gate-in menggambarkan **satu** aturan, bukan dua yang harus dijaga sinkron manual.
+
+**Otorisasi manual, satu-satunya di proyek ini.** Semua endpoint appointment lain memakai
+`->middleware('can:view,appointment')` — route-model-binding otomatis resolve `{appointment}`
+dari URL. Token QR tak bisa begitu: id-nya baru diketahui **setelah** didekode di dalam
+controller. `VerifyAppointmentQrController`/`AppointmentQrImageController` karena itu memanggil
+`Gate::authorize('view', $appointment)` langsung — Policy & aturan isolasinya (company/terminal/
+driver) identik dengan `ShowAppointmentController`, cuma titik pemanggilannya beda.
+
+**Route `qr/{token}[/image]` didaftarkan SEBELUM `appointments/{appointment}`** di
+`routes/api.php` — segmen statis `qr` harus menang lebih dulu, kalau tidak Laravel akan mencoba
+me-resolve `"qr"` sebagai route-model-binding appointment (404 salah alasan).
+
+**`AppointmentResource.qr_token`** — `whenLoaded('slotWindow', ...)`, pola yang sama dengan
+`dwell_minutes`/`gate_in_at`: field turunan yang butuh relasi tertentu sudah dimuat, supaya
+konsisten dengan `preventLazyLoading` (N+1 harus kelihatan dari titik pemanggil, bukan
+disembunyikan lewat `loadMissing` di dalam Resource).
+
+16 test Pest baru (`AppointmentQrTokenServiceTest`, `VerifyQrTest`, `QrImageTest`) + assertion
+tambahan di `MyTodayAppointmentsTest` (244→260 Pest). Detail FE (komponen, wiring halaman) di
+`FRONTEND.md`.
 
 ---
 

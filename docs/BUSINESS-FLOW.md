@@ -128,8 +128,26 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 2. Lihat kode booking + QR (berisi appointment id ter-sign), window, gate, status realtime via Echo `gate.queue.{terminalId}`.
 3. Tiba di gate, tunjukkan QR.
 
+> **QR = token ter-sign (bukan booking_code polos), 2026-08-14.** `AppointmentResource.qr_token`
+> = `base64url("{appointment_id}|{expires_at}")` + `.` + HMAC-SHA256 (key `APP_KEY`) —
+> `AppointmentQrTokenService`. TTL = `slotWindow.endsAt() + gate_in.late_minutes` (sengaja
+> selaras dengan batas gate-in itu sendiri: lewat itu gate-in memang pasti ditolak, jadi QR
+> wajar ikut basi di titik yang sama). Cuma muncul kalau `slotWindow` di-eager-load (sama
+> syarat dengan `dwell_minutes`). Gambarnya dirender **di client** (`AppointmentQrCode.vue`,
+> lib `qrcode`, canvas) langsung dari `qr_token` — backend tak pernah mengirim/menyimpan file
+> gambar apa pun (nol beban storage server, keputusan desain sadar, bukan optimisasi
+> belakangan). Ada endpoint gambar terpisah untuk kebutuhan cetak/email — lihat §3.5.
+
 ### 3.5 Gate Officer: gate-in
-1. Scan QR / input kode booking → `GET /api/v1/appointments/{id}` (cek terminal cocok).
+1. Scan QR / input kode booking → `GET /api/v1/appointments/qr/{token}` (token = `qr_token`
+   di atas; mendekode → cek Policy `view` manual di controller karena id baru diketahui
+   setelah token didekode, bukan lewat route-model-binding biasa seperti
+   `GET /api/v1/appointments/{id}`). Token diutak-atik/tampered atau kedaluwarsa → 403
+   `invalid_qr_token`. Untuk kebutuhan cetak/email (jarang), ada juga
+   `GET /api/v1/appointments/qr/{token}/image` — PNG di-generate **di memori per request**
+   (`endroid/qr-code`), **tidak pernah** `Storage::put()`; begitu token basi, gambar lama
+   (kalau sempat dicetak) memang wajar percuma — tak ada apa pun yang perlu dibersihkan
+   karena tak ada yang pernah tersimpan.
 2. Verifikasi truk & kontainer fisik.
 3. `POST /api/v1/appointments/{id}/gate-in` + `Idempotency-Key`.
 4. `GateInAction`: cek state `CONFIRMED`, lalu **toleransi jendela waktu** — truk hanya diterima antara `window.start − early` dan `window.end + late` (`config/tas.php → gate_in`, default 30/30 menit, batas inklusif). Di luar itu → `409 gate_in_too_early` / `gate_in_too_late`. Lolos → buat `gate_transactions` (`type=IN`), status → `ARRIVED`. Saat proses bongkar/muat dimulai di dalam terminal, status → `IN_PROGRESS` (sesuai §2). Untuk MVP keduanya boleh terjadi berurutan dalam satu aksi.

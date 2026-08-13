@@ -156,7 +156,8 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/bookings` | `pages/MyBookingsPage.vue` | `appointment.write` | `GET /me/appointments` (filter status); **Batalkan** (konfirmasi 2-langkah) & **Pindah jadwal**; kirim `version` (optimistic lock). Tampilkan **Gate in/Gate out** begitu ada (2026-08-13 — endpoint ikut eager-load `gateIn`/`gateOut`, bukan halaman terpisah) |
 | `/trucks` | `pages/MyTrucksPage.vue` | `fleet.manage` | CRUD armada truk company sendiri (`/me/trucks`): form create/edit dipakai bersama (`editingId != null` = mode edit), hapus konfirmasi 2-langkah; map 409 `entity_in_use` & 422. Menampilkan truk **ACTIVE + INACTIVE** (kebalikan dropdown booking) supaya truk nonaktif bisa diaktifkan lagi |
 | — | `components/RescheduleDialog.vue` | — | modal pilih window tujuan (**reuse** `useGates`+`useSlotAvailability`); default ke gate/tanggal window saat ini; kirim `slot_window_id`+`version` |
-| `/today` | `pages/DriverSchedulePage.vue` | `appointment.read.self` | jadwal hari-H sopir, urut jam, nama gate |
+| `/today` | `pages/DriverSchedulePage.vue` | `appointment.read.self` | jadwal hari-H sopir, urut jam, nama gate; per kartu render **QR gate-in** (`AppointmentQrCode`) bila `qr_token` ada |
+| — | `components/AppointmentQrCode.vue` | — | render QR **di client** (canvas, lib `qrcode`) dari `qr_token` — backend tak pernah dikirimi/mengirim gambar utk jalur ini (nol beban storage, lihat `CODE-WALKTHROUGH §AA`). Prop `qrToken`; fallback pesan error kalau render gagal |
 | `/gate` | `pages/GateDashboardPage.vue` | `gate.process` | antrian (`GET /gate/queue`); **Gate In** (CONFIRMED) / **Gate Out** (IN_PROGRESS) |
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
 | `/planner/gate-history` | `pages/GateHistoryPage.vue` | `slot.manage` (sama actor dgn backend `hasAnyRole(admin,planner)`) | riwayat gate-in/out per gate+tanggal (`GET /reports/gate-history`), **termasuk yang COMPLETED** (beda dari antrian `/gate`); urut jam gate-in **di klien** (repo sengaja tak sort kolom relasi) |
@@ -263,6 +264,10 @@ Jebakan yang sudah ditemukan & dicatat:
 - **Submit form**: klik `<button type="submit">` **tidak** memicu `@submit` di jsdom →
   trigger `wrapper.find('form').trigger('submit.prevent')`.
 - **`isAxiosError`** asli dipakai (rejected value cukup punya `isAxiosError: true`).
+- **jsdom tak punya canvas 2D nyata** — `AppointmentQrCode.test.ts` mock modul `qrcode`
+  (`vi.mock('qrcode', ...)`) dan cuma assert `toCanvas` dipanggil dengan token yang benar,
+  bukan mencoba merender piksel sungguhan. Halaman yang memakainya (`DriverSchedulePage`)
+  ikut mock `qrcode` supaya tak meledak walau tak menguji isi QR-nya.
 
 ---
 
