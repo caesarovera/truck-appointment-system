@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Appointment;
+use App\Models\GateTransaction;
 use App\Models\SlotWindow;
 use App\Models\TransportCompany;
 use App\Models\User;
@@ -85,4 +86,30 @@ it('forbids a driver lacking appointment.read (403)', function (): void {
 
 it('requires authentication (401)', function (): void {
     getJson('/api/v1/me/appointments')->assertUnauthorized();
+});
+
+it('includes gate_in_at/gate_out_at once the truck has gated in and out', function (): void {
+    $company = TransportCompany::factory()->create();
+    $user = User::factory()->create(['company_id' => $company->id]);
+    $user->assignRole('transporter');
+
+    $appointment = Appointment::factory()->completed()->create([
+        'company_id' => $company->id,
+        'slot_window_id' => SlotWindow::factory()->create()->id,
+    ]);
+    GateTransaction::factory()->create(['appointment_id' => $appointment->id, 'type' => 'IN']);
+    GateTransaction::factory()->create(['appointment_id' => $appointment->id, 'type' => 'OUT']);
+
+    Sanctum::actingAs($user);
+
+    getJson('/api/v1/me/appointments')
+        ->assertOk()
+        ->assertJsonPath('data.0.status', 'COMPLETED');
+    // gate_in_at/gate_out_at/dwell_minutes hadir tapi bukan null — dicek via
+    // structure di sini karena nilai timestamp-nya non-deterministik.
+    $data = getJson('/api/v1/me/appointments')->json('data.0');
+    expect($data)->toHaveKeys(['gate_in_at', 'gate_out_at', 'dwell_minutes'])
+        ->and($data['gate_in_at'])->not->toBeNull()
+        ->and($data['gate_out_at'])->not->toBeNull()
+        ->and($data['dwell_minutes'])->not->toBeNull();
 });

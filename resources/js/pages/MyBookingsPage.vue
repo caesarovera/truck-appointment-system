@@ -24,6 +24,11 @@ function canManage(a: Appointment): boolean {
     return MANAGEABLE.includes(a.status);
 }
 
+function formatTime(iso: string | null | undefined): string {
+    if (iso === null || iso === undefined) return '';
+    return iso.slice(11, 16); // "2026-08-13T09:00:00.000000Z" → "09:00"
+}
+
 function onRescheduled(): void {
     // Daftar & ketersediaan ter-invalidate oleh mutation → cukup tutup dialog.
     rescheduling.value = null;
@@ -102,6 +107,13 @@ function extractError(e: unknown): string {
                         <template v-if="a.truck"> · {{ a.truck.plate_no }}</template>
                         <template v-if="a.driver"> · {{ a.driver.name }}</template>
                         <template v-if="a.containers[0]"> · {{ a.containers[0].container_no }}</template>
+                    </p>
+
+                    <p v-if="a.gate_in_at" class="text-sm text-gray-600" data-testid="gate-times">
+                        Gate in <strong>{{ formatTime(a.gate_in_at) }}</strong>
+                        <template v-if="a.gate_out_at">
+                            · Gate out <strong>{{ formatTime(a.gate_out_at) }}</strong>
+                        </template>
                     </p>
 
                     <div v-if="canManage(a)" class="flex items-center gap-2 pt-1">

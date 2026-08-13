@@ -21,6 +21,7 @@ final class AppointmentResource extends JsonResource
             'move_type' => $this->move_type->value,
             'version' => $this->version,
             'company_id' => $this->company_id,
+            'company' => $this->whenLoaded('company', fn () => CompanyResource::make($this->company)),
             // Relasi hanya muncul bila di-eager-load (cegah N+1; pakai callback
             // agar tidak diakses saat belum dimuat).
             'slot_window' => $this->whenLoaded('slotWindow', fn () => SlotWindowResource::make($this->slotWindow)),

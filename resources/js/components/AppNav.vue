@@ -79,6 +79,14 @@ const activeClass = 'text-indigo-700 font-medium bg-indigo-50';
             <RouterLink v-if="auth.can('slot.manage')" to="/planner" :class="linkClass" :exact-active-class="activeClass">
                 Kelola Slot
             </RouterLink>
+            <RouterLink
+                v-if="auth.can('slot.manage')"
+                to="/planner/gate-history"
+                :class="linkClass"
+                :exact-active-class="activeClass"
+            >
+                Riwayat Gate
+            </RouterLink>
             <RouterLink v-if="auth.can('terminal.manage')" to="/admin" :class="linkClass" :exact-active-class="activeClass">
                 Master Data
             </RouterLink>

@@ -20,6 +20,13 @@ export async function fetchMyAppointments(status?: string): Promise<Appointment[
     return data.data;
 }
 
+/** Riwayat gate-in/out (planner/admin) — GET /reports/gate-history?gate=&date=. */
+export async function fetchGateHistory(gate: number, date: string): Promise<Appointment[]> {
+    const { data } = await api.get<{ data: Appointment[] }>('/reports/gate-history', { params: { gate, date } });
+
+    return data.data;
+}
+
 /** Batalkan appointment — kirim `version` untuk optimistic lock (409 bila usang). */
 export async function cancelAppointment(id: number, version: number): Promise<Appointment> {
     const { data } = await api.post<{ data: Appointment }>(`/appointments/${id}/cancel`, { version });

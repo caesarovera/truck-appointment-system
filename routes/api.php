@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\V1\Fleet\CreateTruckController;
 use App\Http\Controllers\Api\V1\Fleet\DeleteTruckController;
 use App\Http\Controllers\Api\V1\Fleet\ListTrucksController;
 use App\Http\Controllers\Api\V1\Fleet\UpdateTruckController;
+use App\Http\Controllers\Api\V1\GateHistoryReportController;
 use App\Http\Controllers\Api\V1\GateInController;
 use App\Http\Controllers\Api\V1\GateOutController;
 use App\Http\Controllers\Api\V1\GateQueueController;
@@ -102,6 +103,9 @@ Route::prefix('v1')->group(function (): void {
         // Agregat lintas-company (planner/admin) vs scoped milik sendiri (transporter).
         Route::get('reports/utilization', UtilizationReportController::class);
         Route::get('me/reports/utilization', MyUtilizationReportController::class);
+        // Riwayat gate-in/out per gate+tanggal (planner/admin) — appointment yang
+        // sudah gate-in, termasuk yang sudah COMPLETED. Lihat GateHistoryReportRequest.
+        Route::get('reports/gate-history', GateHistoryReportController::class);
 
         // Admin CRUD — otorisasi per-permission di setiap FormRequest.
         Route::prefix('admin')->group(function (): void {

@@ -61,6 +61,7 @@ describe('AppNav', () => {
 
         expect(text).not.toContain('Laporan');
         expect(text).toContain('Kelola Slot');
+        expect(text).toContain('Riwayat Gate'); // slot.manage = actor sama dgn backend hasAnyRole(admin,planner)
     });
 
     it('hides company/terminal-scoped links for admin even though admin has every permission', () => {

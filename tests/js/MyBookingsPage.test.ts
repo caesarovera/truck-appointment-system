@@ -66,6 +66,26 @@ describe('MyBookingsPage', () => {
         expect(wrapper.text()).toContain('MAUU1234567');
     });
 
+    it('shows gate in/out times once the truck has gated in', () => {
+        listState.appointments.value = [
+            appointment({ id: 1, status: 'IN_PROGRESS', gate_in_at: '2026-08-13T09:00:00.000000Z', gate_out_at: null }),
+        ];
+
+        const wrapper = mountPage();
+
+        expect(wrapper.find('[data-testid="gate-times"]').text()).toContain('Gate in');
+        expect(wrapper.find('[data-testid="gate-times"]').text()).toContain('09:00');
+        expect(wrapper.find('[data-testid="gate-times"]').text()).not.toContain('Gate out');
+    });
+
+    it('does not show gate times before the truck has gated in', () => {
+        listState.appointments.value = [appointment({ id: 1, status: 'CONFIRMED' })];
+
+        const wrapper = mountPage();
+
+        expect(wrapper.find('[data-testid="gate-times"]').exists()).toBe(false);
+    });
+
     it('shows an empty state when there are no bookings', () => {
         expect(mountPage().text()).toContain('Belum ada booking');
     });

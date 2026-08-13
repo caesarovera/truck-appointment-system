@@ -51,6 +51,11 @@ const routes: RouteRecordRaw[] = [
                 component: () => import('@/pages/PlannerWindowsPage.vue'),
             },
             {
+                path: 'planner/gate-history',
+                name: 'gate-history',
+                component: () => import('@/pages/GateHistoryPage.vue'),
+            },
+            {
                 path: 'reports',
                 name: 'reports',
                 component: () => import('@/pages/MyUtilizationPage.vue'),

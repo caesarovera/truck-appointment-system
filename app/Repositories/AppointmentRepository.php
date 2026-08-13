@@ -150,7 +150,7 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
         return Appointment::query()
             ->where('company_id', $companyId)
             ->when($status !== null, fn ($q) => $q->where('status', $status))
-            ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers'])
+            ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers', 'gateIn', 'gateOut'])
             ->orderByDesc('id') // booking terbaru di atas
             ->get();
     }
@@ -163,6 +163,19 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
             ->whereIn('status', [AppointmentStatus::CONFIRMED, AppointmentStatus::IN_PROGRESS])
             ->whereHas('slotWindow', fn ($q) => $q->whereDate('date', $date))
             ->whereRelation('slotWindow.gate', 'terminal_id', $terminalId)
+            ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers', 'gateIn', 'gateOut'])
+            ->get();
+    }
+
+    public function gateHistoryForGate(int $gateId, string $date): Collection
+    {
+        // whereHas('gateIn') = sudah pernah gate-in — cakupan lebih luas dari
+        // queueForTerminal (yang cuma CONFIRMED/IN_PROGRESS): truk COMPLETED
+        // ikut muncul di sini, itu justru intinya (riwayat, bukan antrian aktif).
+        return Appointment::query()
+            ->whereHas('gateIn')
+            ->whereHas('slotWindow', fn ($q) => $q->whereDate('date', $date))
+            ->whereRelation('slotWindow', 'gate_id', $gateId)
             ->with(['truck', 'driver', 'company', 'slotWindow.gate', 'containers', 'gateIn', 'gateOut'])
             ->get();
     }

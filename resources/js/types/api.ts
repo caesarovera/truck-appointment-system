@@ -161,6 +161,13 @@ export interface AdminGate {
     name: string;
 }
 
+/** Bentuk ringkas company di respons appointment (CompanyResource, whenLoaded). */
+export interface Company {
+    id: number;
+    code: string;
+    name: string;
+}
+
 export interface AdminCompany {
     id: number;
     code: string;
@@ -214,9 +221,18 @@ export interface Appointment {
     move_type: MoveType;
     version: number;
     company_id: number;
+    // Hadir bila relasi company di-eager-load (mis. GET /reports/gate-history —
+    // planner lintas-company perlu tahu ini truk siapa).
+    company?: Company | null;
     slot_window: SlotWindow | null;
     truck: Truck | null;
     driver: Driver | null;
     containers: Container[];
+    // Hadir bila gateIn/gateOut di-eager-load di backend (GET /me/appointments,
+    // GET /reports/gate-history, respons gate-in/gate-out). Null sebelum gate-in
+    // terjadi; dwell_minutes null sampai gate-out juga terjadi.
+    gate_in_at?: string | null;
+    gate_out_at?: string | null;
+    dwell_minutes?: number | null;
     created_at: string | null;
 }

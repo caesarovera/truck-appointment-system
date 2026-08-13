@@ -48,6 +48,7 @@ driver       → appointment.read.self
 | Tandai no-show (manual) + sweep otomatis² | ✅ | — | ✅ | — | — |
 | Lihat jadwal pribadi + QR | — | — | — | — | ✅ |
 | Lihat audit log | ✅ | sebagian | — | company sendiri | — |
+| Lihat riwayat gate-in/out (termasuk COMPLETED) | ✅ | ✅ | ⚠️ antrian aktif saja³ | company sendiri⁴ | — |
 | Laporan utilisasi | ✅ | ✅ | — | company sendiri | — |
 
 Aturan kritikal yang harus ditegakkan Policy/Gate Laravel:
@@ -56,6 +57,8 @@ Aturan kritikal yang harus ditegakkan Policy/Gate Laravel:
 - Gate Officer hanya boleh proses appointment di terminal tempat ia ditugaskan.
 - ¹ Planner **tidak** punya `appointment.write` (booking self-service). Reschedule/cancel oleh planner hanya lewat `appointment.override` — administratif, boleh lintas-company, **wajib teraudit**. Bukan untuk operasional harian.
 - ² `POST /api/v1/appointments/{id}/no-show` (manual, Policy `process`) **dan** `NoShowSweepJob` (otomatis, tiap 5 menit, causer NULL) sama-sama berlaku — lihat §3.5.
+- ³ Gate-officer lihat gate-in/out lewat `GET /gate/queue` (antrian aktif hari ini di terminalnya — `CONFIRMED`/`IN_PROGRESS` saja). Truk yang sudah `COMPLETED` hilang dari situ; endpoint riwayat lintas-status (`/reports/gate-history`) khusus admin/planner.
+- ⁴ Transporter lihat lewat `GET /me/appointments` yang sudah ada (bukan endpoint terpisah) — `gate_in_at`/`gate_out_at`/`dwell_minutes` muncul begitu truk gate-in.
 
 ---
 
@@ -149,6 +152,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 ### 3.7 Monitoring & audit
 - Planner: `GET /api/v1/reports/utilization?gate=&date=` → kuota vs terpakai vs no-show.
 - Transporter: `GET /api/v1/me/reports/utilization?gate=&date=` → sama, tapi hitungan per status hanya milik company sendiri (angka company lain tidak bocor; lihat matriks §1).
+- **Riwayat gate-in/out** (2026-08-13): planner/admin lewat `GET /api/v1/reports/gate-history?gate=&date=` (otorisasi `hasAnyRole(['admin','planner'])`, sama dgn `utilization`) — daftar appointment yang **sudah gate-in** di 1 gate+tanggal, **termasuk yang sudah `COMPLETED`** (beda dari antrian gate-officer `GET /gate/queue` yang cuma tampilkan `CONFIRMED`/`IN_PROGRESS`). Transporter cukup lewat `GET /me/appointments` yang sudah ada — sekarang ikut eager-load `gateIn`/`gateOut`, jadi `gate_in_at`/`gate_out_at`/`dwell_minutes` otomatis muncul di situ tanpa endpoint terpisah.
 - Semua perubahan status & gate event tercatat lewat **Spatie Activity Log** (sumber kebenaran audit trail). Transporter hanya lihat log company sendiri.
 - Dibaca lewat `GET /api/v1/appointments/{id}/audit` — otorisasi **dua lapis**: permission `audit.read` (FormRequest) **+** `AppointmentPolicy::view` (isolasi company/terminal). Gate-officer & driver lolos Policy untuk appointment mereka sendiri tapi **tidak** punya `audit.read`, sesuai matriks §1 — trail memuat nama orang yang mengubah, bukan cuma data appointment-nya.
 

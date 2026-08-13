@@ -1111,6 +1111,33 @@ mengikuti pola `reschedule`/`cancel` (bukan `gate-in`/`gate-out`): perlindungan 
 cukup lewat middleware `idempotency` (replay Idempotency-Key sama), tanpa menambah cabang baru
 ke Action yang sudah ber-test lewat sweep job.
 
+### N.7 Riwayat gate-in/out (planner + transporter, BUSINESS-FLOW §3.7)
+Dua jalur, **tanpa** perubahan Action atau state machine — murni query + eager-load:
+
+```php
+// AppointmentRepository::gateHistoryForGate() — planner/admin, lintas-company
+return Appointment::query()
+    ->whereHas('gateIn')                                     // sudah gate-in
+    ->whereHas('slotWindow', fn ($q) => $q->whereDate('date', $date))
+    ->whereRelation('slotWindow', 'gate_id', $gateId)         // BUKAN closure gate_id —
+    ->with([...])                                             // PHPStan tak bisa infer kolom
+    ->get();                                                  // model di closure whereHas
+```
+Beda dari `queueForTerminal` (§N.2 antrian gate-officer): tak dibatasi status
+`CONFIRMED`/`IN_PROGRESS` — `whereHas('gateIn')` saja cukup, jadi truk yang sudah
+`COMPLETED` (sudah gate-out) tetap ikut. Endpoint: `GET /reports/gate-history?gate=&date=`,
+`GateHistoryReportRequest::authorize()` = `hasAnyRole(['admin','planner'])`, pola identik
+`UtilizationReportRequest` (sibling paling mirip — sama-sama agregat lintas-company).
+
+**Transporter tidak dapat endpoint baru.** `AppointmentRepository::forCompany()` (dipakai
+`GET /me/appointments`, "Booking Saya") cukup ditambah `gateIn`/`gateOut` ke `->with()` —
+`AppointmentResource` sudah punya `gate_in_at`/`gate_out_at`/`dwell_minutes` sejak slice
+`dwell_minutes` (§N.5), otomatis muncul begitu relasinya dimuat.
+
+`AppointmentResource` juga dapat `'company' => whenLoaded('company', …)` (baru) — planner
+lintas-company perlu tahu truk itu milik siapa; sebelumnya cuma `company_id` (angka polos).
+Field lain (`truck`/`driver`/`slot_window`) sudah lebih dulu pakai pola `whenLoaded` ini.
+
 ---
 
 ## O. Slice Job No-show & Reminder (scheduler + queue)

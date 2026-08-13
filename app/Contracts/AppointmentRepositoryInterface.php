@@ -81,4 +81,16 @@ interface AppointmentRepositoryInterface
      * @return Collection<int, Appointment>
      */
     public function queueForTerminal(int $terminalId, string $date): Collection;
+
+    /**
+     * Riwayat gate-in/out (planner/admin): appointment yang SUDAH gate-in
+     * (gate-out opsional — bisa masih IN_PROGRESS) di 1 gate pada $date. Beda
+     * dari queueForTerminal: tak dibatasi status CONFIRMED/IN_PROGRESS saja,
+     * jadi truk yang sudah COMPLETED tetap muncul. Relasi + jejak gate
+     * di-eager-load (anti N+1). Urutan kronologis diserahkan ke klien (sama
+     * seperti queueForTerminal — hindari sort by kolom relasi di sini).
+     *
+     * @return Collection<int, Appointment>
+     */
+    public function gateHistoryForGate(int $gateId, string $date): Collection;
 }

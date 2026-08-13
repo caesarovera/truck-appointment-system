@@ -485,6 +485,7 @@ Endpoint yang sudah ada:
 | `POST` | `/api/v1/appointments/{id}/cancel` | token | Policy `cancel` | batalkan (kembalikan kuota); body opsional `version` → optimistic lock (409 `version_conflict` bila usang) |
 | `POST` | `/api/v1/appointments/{id}/gate-in` | token | Policy `process` | gate-in (CONFIRMED→IN_PROGRESS), idempoten; di luar toleransi jendela → 409 `gate_in_too_early` / `gate_in_too_late` (`config/tas.php` → `gate_in`) |
 | `POST` | `/api/v1/appointments/{id}/gate-out` | token | Policy `process` | gate-out (IN_PROGRESS→COMPLETED), idempoten |
+| `POST` | `/api/v1/appointments/{id}/no-show` | token | Policy `process` | tandai no-show manual (BOOKED/CONFIRMED→NO_SHOW, kembalikan kuota) — pelengkap `NoShowSweepJob` otomatis |
 | `POST` | `/api/v1/slots` | token | `slot.manage` | planner buka window (body: `gate`, `date`, `start_time`, `end_time`, `capacity`) |
 | `POST` | `/api/v1/slots/{slotWindow}/close` | token | `slot.manage` | planner tutup window (status CLOSED, idempoten) |
 | `GET`  | `/api/v1/me/appointments?status={STATUS}` | token | `appointment.read` + punya company | daftar booking transporter (filter status opsional) |
@@ -492,6 +493,7 @@ Endpoint yang sudah ada:
 | `GET`  | `/api/v1/gate/queue?date=YYYY-MM-DD` | token | `gate.process` + punya terminal | antrian gate-officer (CONFIRMED/IN_PROGRESS di terminalnya, default hari ini) |
 | `GET`  | `/api/v1/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | planner/admin | utilisasi gate (kuota vs terpakai vs no-show) |
 | `GET`  | `/api/v1/me/reports/utilization?gate={id}&date=YYYY-MM-DD` | token | `report.read` + punya company | utilisasi company sendiri per window (angka company lain tak bocor) |
+| `GET`  | `/api/v1/reports/gate-history?gate={id}&date=YYYY-MM-DD` | token | `hasAnyRole(admin,planner)` | riwayat gate-in/out per gate+tanggal, termasuk yang sudah COMPLETED (beda dari antrian `/gate/queue`) |
 
 **Admin — master data CRUD** (semua di bawah `/api/v1/admin`, butuh permission manage terkait;
 hapus → **409 `entity_in_use`** bila masih ada dependen):
