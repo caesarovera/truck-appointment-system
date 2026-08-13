@@ -32,7 +32,12 @@ jobs:
           # dev lokal perlu --ignore-platform-req (lihat SETUP-GUIDE §3b). Di Linux
           # keduanya tersedia, jadi CI TIDAK memakai flag itu: composer install di
           # sini memverifikasi dependensi apa adanya, tanpa pengecualian.
-          extensions: pcntl, posix, pdo_sqlite, sqlite3, mbstring
+          # gd: dipakai endroid/qr-code (PngWriter) buat generate gambar QR
+          # on-demand (§AA) — cuma "suggest" di composer.json paketnya (bukan
+          # require keras), jadi composer install tak akan gagal kalau ini
+          # lupa ditambah, tapi QrImageTest akan meledak runtime. Eksplisit di
+          # sini biar tak bergantung asumsi "ubuntu runner biasanya sudah ada gd".
+          extensions: pcntl, posix, pdo_sqlite, sqlite3, mbstring, gd
           coverage: none
 
       - name: Cache dependensi Composer
