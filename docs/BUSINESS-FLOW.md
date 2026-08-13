@@ -37,7 +37,7 @@ driver       → appointment.read.self
 
 | Kemampuan | Admin | Planner | Gate | Transporter | Driver |
 |-----------|:--:|:--:|:--:|:--:|:--:|
-| Kelola user & role | ✅ | — | — | — | — |
+| Kelola user & role⁵ | ✅ | — | — | — | — |
 | CRUD master data (terminal/gate/company) | ✅ | — | — | — | — |
 | Buka/tutup slot window & set kuota | ✅ | ✅ | — | — | — |
 | Lihat ketersediaan slot | ✅ | ✅ | ✅ | ✅ (read) | — |
@@ -59,6 +59,7 @@ Aturan kritikal yang harus ditegakkan Policy/Gate Laravel:
 - ² `POST /api/v1/appointments/{id}/no-show` (manual, Policy `process`) **dan** `NoShowSweepJob` (otomatis, tiap 5 menit, causer NULL) sama-sama berlaku — lihat §3.5.
 - ³ Gate-officer lihat gate-in/out lewat `GET /gate/queue` (antrian aktif hari ini di terminalnya — `CONFIRMED`/`IN_PROGRESS` saja). Truk yang sudah `COMPLETED` hilang dari situ; endpoint riwayat lintas-status (`/reports/gate-history`) khusus admin/planner.
 - ⁴ Transporter lihat lewat `GET /me/appointments` yang sudah ada (bukan endpoint terpisah) — `gate_in_at`/`gate_out_at`/`dwell_minutes` muncul begitu truk gate-in.
+- ⁵ **"Kelola role" = edit permission dari 5 role yang sudah ada** (`GET/PUT /admin/roles`), **BUKAN** bikin/hapus role baru. Role baru butuh refactor `AppointmentPolicy` dulu (scoping row-level di situ hardcode nama role, bukan data-driven) — lihat `CODE-WALKTHROUGH §V.6`. Role `admin` sendiri immutable (server-enforced) — tak bisa diedit permission-nya walau lewat API langsung.
 
 ---
 

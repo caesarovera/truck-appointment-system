@@ -10,7 +10,8 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-13` (4) · Sesi: **Fitur baru (bukan bugfix): halaman "Riwayat Gate" untuk planner + gate-in/out muncul di "Booking Saya" transporter.** Dipicu pertanyaan user langsung ("gimana cara tahu truk yang sudah gate-in/out"): sebelumnya cuma bisa dilihat lewat menu Gate (gate-officer, hilang begitu `COMPLETED`) atau API audit trail mentah (tanpa UI). Backend: endpoint baru `GET /reports/gate-history?gate=&date=` (planner/admin, `hasAnyRole` — pola `UtilizationReportRequest`) + repo method `gateHistoryForGate()` (`whereHas('gateIn')`, cakupan lebih luas dari antrian gate-officer — termasuk yang sudah `COMPLETED`); `AppointmentRepository::forCompany()` (dipakai "Booking Saya") ikut eager-load `gateIn`/`gateOut` — **tanpa endpoint baru** untuk transporter; `AppointmentResource` +`company` (whenLoaded, planner lintas-company perlu tahu ini truk siapa). Frontend: halaman baru `GateHistoryPage.vue` (`/planner/gate-history`, link "Riwayat Gate" gated `slot.manage`), `MyBookingsPage` tampilkan Gate in/Gate out per card. 5 test Pest baru + 20 test Vitest baru/diperluas (237 Pest / **99 Vitest**). PHPStan sempat merah (nested-closure `where('gate_id', …)` di dalam `whereHas` — pola persis yang sudah dihindari `queueForTerminal`; diperbaiki jadi `whereRelation`, bukti bagus kenapa gerbang analyse dijalankan tiap slice). Docs: `BUSINESS-FLOW §1`+`§3.7`, `CODE-WALKTHROUGH §N.7` (baru), `SETUP-GUIDE §10d` (+ nambal drift lama: baris `no-show` yang lupa ditambahkan sesi sebelumnya), `FRONTEND.md §4`+`§6`.
+- Update terakhir: `2026-08-13` (5) · Sesi: **Fitur baru: tab "Role & Izin" di Master Data — admin bisa edit permission dari 5 role yang sudah ada (BUKAN bikin/hapus role baru).** User awalnya minta "role CRUD penuh" (bisa bikin role baru) — ditolak dulu, dijelaskan kenapa: `AppointmentPolicy` (jantung otorisasi row-level proyek ini) hardcode nama role untuk scoping (`hasRole('gate-officer') => atOfficerTerminal(...)`, dst), jadi role baru lewat CRUD murni akan selalu 403 di endpoint appointment walau permission-nya lengkap — perlu refactor Policy jadi data-driven (kolom `scope_type`) dulu, pekerjaan arsitektur terpisah. User setuju scope dipersempit ke editor permission untuk 5 role yang ada. Backend: `GET /admin/roles` + `PUT /admin/roles/{role}/permissions` (baru), permission `role.manage` (baru, admin-only otomatis), `RoleRepository` (sync=replace, `allPermissionNames()` pakai loop eksplisit karena PHPStan tak bisa buktikan `pluck()->all()` itu `list<string>`), `UpdateRolePermissionsAction` menolak role `admin` (422 `role_immutable`, **server-enforced** — bukan cuma UI, mencegah admin mengunci diri sendiri). Frontend: tab ke-5 `AdminPage.vue` — checkbox grid, role admin read-only. 7 test Pest baru + 4 test Vitest baru (**AdminPage baru pertama kali punya test Vitest sama sekali** — gap lama, dilaporkan tak ditutup penuh, cuma tab baru yang di-test). 244 Pest/640 assert, 103 Vitest, PHPStan lvl 8 (sempat merah: `pluck('name')->all()` bukan `list<string>` yang provable — diperbaiki loop eksplisit), Pint, vue-tsc, build — semua hijau. Docs: `BUSINESS-FLOW §1` (footnote⁵) , `CODE-WALKTHROUGH §V.6` (baru, jelaskan batasan arsitektur), `SETUP-GUIDE §10d`, `FRONTEND.md §4`.
+- Sesi sebelumnya: `2026-08-13` (4) · **Fitur baru (bukan bugfix): halaman "Riwayat Gate" untuk planner + gate-in/out muncul di "Booking Saya" transporter.** Dipicu pertanyaan user langsung ("gimana cara tahu truk yang sudah gate-in/out"): sebelumnya cuma bisa dilihat lewat menu Gate (gate-officer, hilang begitu `COMPLETED`) atau API audit trail mentah (tanpa UI). Backend: endpoint baru `GET /reports/gate-history?gate=&date=` (planner/admin, `hasAnyRole` — pola `UtilizationReportRequest`) + repo method `gateHistoryForGate()` (`whereHas('gateIn')`, cakupan lebih luas dari antrian gate-officer — termasuk yang sudah `COMPLETED`); `AppointmentRepository::forCompany()` (dipakai "Booking Saya") ikut eager-load `gateIn`/`gateOut` — **tanpa endpoint baru** untuk transporter; `AppointmentResource` +`company` (whenLoaded, planner lintas-company perlu tahu ini truk siapa). Frontend: halaman baru `GateHistoryPage.vue` (`/planner/gate-history`, link "Riwayat Gate" gated `slot.manage`), `MyBookingsPage` tampilkan Gate in/Gate out per card. 5 test Pest baru + 20 test Vitest baru/diperluas (237 Pest / **99 Vitest**). PHPStan sempat merah (nested-closure `where('gate_id', …)` di dalam `whereHas` — pola persis yang sudah dihindari `queueForTerminal`; diperbaiki jadi `whereRelation`, bukti bagus kenapa gerbang analyse dijalankan tiap slice). Docs: `BUSINESS-FLOW §1`+`§3.7`, `CODE-WALKTHROUGH §N.7` (baru), `SETUP-GUIDE §10d` (+ nambal drift lama: baris `no-show` yang lupa ditambahkan sesi sebelumnya), `FRONTEND.md §4`+`§6`.
 - Sesi sebelumnya: `2026-08-13` (3) · **Bug kedua dari sesi verifikasi manual: admin bisa buka 4 menu operasional (Booking Saya/Armada/Gate/Jadwal Hari Ini) yang semuanya gagal atau kosong.** `AppNav` menggate link cuma pakai `can(permission)`, dan admin punya SEMUA permission (`RolePermissionSeeder`) — tapi 3 endpoint di baliknya (`MyFleetController`/`MyAppointmentsController`/`GateQueueController`) `abort_if(company_id/terminal_id === null)` 403 karena admin **tak** punya identitas company/terminal. `/today` beda: backend-nya tak 403, cuma balikin list kosong (admin bukan `driver_id` appointment mana pun) — bukan error, tapi menu tak relevan. Fix: `AppNav` link `/bookings`/`/trucks` tambah cek `company_id != null` (pola sama dgn `/reports` yang sudah ada), `/gate` cek `terminal_id != null`, `/today` cek `hasRole('driver')`. 2 test Vitest baru (231→89 Vitest tetap sama filenya, `AppNav.test.ts` +2 → **91 Vitest**). Lihat *Sudah selesai*.
 - Sesi sebelumnya: `2026-08-13` (2) · **Bug ditemukan saat verifikasi realtime manual → fix: badge "Tersedia" & pesan error booking tak bedakan window yang sudah berakhir.** `SlotWindowResource` diam-diam tak pernah expose bahwa window `OPEN` bisa saja `window.end`-nya sudah lewat (`SlotWindow::hasEnded()` sudah ada sejak ronde 2, cuma dipakai `BookAppointmentAction`) — akibatnya FE `/slots` menampilkan badge **"Tersedia"** + tombol Booking untuk window yang **pasti** ditolak 409 server-side, dan pesan error-nya generik ("penuh atau ditutup") walau backend sudah kirim alasan spesifik. Fix: `SlotWindowResource` + `ended`, FE badge baru **"Berakhir"** (menang atas sisa kuota) + tombol Booking disembunyikan, `BookingForm` pakai `message` asli dari backend alih-alih teks hardcode. 2 test Pest + 3 test Vitest baru (229→**231 Pest**, +2 Vitest → **89 Vitest**). Lihat *Sudah selesai*.
 - Sesi sebelumnya: `2026-08-13` (1) · **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→229 Pest). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
@@ -19,12 +20,49 @@
 - Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
 - Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
 - Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **237 pass / 619 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **99 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
+- Build backend: `composer test` → ✅ **244 pass / 640 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
+- Build frontend: `npm run test:js` → ✅ **103 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
 - **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
 - Paket FE baru: (tak ada sesi ini) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
 
 ## Sudah selesai
+- [x] **Tab "Role & Izin" di Master Data — edit permission 5 role, BUKAN CRUD role
+  (2026-08-13).** User minta "add/edit data role"; diklarifikasi jadi 2 kemungkinan
+  yang beda jauh cakupannya, user awalnya pilih **"role CRUD penuh (bisa bikin role
+  baru)"** — ditolak dulu setelah dijelaskan konsekuensinya: `AppointmentPolicy`
+  (jantung otorisasi row-level, `hasRole('gate-officer')`/`hasRole('transporter')`/dst
+  untuk scoping terminal/company/self) hardcode nama 5 role yang ada. Role baru lewat
+  CRUD murni bisa dikasih permission apa pun tapi **tetap 403** di semua endpoint
+  appointment (`default => false` di Policy) — fitur akan terlihat jalan tapi rusak.
+  Supaya role baru beneran berperilaku benar butuh refactor Policy jadi data-driven
+  (kolom `scope_type`: `NONE`/`TERMINAL`/`COMPANY`/`SELF`) — pekerjaan arsitektur
+  terpisah, disarankan ADR dulu. User setuju turun ke scope aman: **editor permission
+  untuk 5 role yang sudah ada**, tanpa refactor Policy.
+  Backend: `GET /admin/roles` (list role+permission+`meta.all_permissions`) +
+  `PUT /admin/roles/{name}/permissions` (sync=replace, bukan tambah) — baru.
+  Permission baru `role.manage` (pola sama `terminal.manage`/dst, admin-only
+  otomatis karena `admin => $permissions` sudah mencakup semua). `RoleRepository`
+  (baru), `UpdateRolePermissionsAction` (baru) — **menolak role `admin`**
+  (`ImmutableRoleException` 422 `role_immutable`, **ditegakkan server**, bukan cuma
+  UI — kalau admin bisa hapus `role.manage`/`user.manage` dari role sendiri, tak
+  ada jalan balik tanpa akses DB langsung). Route param `{role}` **bukan**
+  route-model-binding implisit (Spatie `Role` bukan Eloquent model biasa proyek
+  ini, dan sudah pernah kejebak jebakan PHPStan route-binding — lihat
+  `CODE-WALKTHROUGH §V.4`) — resolve manual via `RoleRepository::find()`.
+  Frontend: tab ke-5 `AdminPage.vue` — checkbox grid (baris=role, kolom=permission),
+  role `admin` checkbox `disabled` + tanpa tombol Simpan, state lokal `editing`
+  disinkronkan ulang dari server tiap query berubah (`watch`), 1 tombol Simpan per
+  baris (sync array penuh, bukan diff).
+  Test: `tests/Feature/Admin/RolePermissionsTest.php` (baru, 7: list+universe,
+  sync=replace, 422 admin immutable, 422 permission tak dikenal, 404 role tak
+  dikenal, 403 non-admin, 401). `tests/js/AdminPage.test.ts` (**baru — AdminPage
+  sebelumnya 0 test Vitest sama sekali** meski 4 tab lain sudah lama ada; gap lama
+  dilaporkan ke user, **tak** ditutup penuh di sini — cuma tab Role yang di-test,
+  di luar scope slice ini untuk backfill 4 tab lama).
+  PHPStan sempat merah: `RoleRepository::allPermissionNames()` — `pluck('name')->all()`
+  tak provable sebagai `list<string>` (union `array<int,mixed>`); diperbaiki jadi
+  loop eksplisit (`foreach (...->pluck('name') as $name) { $names[] = (string) $name; }`)
+  — **bukan** `@var` override (dilarang instruksi PHPStan sendiri).
 - [x] **Halaman "Riwayat Gate" (planner) + gate in/out di "Booking Saya" (transporter)
   (2026-08-13).** Dipicu pertanyaan user langsung: "gimana cara tahu truk yang sudah
   gate-in/out". Sebelum ini cuma bisa lewat menu Gate (gate-officer — hilang begitu
@@ -521,6 +559,26 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-13` (6): **Fitur baru: tab "Role & Izin" (edit permission 5 role, bukan
+  CRUD role).** Kode: `RoleRepositoryInterface`+`RoleRepository`,
+  `UpdateRolePermissionsAction`, `ImmutableRoleException`, `ListRolesRequest`+
+  `UpdateRolePermissionsRequest`, `ListRolesController`+`UpdateRolePermissionsController`,
+  `RoleResource` (baru); `RolePermissionSeeder` (+permission `role.manage`);
+  `AppServiceProvider` (+binding); `routes/api.php` (+2 route);
+  `resources/js/{types/api.ts,api/admin.ts,composables/useAdmin.ts,pages/AdminPage.vue}`.
+  Test: `tests/Feature/Admin/RolePermissionsTest.php` (baru, 7),
+  `tests/js/AdminPage.test.ts` (baru, 4 — pertama kali AdminPage punya test
+  Vitest). 244 Pest/640 assert, 103 Vitest, PHPStan lvl 8, Pint, vue-tsc,
+  `npm run build` — semua hijau. Docs: `BUSINESS-FLOW §1` (footnote⁵),
+  `CODE-WALKTHROUGH §V.6` (baru — jelaskan kenapa CRUD role penuh butuh refactor
+  Policy dulu), `SETUP-GUIDE §10d`, `FRONTEND.md §4`, `HANDOVER`
+  §Status/§Sudah selesai. Seeder: `role.manage` ditambah ke `RolePermissionSeeder`
+  (admin dapat otomatis via `admin => $permissions`). **Alasan:** user minta
+  "add/edit data role" — diklarifikasi dulu (role CRUD penuh vs edit permission
+  role existing) karena beda arsitektur; role CRUD penuh butuh `AppointmentPolicy`
+  data-driven (`scope_type` per role) supaya role baru beneran bisa berperilaku
+  benar, bukan cuma tabel kosong yang selalu 403. User setuju scope dipersempit ke
+  editor permission, aman & tak menyentuh scoping Policy sama sekali.
 - `2026-08-13` (5): **Fitur baru: halaman "Riwayat Gate" (planner) + gate in/out di
   "Booking Saya" (transporter).** Kode: `GateHistoryReportRequest`,
   `GateHistoryReportController` (baru), `AppointmentRepositoryInterface`+

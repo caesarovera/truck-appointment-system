@@ -14,6 +14,7 @@ final class RolePermissionSeeder extends Seeder
     {
         $permissions = [
             'user.manage',
+            'role.manage',
             'terminal.manage',
             'gate.manage',
             'company.manage',

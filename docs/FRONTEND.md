@@ -161,7 +161,7 @@ tanpa refetch manual. Contoh kunci konsistensi:
 | `/planner` | `pages/PlannerWindowsPage.vue` | `slot.manage` | utilisasi window (`GET /reports/utilization`); form **buka window** + tombol **Tutup** |
 | `/planner/gate-history` | `pages/GateHistoryPage.vue` | `slot.manage` (sama actor dgn backend `hasAnyRole(admin,planner)`) | riwayat gate-in/out per gate+tanggal (`GET /reports/gate-history`), **termasuk yang COMPLETED** (beda dari antrian `/gate`); urut jam gate-in **di klien** (repo sengaja tak sort kolom relasi) |
 | `/reports` | `pages/MyUtilizationPage.vue` | `report.read` **+ punya company** | laporan company sendiri (`GET /me/reports/utilization`): selesai/no-show/batal/aktif per window + ringkasan; read-only (`useMyUtilization`, key `['my-utilization']` sengaja terpisah dari `['utilization']` planner — beda scope, tak boleh saling menimpa cache) |
-| `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **4-tab** master data (terminal/gate/company/user); form inline create/edit + hapus dgn konfirmasi |
+| `/admin` | `pages/AdminPage.vue` | `terminal.manage` | **5-tab** master data (terminal/gate/company/user/**role**); form inline create/edit + hapus dgn konfirmasi. Tab **Role & Izin** (2026-08-13): checkbox grid permission per role (`GET/PUT /admin/roles`), role `admin` read-only — **bukan** CRUD role (lihat `CODE-WALKTHROUGH §V.6` kenapa) |
 | — | `components/SkeletonRows.vue` | — | placeholder loading bersama (`rows`, `label`) — dipakai **12 titik** di 8 halaman + `RescheduleDialog` (`AdminPage` sendiri 4, satu per tab). Lihat catatan di bawah |
 
 ### Loading state — `SkeletonRows`
@@ -185,12 +185,21 @@ Dua hal yang sengaja dipertahankan:
   saat data lama masih tampil — menggantinya dengan skeleton justru menyembunyikan
   data yang sudah benar. Skeleton hanya untuk `isLoading` (belum ada data sama sekali).
 
-### Admin master data — `useAdmin` + `AdminPage` (4 tab)
+### Admin master data — `useAdmin` + `AdminPage` (5 tab)
 
-`AdminPage.vue` adalah satu halaman dengan **4 tab** (terminal · gate · company · user),
-masing-masing CRUD lengkap inline (tanpa modal terpisah). Logikanya di
+`AdminPage.vue` adalah satu halaman dengan **5 tab** (terminal · gate · company · user ·
+**role**), 4 pertama CRUD lengkap inline (tanpa modal terpisah). Logikanya di
 `composables/useAdmin.ts`: `useTerminals`, `useAdminGates`, `useCompanies`, `useUsers`
 — tiap composable membungkus `useQuery` + tiga `useMutation` (create/update/remove).
+
+Tab **Role & Izin** (2026-08-13) beda pola — bukan CRUD, cuma **edit permission** dari
+5 role yang sudah ada (`useRoles`: `useQuery` + 1 `useMutation` `updatePermissions`,
+sync bukan tambah). State centang lokal (`editing`, keyed per nama role) disinkronkan
+ulang dari data server tiap query berubah lewat `watch(roleData, ...)` — bukan
+`v-model` langsung ke data server, supaya centang yang belum di-"Simpan" tak
+langsung memanggil API tiap klik. Role `admin` tampil tapi checkbox-nya `disabled`
+dan tanpa tombol Simpan (server juga menolak 422 kalau dipaksa lewat API langsung —
+lihat `CODE-WALKTHROUGH §V.6`).
 
 ```ts
 // pola tiap entitas — query + mutation yang invalidasi key-nya sendiri

@@ -11,10 +11,12 @@ import {
     deleteUser,
     fetchAdminGates,
     fetchCompanies,
+    fetchRoles,
     fetchTerminals,
     fetchUsers,
     updateCompany,
     updateGate,
+    updateRolePermissions,
     updateTerminal,
     updateUser,
 } from '@/api/admin'
@@ -118,6 +120,19 @@ export function useUsers(role?: string) {
     })
 
     return { ...query, create, update, remove }
+}
+
+export function useRoles() {
+    const query = useQuery({ queryKey: ['admin-roles'], queryFn: fetchRoles, staleTime: 0 })
+    const client = useQueryClient()
+
+    const updatePermissions = useMutation({
+        mutationFn: ({ name, permissions }: { name: string; permissions: string[] }) =>
+            updateRolePermissions(name, permissions),
+        onSuccess: () => client.invalidateQueries({ queryKey: ['admin-roles'] }),
+    })
+
+    return { ...query, updatePermissions }
 }
 
 /** Kumpulkan semua referensi master data untuk dropdown di form user. */

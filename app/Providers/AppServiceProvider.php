@@ -10,6 +10,7 @@ use App\Contracts\CompanyRepositoryInterface;
 use App\Contracts\FleetRepositoryInterface;
 use App\Contracts\GateEventGateway;
 use App\Contracts\GateRepositoryInterface;
+use App\Contracts\RoleRepositoryInterface;
 use App\Contracts\SlotRepositoryInterface;
 use App\Contracts\TerminalRepositoryInterface;
 use App\Contracts\UserRepositoryInterface;
@@ -18,6 +19,7 @@ use App\Repositories\AuditRepository;
 use App\Repositories\CompanyRepository;
 use App\Repositories\FleetRepository;
 use App\Repositories\GateRepository;
+use App\Repositories\RoleRepository;
 use App\Repositories\SlotRepository;
 use App\Repositories\TerminalRepository;
 use App\Repositories\UserRepository;
@@ -41,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CompanyRepositoryInterface::class, CompanyRepository::class);
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
         $this->app->bind(AuditRepositoryInterface::class, AuditRepository::class);
+        $this->app->bind(RoleRepositoryInterface::class, RoleRepository::class);
 
         // TOS seam: default log; swap saat integrasi TOS riil.
         $this->app->bind(GateEventGateway::class, LoggingGateEventGateway::class);

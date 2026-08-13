@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Admin\DeleteTerminalController;
 use App\Http\Controllers\Api\V1\Admin\DeleteUserController;
 use App\Http\Controllers\Api\V1\Admin\ListAdminGatesController;
 use App\Http\Controllers\Api\V1\Admin\ListCompaniesController;
+use App\Http\Controllers\Api\V1\Admin\ListRolesController;
 use App\Http\Controllers\Api\V1\Admin\ListTerminalsController;
 use App\Http\Controllers\Api\V1\Admin\ListUsersController;
 use App\Http\Controllers\Api\V1\Admin\ShowCompanyController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Api\V1\Admin\ShowTerminalController;
 use App\Http\Controllers\Api\V1\Admin\ShowUserController;
 use App\Http\Controllers\Api\V1\Admin\UpdateCompanyController;
 use App\Http\Controllers\Api\V1\Admin\UpdateGateController;
+use App\Http\Controllers\Api\V1\Admin\UpdateRolePermissionsController;
 use App\Http\Controllers\Api\V1\Admin\UpdateTerminalController;
 use App\Http\Controllers\Api\V1\Admin\UpdateUserController;
 use App\Http\Controllers\Api\V1\AppointmentAuditController;
@@ -136,6 +138,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('users/{user}', ShowUserController::class);
             Route::put('users/{user}', UpdateUserController::class);
             Route::delete('users/{user}', DeleteUserController::class);
+
+            // Role & Izin — hanya edit permission role yang sudah ada (5 tetap),
+            // TIDAK bisa bikin/hapus role baru (lihat HANDOVER 2026-08-13: scoping
+            // otorisasi di AppointmentPolicy hardcode nama role, jadi role baru
+            // butuh refactor Policy dulu supaya beneran punya perilaku yang benar).
+            Route::get('roles', ListRolesController::class);
+            Route::put('roles/{role}/permissions', UpdateRolePermissionsController::class);
         });
     });
 });

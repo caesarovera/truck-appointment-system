@@ -191,6 +191,13 @@ export interface AdminUser {
 
 export type AdminRole = 'admin' | 'planner' | 'gate-officer' | 'transporter' | 'driver';
 
+/** GET /admin/roles — 1 baris. `admin` selalu immutable (server-enforced, bukan cuma FE). */
+export interface RoleWithPermissions {
+    name: AdminRole;
+    immutable: boolean;
+    permissions: string[];
+}
+
 export interface CreateTerminalPayload { code: string; name: string }
 export interface CreateGatePayload { terminal_id: number; code: string; name: string }
 export interface CreateCompanyPayload { code: string; name: string }

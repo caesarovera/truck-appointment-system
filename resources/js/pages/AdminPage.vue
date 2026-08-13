@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useTerminals, useAdminGates, useCompanies, useUsers, useAdminRefs } from '@/composables/useAdmin'
+import { ref, watch } from 'vue'
+import { useTerminals, useAdminGates, useCompanies, useUsers, useAdminRefs, useRoles } from '@/composables/useAdmin'
 import type { AdminTerminal, AdminGate, AdminCompany, AdminUser, AdminRole } from '@/types/api'
 import SkeletonRows from '@/components/SkeletonRows.vue'
 
-type Tab = 'terminals' | 'gates' | 'companies' | 'users'
+type Tab = 'terminals' | 'gates' | 'companies' | 'users' | 'roles'
 const activeTab = ref<Tab>('terminals')
 
 // ─── Terminals ──────────────────────────────────────────────────────────────
@@ -109,6 +109,33 @@ async function uDelete(id: number) {
 
 const needsTerminal = (role: string) => role === 'gate-officer'
 const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
+
+// ─── Role & Izin ──────────────────────────────────────────────────────────
+const { data: roleData, isLoading: loadingRoles, updatePermissions } = useRoles()
+// Salinan lokal yang bisa dicentang bebas — disinkronkan ulang tiap query
+// server berubah (mis. setelah Simpan sukses → invalidate → refetch).
+const editing = ref<Record<string, string[]>>({})
+watch(
+    roleData,
+    (val) => {
+        if (!val) return
+        for (const r of val.roles) editing.value[r.name] = [...r.permissions]
+    },
+    { immediate: true },
+)
+
+function isChecked(roleName: string, perm: string): boolean {
+    return editing.value[roleName]?.includes(perm) ?? false
+}
+function togglePermission(roleName: string, perm: string): void {
+    const current = editing.value[roleName] ?? []
+    editing.value[roleName] = current.includes(perm)
+        ? current.filter((p) => p !== perm)
+        : [...current, perm]
+}
+async function saveRolePermissions(roleName: string): Promise<void> {
+    await updatePermissions.mutateAsync({ name: roleName, permissions: editing.value[roleName] ?? [] })
+}
 </script>
 
 <template>
@@ -118,7 +145,7 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
         <!-- Tab nav -->
         <div class="flex gap-2 border-b mb-6">
             <button
-                v-for="tab in (['terminals', 'gates', 'companies', 'users'] as Tab[])"
+                v-for="tab in (['terminals', 'gates', 'companies', 'users', 'roles'] as Tab[])"
                 :key="tab"
                 :class="['px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px', activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900']"
                 @click="activeTab = tab"
@@ -294,6 +321,54 @@ const needsCompany = (role: string) => ['transporter', 'driver'].includes(role)
                     <tr v-if="!users?.length"><td colspan="6" class="p-4 text-center text-gray-400">Belum ada user</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- ─── Role & Izin ───────────────────────────────────────────────── -->
+        <div v-if="activeTab === 'roles'">
+            <p class="text-sm text-gray-500 mb-4">
+                Centang permission yang dipegang tiap role, lalu klik Simpan per baris.
+                Role <strong>admin</strong> selalu punya semua permission dan tak bisa diubah.
+            </p>
+
+            <SkeletonRows v-if="loadingRoles" :rows="5" label="Memuat role…" />
+            <div v-else class="space-y-4" data-testid="role-list">
+                <div
+                    v-for="r in roleData?.roles"
+                    :key="r.name"
+                    class="border rounded p-3"
+                    data-testid="role-row"
+                >
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium">{{ r.name }}</span>
+                        <span v-if="r.immutable" class="text-xs text-gray-400">(tak bisa diubah)</span>
+                        <button
+                            v-else
+                            type="button"
+                            :disabled="updatePermissions.isPending.value"
+                            class="px-3 py-1 bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                            data-testid="save-role"
+                            @click="saveRolePermissions(r.name)"
+                        >
+                            {{ updatePermissions.isPending.value ? 'Menyimpan…' : 'Simpan' }}
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                        <label
+                            v-for="perm in roleData?.allPermissions"
+                            :key="perm"
+                            class="flex items-center gap-1 text-xs"
+                        >
+                            <input
+                                type="checkbox"
+                                :disabled="r.immutable"
+                                :checked="isChecked(r.name, perm)"
+                                @change="togglePermission(r.name, perm)"
+                            />
+                            {{ perm }}
+                        </label>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>

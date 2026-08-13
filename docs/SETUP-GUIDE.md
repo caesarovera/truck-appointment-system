@@ -504,6 +504,8 @@ hapus → **409 `entity_in_use`** bila masih ada dependen):
 | `GET` · `POST` | `/admin/gates` · `/admin/gates/{id}` (GET/PUT/DELETE) | `gate.manage` | CRUD gate (`terminal_id`, `code`, `name`); hapus ditolak bila punya slot window |
 | `GET` · `POST` | `/admin/companies` · `/admin/companies/{id}` (GET/PUT/DELETE) | `company.manage` | CRUD perusahaan angkutan; hapus ditolak bila punya user/appointment |
 | `GET` · `POST` | `/admin/users` · `/admin/users/{id}` (GET/PUT/DELETE) | `user.manage` | CRUD user (`name`, `email`, `role`, `password?`, `terminal_id?`, `company_id?`); password di-hash saat dibuat & hanya diubah bila diisi; tak bisa hapus diri sendiri (422) |
+| `GET` | `/admin/roles` | `role.manage` | list 5 role + permission masing-masing + `meta.all_permissions` (universe checkbox FE) |
+| `PUT` | `/admin/roles/{name}/permissions` | `role.manage` | ganti (sync, bukan tambah) seluruh permission 1 role; `{name}` = nama role bukan id; role `admin` ditolak 422 `role_immutable` — **tak bisa bikin/hapus role baru**, lihat `CODE-WALKTHROUGH §V.6` |
 
 Jalankan server: `php artisan serve` (default `http://127.0.0.1:8000`), pastikan data
 demo ada (`php artisan migrate:fresh --seed`).

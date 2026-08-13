@@ -9,6 +9,7 @@ import type {
     CreateCompanyPayload,
     CreateUserPayload,
     UpdateUserPayload,
+    RoleWithPermissions,
 } from '@/types/api'
 
 // ── Terminals ──────────────────────────────────────────────────────────────
@@ -70,3 +71,15 @@ export const updateUser = (id: number, payload: UpdateUserPayload): Promise<Admi
 
 export const deleteUser = (id: number): Promise<void> =>
     api.delete(`/admin/users/${id}`)
+
+// ── Role & Izin ────────────────────────────────────────────────────────────
+
+export const fetchRoles = (): Promise<{ roles: RoleWithPermissions[]; allPermissions: string[] }> =>
+    api
+        .get<{ data: RoleWithPermissions[]; meta: { all_permissions: string[] } }>('/admin/roles')
+        .then((r) => ({ roles: r.data.data, allPermissions: r.data.meta.all_permissions }))
+
+export const updateRolePermissions = (name: string, permissions: string[]): Promise<RoleWithPermissions> =>
+    api
+        .put<{ data: RoleWithPermissions }>(`/admin/roles/${name}/permissions`, { permissions })
+        .then((r) => r.data.data)

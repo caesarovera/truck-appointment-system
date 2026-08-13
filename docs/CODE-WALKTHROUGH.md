@@ -1685,6 +1685,50 @@ yang hanya tersedia di arrow function `fn () => seed(...)`.
 > **Frontend admin** (AdminPage 4-tab, `useAdmin` composable, invalidasi cache): di
 > `docs/FRONTEND.md §4`.
 
+### V.6 Role & Izin — edit permission, BUKAN CRUD role (2026-08-13)
+Sengaja **terbatas**: admin bisa ubah permission dari 5 role yang sudah ada
+(`GET /admin/roles`, `PUT /admin/roles/{role}/permissions`), tapi **tak bisa** bikin
+atau hapus role baru. Alasannya bukan keterbatasan waktu — ini batas arsitektur nyata:
+
+```php
+// AppointmentPolicy::view() — scoping row-level pakai NAMA role, bukan permission
+$user->hasRole('gate-officer') => $this->atOfficerTerminal($user, $appointment),
+$user->hasRole('transporter') => $appointment->company_id === $user->company_id,
+```
+Role baru lewat CRUD bisa dikasih permission apa pun, tapi `AppointmentPolicy` tetap
+jatuh ke `default => false` untuknya — **403 total**, walau permission-nya lengkap.
+Supaya role baru beneran punya perilaku yang benar, `AppointmentPolicy` perlu
+di-refactor jadi data-driven (mis. kolom `scope_type` di tabel `roles`: `NONE`/
+`TERMINAL`/`COMPANY`/`SELF`) — pekerjaan arsitektur terpisah, bukan bagian slice ini.
+
+**Guard kunci:** role `admin` immutable, ditegakkan di `UpdateRolePermissionsAction`
+(bukan cuma UI) — mencegah admin mengunci diri sendiri (hapus `role.manage`/
+`user.manage` dari role sendiri = tak ada jalan balik tanpa akses DB langsung):
+```php
+if ($role->name === 'admin') {
+    throw ImmutableRoleException::admin();   // 422 role_immutable
+}
+```
+`RoleRepository::allPermissionNames()` sengaja pakai loop eksplisit
+(`foreach (...->pluck('name') as $name) { $names[] = (string) $name; }`), bukan
+`->pluck('name')->all()` — PHPStan level 8 tak bisa membuktikan hasil `pluck()` itu
+`list<string>` (union `array<int,mixed>`), dan loop eksplisit adalah cara paling jujur
+membuktikannya tanpa `@var` override (dilarang §CLAUDE.md).
+
+Route param `{role}` **bukan** route-model-binding implisit — Spatie `Role` bukan
+Eloquent model biasa proyek ini, dan sudah pernah kejebak jebakan PHPStan di binding
+lain (`§V.4`). Controller resolve manual lewat `RoleRepository::find($name)`
+(`firstOrFail()` → 404 otomatis kalau nama role tak dikenal).
+
+Test: `tests/Feature/Admin/RolePermissionsTest.php` (list + universe permission,
+sync=replace bukan tambah, 422 admin immutable, 422 permission tak dikenal, 404 role
+tak dikenal, 403 non-admin). FE: tab ke-5 `AdminPage.vue` — checkbox grid (baris=role,
+kolom=permission), state lokal `editing` disinkronkan ulang dari query server tiap
+berubah (`watch(roleData, ...)`), 1 tombol Simpan per baris (sync array penuh, bukan
+diff). Test: `tests/js/AdminPage.test.ts` (baru — sebelumnya **AdminPage sama sekali
+tak punya test Vitest** meski 4 tab lain sudah lama ada; gap dilaporkan, tak ditutup
+di sini karena di luar scope slice ini).
+
 ---
 
 ## W. CRUD armada truk transporter (`/me/trucks`)
