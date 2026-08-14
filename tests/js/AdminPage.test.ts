@@ -9,9 +9,9 @@ import type { RoleWithPermissions } from '@/types/api';
 const emptyList = () => ({ data: ref([]), isLoading: ref(false) });
 const emptyCrud = () => ({
     ...emptyList(),
-    create: { mutateAsync: vi.fn() },
-    update: { mutateAsync: vi.fn() },
-    remove: { mutateAsync: vi.fn() },
+    create: { mutateAsync: vi.fn(), isPending: ref(false) },
+    update: { mutateAsync: vi.fn(), isPending: ref(false) },
+    remove: { mutateAsync: vi.fn(), isPending: ref(false) },
 });
 
 const rolesState = {

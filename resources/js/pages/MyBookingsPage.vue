@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router';
 import { isAxiosError } from 'axios';
 import { useMyAppointments } from '@/composables/useMyAppointments';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import Spinner from '@/components/Spinner.vue';
 import { useCancelAppointment } from '@/composables/useCancelAppointment';
 import RescheduleDialog from '@/components/RescheduleDialog.vue';
 import type { Appointment } from '@/types/api';
@@ -56,11 +57,11 @@ function extractError(e: unknown): string {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Booking Saya</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Booking Saya</h1>
             <div class="flex items-center gap-4 text-sm">
-                <RouterLink to="/slots" class="text-indigo-600 hover:text-indigo-800">+ Booking baru</RouterLink>
+                <RouterLink to="/slots" class="text-harbor-700 hover:text-harbor-900">+ Booking baru</RouterLink>
             </div>
         </header>
 
@@ -69,7 +70,7 @@ function extractError(e: unknown): string {
                 <span class="text-sm font-medium text-gray-700">Status</span>
                 <select
                     v-model="status"
-                    class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                 >
                     <option value="">Semua</option>
                     <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
@@ -95,7 +96,7 @@ function extractError(e: unknown): string {
                 >
                     <div class="flex items-center justify-between">
                         <span class="font-medium text-gray-900">{{ a.booking_code }}</span>
-                        <span class="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{{ a.status }}</span>
+                        <span class="text-xs rounded-full px-2 py-0.5 bg-harbor-50 text-harbor-700">{{ a.status }}</span>
                     </div>
 
                     <p v-if="a.slot_window" class="text-sm text-gray-600">
@@ -122,10 +123,11 @@ function extractError(e: unknown): string {
                             <button
                                 type="button"
                                 :disabled="cancelMutation.isPending.value"
-                                class="rounded-md bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 disabled:opacity-50"
+                                class="rounded-md bg-red-600 text-white px-3 py-1 text-sm hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                                 data-testid="confirm-cancel"
                                 @click="confirmCancel(a)"
                             >
+                                <Spinner v-if="cancelMutation.isPending.value" />
                                 {{ cancelMutation.isPending.value ? 'Memproses…' : 'Ya, batalkan' }}
                             </button>
                             <button type="button" class="text-sm text-gray-600 hover:text-gray-900" @click="confirmingId = null">
@@ -135,7 +137,7 @@ function extractError(e: unknown): string {
                         <template v-else>
                             <button
                                 type="button"
-                                class="rounded-md border border-indigo-300 text-indigo-700 px-3 py-1 text-sm hover:bg-indigo-50"
+                                class="rounded-md border border-harbor-300 text-harbor-700 px-3 py-1 text-sm hover:bg-harbor-50"
                                 data-testid="reschedule-button"
                                 @click="rescheduling = a"
                             >

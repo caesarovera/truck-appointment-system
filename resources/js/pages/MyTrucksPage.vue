@@ -4,6 +4,7 @@ import { isAxiosError } from 'axios';
 
 import { useMyTrucks } from '@/composables/useTrucks';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import Spinner from '@/components/Spinner.vue';
 import type { Truck, TruckStatus } from '@/types/api';
 
 const { trucks, isLoading, isError, create, update, remove } = useMyTrucks();
@@ -82,9 +83,9 @@ function mapError(e: unknown): string {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4">
-            <h1 class="font-semibold text-gray-900">Armada Truk</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4">
+            <h1 class="font-semibold text-harbor-900 text-lg">Armada Truk</h1>
         </header>
 
         <main class="p-6 space-y-6">
@@ -107,7 +108,7 @@ function mapError(e: unknown): string {
                         maxlength="20"
                         placeholder="mis. B 1234 XY"
                         data-testid="plate-input"
-                        class="w-48 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-48 rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     />
                 </label>
                 <label class="block space-y-1">
@@ -115,7 +116,7 @@ function mapError(e: unknown): string {
                     <select
                         v-model="status"
                         data-testid="status-select"
-                        class="w-40 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-40 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option value="ACTIVE">ACTIVE</option>
                         <option value="INACTIVE">INACTIVE</option>
@@ -125,15 +126,16 @@ function mapError(e: unknown): string {
                     type="submit"
                     :disabled="busy"
                     data-testid="submit-truck"
-                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    class="rounded-md bg-signal-600 text-white px-4 py-2 text-sm font-medium hover:bg-signal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
+                    <Spinner v-if="create.isPending.value || update.isPending.value" />
                     {{ isEditing ? 'Simpan' : 'Tambah' }}
                 </button>
                 <button
                     v-if="isEditing"
                     type="button"
                     data-testid="cancel-edit"
-                    class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-sand-50"
                     @click="resetForm"
                 >
                     Batal
@@ -175,14 +177,15 @@ function mapError(e: unknown): string {
                                 type="button"
                                 :disabled="busy"
                                 data-testid="confirm-delete"
-                                class="rounded-md bg-red-600 text-white px-3 py-1.5 text-sm hover:bg-red-700 disabled:opacity-50"
+                                class="rounded-md bg-red-600 text-white px-3 py-1.5 text-sm hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                                 @click="onDelete(t.id)"
                             >
-                                Ya, hapus
+                                <Spinner v-if="remove.isPending.value" />
+                                {{ remove.isPending.value ? 'Memproses…' : 'Ya, hapus' }}
                             </button>
                             <button
                                 type="button"
-                                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-sand-50"
                                 @click="confirmingId = null"
                             >
                                 Batal
@@ -192,7 +195,7 @@ function mapError(e: unknown): string {
                             <button
                                 type="button"
                                 data-testid="edit-truck"
-                                class="rounded-md border border-indigo-600 text-indigo-700 px-3 py-1.5 text-sm hover:bg-indigo-50"
+                                class="rounded-md border border-harbor-600 text-harbor-700 px-3 py-1.5 text-sm hover:bg-harbor-50"
                                 @click="startEdit(t)"
                             >
                                 Edit

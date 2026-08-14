@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { isAxiosError } from 'axios';
 import { useFleet } from '@/composables/useFleet';
 import { useBookAppointment } from '@/composables/useBookAppointment';
+import Spinner from '@/components/Spinner.vue';
 import type { BookedAppointment, MoveType, SlotWindow } from '@/types/api';
 
 const props = defineProps<{ slotWindow: SlotWindow }>();
@@ -85,7 +86,7 @@ function extractError(e: unknown): string {
                     :disabled="fleetLoading"
                     required
                     data-testid="booking-truck"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                 >
                     <option :value="null" disabled>Pilih truk</option>
                     <option v-for="t in trucks" :key="t.id" :value="t.id">{{ t.plate_no }}</option>
@@ -99,7 +100,7 @@ function extractError(e: unknown): string {
                     :disabled="fleetLoading"
                     required
                     data-testid="booking-driver"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                 >
                     <option :value="null" disabled>Pilih sopir</option>
                     <option v-for="d in drivers" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -111,7 +112,7 @@ function extractError(e: unknown): string {
                     <span class="text-sm font-medium text-gray-700">Jenis</span>
                     <select
                         v-model="moveType"
-                        class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option value="DELIVERY">DELIVERY</option>
                         <option value="RECEIVAL">RECEIVAL</option>
@@ -121,7 +122,7 @@ function extractError(e: unknown): string {
                     <span class="text-sm font-medium text-gray-700">Ukuran</span>
                     <select
                         v-model.number="size"
-                        class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-full rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option :value="null">—</option>
                         <option :value="20">20</option>
@@ -139,7 +140,7 @@ function extractError(e: unknown): string {
                     maxlength="20"
                     placeholder="mis. MAUU1234567"
                     data-testid="booking-container-no"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                 />
             </label>
 
@@ -150,7 +151,7 @@ function extractError(e: unknown): string {
                     type="text"
                     maxlength="10"
                     placeholder="mis. 22G1"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                 />
             </label>
 
@@ -167,8 +168,9 @@ function extractError(e: unknown): string {
                     type="submit"
                     :disabled="booking.isPending.value"
                     data-testid="booking-submit"
-                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    class="rounded-md bg-signal-600 text-white px-4 py-2 text-sm font-medium hover:bg-signal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
+                    <Spinner v-if="booking.isPending.value" />
                     {{ booking.isPending.value ? 'Memproses…' : 'Booking' }}
                 </button>
             </div>

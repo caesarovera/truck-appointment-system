@@ -186,6 +186,39 @@ Dua hal yang sengaja dipertahankan:
   saat data lama masih tampil — menggantinya dengan skeleton justru menyembunyikan
   data yang sudah benar. Skeleton hanya untuk `isLoading` (belum ada data sama sekali).
 
+### Aksi mutasi — `ConfirmButton` + `Spinner` (2026-08-14)
+
+Semua tombol yang mengubah/menghapus data (bukan cuma yang sudah lama punya pola manual)
+memakai dua komponen bersama, bukan `confirm()` native atau teks polos "Memproses…":
+
+```vue
+<ConfirmButton
+    :open="deletingId === item.id"
+    :pending="remove.isPending.value"
+    variant="danger"
+    label="Hapus"
+    confirm-label="Hapus item ini?"
+    testid="delete-item"
+    @update:open="(v) => (deletingId = v ? item.id : null)"
+    @confirm="onDelete(item.id)"
+/>
+```
+
+* **`open` dikontrol parent (`v-model`), bukan state internal komponen.** Supaya parent
+  bisa menutup panel konfirmasi sendiri setelah mutasi sukses/gagal (`finally { x = null }`)
+  — pola yang sama persis dengan yang sudah lama manual di `MyTrucksPage`/`MyBookingsPage`
+  sebelum komponen ini ada, cuma digeneralisasi.
+* **`data-testid`:** `testid` = tombol idle, `${testid}-confirm`/`${testid}-cancel` = dua
+  tombol setelah dibuka. Test yang klik aksi 2-langkah (Gate In/Out, Tutup window, hapus
+  master data) perlu **dua** `trigger('click')` berurutan.
+* **`Spinner.vue`** dipakai berdiri sendiri (bukan lewat `ConfirmButton`) di tombol submit
+  form yang tak butuh konfirmasi (booking, reschedule, simpan master data) — `aria-hidden`,
+  status loading tetap diumumkan lewat teks tombol.
+* Dipasang setelah audit menemukan 3 gap: delete di `AdminPage` (4 tab) yang tadinya
+  `confirm()` native + tanpa loading state sama sekali, Gate In/Out di `GateDashboardPage`
+  yang langsung eksekusi tanpa konfirmasi, dan Tutup window di `PlannerWindowsPage` yang
+  juga langsung eksekusi. Detail: `HANDOVER.md` §Status `2026-08-14` (3).
+
 ### Admin master data — `useAdmin` + `AdminPage` (5 tab)
 
 `AdminPage.vue` adalah satu halaman dengan **5 tab** (terminal · gate · company · user ·

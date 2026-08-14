@@ -90,6 +90,7 @@ describe('GateDashboardPage', () => {
 
         const wrapper = mountPage();
         await wrapper.find('[data-testid="gate-in"]').trigger('click');
+        await wrapper.find('[data-testid="gate-in-confirm"]').trigger('click');
         await flushPromises();
 
         expect(gateInMutation.mutateAsync).toHaveBeenCalledWith(7);
@@ -104,6 +105,7 @@ describe('GateDashboardPage', () => {
 
         const wrapper = mountPage();
         await wrapper.find('[data-testid="gate-out"]').trigger('click');
+        await wrapper.find('[data-testid="gate-out-confirm"]').trigger('click');
         await flushPromises();
 
         expect(wrapper.find('[role="alert"]').text()).toContain('Status tidak sesuai');

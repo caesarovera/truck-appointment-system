@@ -101,6 +101,7 @@ describe('PlannerWindowsPage', () => {
 
         const wrapper = mountPage();
         await wrapper.find('[data-testid="close-window"]').trigger('click');
+        await wrapper.find('[data-testid="close-window-confirm"]').trigger('click');
         await flushPromises();
 
         expect(closeMutation.mutateAsync).toHaveBeenCalledWith(7);

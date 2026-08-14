@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { useTerminals, useAdminGates, useCompanies, useUsers, useAdminRefs, useRoles } from '@/composables/useAdmin'
 import type { AdminTerminal, AdminGate, AdminCompany, AdminUser, AdminRole } from '@/types/api'
 import SkeletonRows from '@/components/SkeletonRows.vue'
+import ConfirmButton from '@/components/ConfirmButton.vue'
+import Spinner from '@/components/Spinner.vue'
 
 type Tab = 'terminals' | 'gates' | 'companies' | 'users' | 'roles'
 const activeTab = ref<Tab>('terminals')
@@ -22,9 +24,10 @@ async function tSubmit() {
     else await createT.mutateAsync(tForm.value)
     tCancel()
 }
+const tDeletingId = ref<number | null>(null)
 async function tDelete(id: number) {
-    if (!confirm('Hapus terminal ini?')) return
     await removeT.mutateAsync(id).catch((e) => alert(e.response?.data?.message ?? 'Gagal'))
+    tDeletingId.value = null
 }
 
 // ─── Gates ──────────────────────────────────────────────────────────────────
@@ -43,9 +46,10 @@ async function gSubmit() {
     else await createG.mutateAsync(gForm.value)
     gCancel()
 }
+const gDeletingId = ref<number | null>(null)
 async function gDelete(id: number) {
-    if (!confirm('Hapus gate ini?')) return
     await removeG.mutateAsync(id).catch((e) => alert(e.response?.data?.message ?? 'Gagal'))
+    gDeletingId.value = null
 }
 
 // ─── Companies ──────────────────────────────────────────────────────────────
@@ -63,9 +67,10 @@ async function cSubmit() {
     else await createC.mutateAsync(cForm.value)
     cCancel()
 }
+const cDeletingId = ref<number | null>(null)
 async function cDelete(id: number) {
-    if (!confirm('Hapus perusahaan ini?')) return
     await removeC.mutateAsync(id).catch((e) => alert(e.response?.data?.message ?? 'Gagal'))
+    cDeletingId.value = null
 }
 
 // ─── Users ──────────────────────────────────────────────────────────────────
@@ -102,9 +107,10 @@ async function uSubmit() {
     else await createU.mutateAsync(payload as any)
     uCancel()
 }
+const uDeletingId = ref<number | null>(null)
 async function uDelete(id: number) {
-    if (!confirm('Hapus user ini?')) return
     await removeU.mutateAsync(id).catch((e) => alert(e.response?.data?.message ?? 'Gagal'))
+    uDeletingId.value = null
 }
 
 const needsTerminal = (role: string) => role === 'gate-officer'
@@ -140,14 +146,14 @@ async function saveRolePermissions(roleName: string): Promise<void> {
 
 <template>
     <div class="p-6 max-w-5xl mx-auto">
-        <h1 class="text-2xl font-bold mb-6">Admin — Master Data</h1>
+        <h1 class="text-2xl font-bold text-harbor-900 mb-6">Admin — Master Data</h1>
 
         <!-- Tab nav -->
-        <div class="flex gap-2 border-b mb-6">
+        <div class="flex gap-2 border-b border-slate-200 mb-6">
             <button
                 v-for="tab in (['terminals', 'gates', 'companies', 'users', 'roles'] as Tab[])"
                 :key="tab"
-                :class="['px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px', activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900']"
+                :class="['px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px', activeTab === tab ? 'border-signal-600 text-harbor-700' : 'border-transparent text-gray-600 hover:text-gray-900']"
                 @click="activeTab = tab"
             >{{ tab }}</button>
         </div>
@@ -157,15 +163,20 @@ async function saveRolePermissions(roleName: string): Promise<void> {
             <form class="flex gap-2 mb-4" @submit.prevent="tSubmit">
                 <input v-model="tForm.code" placeholder="Kode (maks 20)" maxlength="20" required class="border rounded px-2 py-1 w-28" />
                 <input v-model="tForm.name" placeholder="Nama terminal" required class="border rounded px-2 py-1 flex-1" />
-                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                    {{ tEditId ? 'Update' : 'Tambah' }}
+                <button
+                    type="submit"
+                    :disabled="createT.isPending.value || updateT.isPending.value"
+                    class="px-3 py-1 bg-signal-600 text-white rounded text-sm disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                    <Spinner v-if="createT.isPending.value || updateT.isPending.value" />
+                    {{ createT.isPending.value || updateT.isPending.value ? 'Menyimpan…' : (tEditId ? 'Update' : 'Tambah') }}
                 </button>
                 <button v-if="tEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="tCancel">Batal</button>
             </form>
 
             <SkeletonRows v-if="loadingTerminals" :rows="3" label="Memuat terminal…" />
             <table v-else class="w-full text-sm border-collapse">
-                <thead><tr class="bg-gray-100 text-left">
+                <thead><tr class="bg-harbor-50 text-left">
                     <th class="p-2 border">ID</th>
                     <th class="p-2 border">Kode</th>
                     <th class="p-2 border">Nama</th>
@@ -173,14 +184,23 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <th class="p-2 border">Aksi</th>
                 </tr></thead>
                 <tbody>
-                    <tr v-for="t in terminals" :key="t.id" class="hover:bg-gray-50">
+                    <tr v-for="t in terminals" :key="t.id" class="hover:bg-sand-50">
                         <td class="p-2 border text-gray-500">{{ t.id }}</td>
                         <td class="p-2 border font-mono">{{ t.code }}</td>
                         <td class="p-2 border">{{ t.name }}</td>
                         <td class="p-2 border">{{ t.gates_count ?? '-' }}</td>
                         <td class="p-2 border">
-                            <button class="text-blue-600 mr-3 text-xs" @click="tEdit(t)">Edit</button>
-                            <button class="text-red-600 text-xs" @click="tDelete(t.id)">Hapus</button>
+                            <button class="text-harbor-700 mr-3 text-xs" @click="tEdit(t)">Edit</button>
+                            <ConfirmButton
+                                :open="tDeletingId === t.id"
+                                :pending="removeT.isPending.value"
+                                variant="danger"
+                                size="sm"
+                                label="Hapus"
+                                confirm-label="Hapus terminal ini?"
+                                @update:open="(v) => (tDeletingId = v ? t.id : null)"
+                                @confirm="tDelete(t.id)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!terminals?.length"><td colspan="5" class="p-4 text-center text-gray-400">Belum ada terminal</td></tr>
@@ -197,15 +217,20 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                 </select>
                 <input v-model="gForm.code" placeholder="Kode gate" maxlength="20" required class="border rounded px-2 py-1 w-24" />
                 <input v-model="gForm.name" placeholder="Nama gate" required class="border rounded px-2 py-1 flex-1" />
-                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                    {{ gEditId ? 'Update' : 'Tambah' }}
+                <button
+                    type="submit"
+                    :disabled="createG.isPending.value || updateG.isPending.value"
+                    class="px-3 py-1 bg-signal-600 text-white rounded text-sm disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                    <Spinner v-if="createG.isPending.value || updateG.isPending.value" />
+                    {{ createG.isPending.value || updateG.isPending.value ? 'Menyimpan…' : (gEditId ? 'Update' : 'Tambah') }}
                 </button>
                 <button v-if="gEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="gCancel">Batal</button>
             </form>
 
             <SkeletonRows v-if="loadingGates" :rows="3" label="Memuat gate…" />
             <table v-else class="w-full text-sm border-collapse">
-                <thead><tr class="bg-gray-100 text-left">
+                <thead><tr class="bg-harbor-50 text-left">
                     <th class="p-2 border">ID</th>
                     <th class="p-2 border">Terminal</th>
                     <th class="p-2 border">Kode</th>
@@ -213,14 +238,23 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <th class="p-2 border">Aksi</th>
                 </tr></thead>
                 <tbody>
-                    <tr v-for="g in gates" :key="g.id" class="hover:bg-gray-50">
+                    <tr v-for="g in gates" :key="g.id" class="hover:bg-sand-50">
                         <td class="p-2 border text-gray-500">{{ g.id }}</td>
                         <td class="p-2 border text-gray-500">{{ g.terminal?.name ?? g.terminal_id }}</td>
                         <td class="p-2 border font-mono">{{ g.code }}</td>
                         <td class="p-2 border">{{ g.name }}</td>
                         <td class="p-2 border">
-                            <button class="text-blue-600 mr-3 text-xs" @click="gEdit(g)">Edit</button>
-                            <button class="text-red-600 text-xs" @click="gDelete(g.id)">Hapus</button>
+                            <button class="text-harbor-700 mr-3 text-xs" @click="gEdit(g)">Edit</button>
+                            <ConfirmButton
+                                :open="gDeletingId === g.id"
+                                :pending="removeG.isPending.value"
+                                variant="danger"
+                                size="sm"
+                                label="Hapus"
+                                confirm-label="Hapus gate ini?"
+                                @update:open="(v) => (gDeletingId = v ? g.id : null)"
+                                @confirm="gDelete(g.id)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!gates?.length"><td colspan="5" class="p-4 text-center text-gray-400">Belum ada gate</td></tr>
@@ -233,15 +267,20 @@ async function saveRolePermissions(roleName: string): Promise<void> {
             <form class="flex gap-2 mb-4" @submit.prevent="cSubmit">
                 <input v-model="cForm.code" placeholder="Kode (maks 20)" maxlength="20" required class="border rounded px-2 py-1 w-28" />
                 <input v-model="cForm.name" placeholder="Nama perusahaan" required class="border rounded px-2 py-1 flex-1" />
-                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                    {{ cEditId ? 'Update' : 'Tambah' }}
+                <button
+                    type="submit"
+                    :disabled="createC.isPending.value || updateC.isPending.value"
+                    class="px-3 py-1 bg-signal-600 text-white rounded text-sm disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                    <Spinner v-if="createC.isPending.value || updateC.isPending.value" />
+                    {{ createC.isPending.value || updateC.isPending.value ? 'Menyimpan…' : (cEditId ? 'Update' : 'Tambah') }}
                 </button>
                 <button v-if="cEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="cCancel">Batal</button>
             </form>
 
             <SkeletonRows v-if="loadingCompanies" :rows="3" label="Memuat perusahaan…" />
             <table v-else class="w-full text-sm border-collapse">
-                <thead><tr class="bg-gray-100 text-left">
+                <thead><tr class="bg-harbor-50 text-left">
                     <th class="p-2 border">ID</th>
                     <th class="p-2 border">Kode</th>
                     <th class="p-2 border">Nama</th>
@@ -250,15 +289,24 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <th class="p-2 border">Aksi</th>
                 </tr></thead>
                 <tbody>
-                    <tr v-for="c in companies" :key="c.id" class="hover:bg-gray-50">
+                    <tr v-for="c in companies" :key="c.id" class="hover:bg-sand-50">
                         <td class="p-2 border text-gray-500">{{ c.id }}</td>
                         <td class="p-2 border font-mono">{{ c.code }}</td>
                         <td class="p-2 border">{{ c.name }}</td>
                         <td class="p-2 border">{{ c.users_count ?? '-' }}</td>
                         <td class="p-2 border">{{ c.trucks_count ?? '-' }}</td>
                         <td class="p-2 border">
-                            <button class="text-blue-600 mr-3 text-xs" @click="cEdit(c)">Edit</button>
-                            <button class="text-red-600 text-xs" @click="cDelete(c.id)">Hapus</button>
+                            <button class="text-harbor-700 mr-3 text-xs" @click="cEdit(c)">Edit</button>
+                            <ConfirmButton
+                                :open="cDeletingId === c.id"
+                                :pending="removeC.isPending.value"
+                                variant="danger"
+                                size="sm"
+                                label="Hapus"
+                                confirm-label="Hapus perusahaan ini?"
+                                @update:open="(v) => (cDeletingId = v ? c.id : null)"
+                                @confirm="cDelete(c.id)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!companies?.length"><td colspan="6" class="p-4 text-center text-gray-400">Belum ada perusahaan</td></tr>
@@ -268,7 +316,7 @@ async function saveRolePermissions(roleName: string): Promise<void> {
 
         <!-- ─── Users ─────────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'users'">
-            <form class="grid grid-cols-2 gap-2 mb-4 p-3 border rounded bg-gray-50" @submit.prevent="uSubmit">
+            <form class="grid grid-cols-2 gap-2 mb-4 p-3 border rounded bg-sand-50" @submit.prevent="uSubmit">
                 <input v-model="uForm.name" placeholder="Nama" required class="border rounded px-2 py-1" />
                 <input v-model="uForm.email" type="email" placeholder="Email" required class="border rounded px-2 py-1" />
                 <input v-model="uForm.password" type="password" :placeholder="uEditId ? 'Password (kosongkan jika tidak diubah)' : 'Password'" :required="!uEditId" class="border rounded px-2 py-1" />
@@ -285,8 +333,13 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <option v-for="c in adminCompanies.data.value" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
                 </select>
                 <div class="col-span-2 flex gap-2">
-                    <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                        {{ uEditId ? 'Update User' : 'Tambah User' }}
+                    <button
+                        type="submit"
+                        :disabled="createU.isPending.value || updateU.isPending.value"
+                        class="px-3 py-1 bg-signal-600 text-white rounded text-sm disabled:opacity-50 inline-flex items-center gap-1.5"
+                    >
+                        <Spinner v-if="createU.isPending.value || updateU.isPending.value" />
+                        {{ createU.isPending.value || updateU.isPending.value ? 'Menyimpan…' : (uEditId ? 'Update User' : 'Tambah User') }}
                     </button>
                     <button v-if="uEditId" type="button" class="px-3 py-1 bg-gray-200 rounded text-sm" @click="uCancel">Batal</button>
                 </div>
@@ -294,7 +347,7 @@ async function saveRolePermissions(roleName: string): Promise<void> {
 
             <SkeletonRows v-if="loadingUsers" :rows="3" label="Memuat user…" />
             <table v-else class="w-full text-sm border-collapse">
-                <thead><tr class="bg-gray-100 text-left">
+                <thead><tr class="bg-harbor-50 text-left">
                     <th class="p-2 border">ID</th>
                     <th class="p-2 border">Nama</th>
                     <th class="p-2 border">Email</th>
@@ -303,19 +356,28 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <th class="p-2 border">Aksi</th>
                 </tr></thead>
                 <tbody>
-                    <tr v-for="u in users" :key="u.id" class="hover:bg-gray-50">
+                    <tr v-for="u in users" :key="u.id" class="hover:bg-sand-50">
                         <td class="p-2 border text-gray-500">{{ u.id }}</td>
                         <td class="p-2 border">{{ u.name }}</td>
                         <td class="p-2 border text-gray-600 text-xs">{{ u.email }}</td>
                         <td class="p-2 border">
-                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">{{ u.role }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-harbor-100 text-harbor-700">{{ u.role }}</span>
                         </td>
                         <td class="p-2 border text-gray-500 text-xs">
                             {{ u.terminal?.name ?? u.company?.name ?? '—' }}
                         </td>
                         <td class="p-2 border">
-                            <button class="text-blue-600 mr-3 text-xs" @click="uEdit(u)">Edit</button>
-                            <button class="text-red-600 text-xs" @click="uDelete(u.id)">Hapus</button>
+                            <button class="text-harbor-700 mr-3 text-xs" @click="uEdit(u)">Edit</button>
+                            <ConfirmButton
+                                :open="uDeletingId === u.id"
+                                :pending="removeU.isPending.value"
+                                variant="danger"
+                                size="sm"
+                                label="Hapus"
+                                confirm-label="Hapus user ini?"
+                                @update:open="(v) => (uDeletingId = v ? u.id : null)"
+                                @confirm="uDelete(u.id)"
+                            />
                         </td>
                     </tr>
                     <tr v-if="!users?.length"><td colspan="6" class="p-4 text-center text-gray-400">Belum ada user</td></tr>
@@ -345,10 +407,11 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                             v-else
                             type="button"
                             :disabled="updatePermissions.isPending.value"
-                            class="px-3 py-1 bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+                            class="px-3 py-1 bg-signal-600 text-white rounded text-xs disabled:opacity-50 inline-flex items-center gap-1.5"
                             data-testid="save-role"
                             @click="saveRolePermissions(r.name)"
                         >
+                            <Spinner v-if="updatePermissions.isPending.value" />
                             {{ updatePermissions.isPending.value ? 'Menyimpan…' : 'Simpan' }}
                         </button>
                     </div>

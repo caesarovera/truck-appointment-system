@@ -5,6 +5,8 @@ import { isAxiosError } from 'axios';
 import { useGates } from '@/composables/useGates';
 import { useUtilization, useOpenSlotWindow, useCloseSlotWindow } from '@/composables/usePlannerWindows';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import ConfirmButton from '@/components/ConfirmButton.vue';
+import Spinner from '@/components/Spinner.vue';
 
 function today(): string {
     return new Date().toISOString().slice(0, 10);
@@ -24,6 +26,7 @@ const endTime = ref('');
 const capacity = ref<number | null>(null);
 const formError = ref<string | null>(null);
 const notice = ref<string | null>(null);
+const closingId = ref<number | null>(null);
 
 function withSeconds(t: string): string {
     return t.length === 5 ? `${t}:00` : t;
@@ -63,6 +66,8 @@ async function closeWindow(id: number): Promise<void> {
         notice.value = 'Window ditutup.';
     } catch (e) {
         formError.value = extractError(e);
+    } finally {
+        closingId.value = null;
     }
 }
 
@@ -77,9 +82,9 @@ function extractError(e: unknown): string {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Kelola Slot Window</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Kelola Slot Window</h1>
         </header>
 
         <main class="p-6 space-y-6">
@@ -89,7 +94,7 @@ function extractError(e: unknown): string {
                     <select
                         v-model.number="gate"
                         :disabled="gatesLoading"
-                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option :value="null" disabled>Pilih gate</option>
                         <option v-for="g in gates" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -100,7 +105,7 @@ function extractError(e: unknown): string {
                     <input
                         v-model="date"
                         type="date"
-                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     />
                 </label>
             </div>
@@ -125,9 +130,10 @@ function extractError(e: unknown): string {
                 <button
                     type="submit"
                     :disabled="openMutation.isPending.value"
-                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    class="rounded-md bg-signal-600 text-white px-4 py-2 text-sm font-medium hover:bg-signal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                     data-testid="open-window"
                 >
+                    <Spinner v-if="openMutation.isPending.value" />
                     {{ openMutation.isPending.value ? 'Memproses…' : 'Buka window' }}
                 </button>
             </form>
@@ -161,16 +167,18 @@ function extractError(e: unknown): string {
                                 <template v-if="w.no_show !== undefined"> · no-show {{ w.no_show }}</template>
                             </p>
                         </div>
-                        <button
+                        <ConfirmButton
                             v-if="w.status === 'OPEN'"
-                            type="button"
-                            :disabled="closeMutation.isPending.value"
-                            class="rounded-md border border-red-300 text-red-700 px-3 py-1 text-sm hover:bg-red-50 disabled:opacity-50"
-                            data-testid="close-window"
-                            @click="closeWindow(w.id)"
-                        >
-                            Tutup
-                        </button>
+                            :open="closingId === w.id"
+                            :pending="closeMutation.isPending.value"
+                            :disabled="closeMutation.isPending.value && closingId !== w.id"
+                            variant="danger"
+                            label="Tutup"
+                            confirm-label="Tutup window ini? Booking yang sudah ada tak terpengaruh."
+                            testid="close-window"
+                            @update:open="(v) => (closingId = v ? w.id : null)"
+                            @confirm="closeWindow(w.id)"
+                        />
                     </li>
                 </ul>
 

@@ -5,6 +5,7 @@ import { isAxiosError } from 'axios';
 import { useAuthStore } from '@/stores/auth';
 import { useGateQueue, useGateIn, useGateOut } from '@/composables/useGateQueue';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import ConfirmButton from '@/components/ConfirmButton.vue';
 import { useGateQueueRealtime } from '@/composables/useRealtime';
 import type { Appointment } from '@/types/api';
 
@@ -18,6 +19,8 @@ const gateOutMutation = useGateOut();
 useGateQueueRealtime(computed(() => auth.user?.terminal_id ?? null));
 
 const error = ref<string | null>(null);
+// Aksi gate-in/out ireversibel di lapangan → konfirmasi inline dulu, per baris.
+const confirmingId = ref<number | null>(null);
 
 // Urut kronologis berdasar jam mulai window.
 const sorted = computed(() =>
@@ -32,6 +35,8 @@ async function onGateIn(a: Appointment): Promise<void> {
         await gateInMutation.mutateAsync(a.id);
     } catch (e) {
         error.value = extractError(e);
+    } finally {
+        confirmingId.value = null;
     }
 }
 
@@ -41,6 +46,8 @@ async function onGateOut(a: Appointment): Promise<void> {
         await gateOutMutation.mutateAsync(a.id);
     } catch (e) {
         error.value = extractError(e);
+    } finally {
+        confirmingId.value = null;
     }
 }
 
@@ -57,9 +64,9 @@ const busy = computed(() => gateInMutation.isPending.value || gateOutMutation.is
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Dashboard Gate</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Dashboard Gate</h1>
         </header>
 
         <main class="p-6 space-y-4">
@@ -94,26 +101,34 @@ const busy = computed(() => gateInMutation.isPending.value || gateOutMutation.is
                         </p>
                     </div>
 
-                    <button
+                    <ConfirmButton
                         v-if="a.status === 'CONFIRMED'"
-                        type="button"
-                        :disabled="busy"
-                        class="rounded-md bg-green-600 text-white px-4 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                        data-testid="gate-in"
-                        @click="onGateIn(a)"
-                    >
-                        Gate In
-                    </button>
-                    <button
+                        :open="confirmingId === a.id"
+                        :pending="gateInMutation.isPending.value"
+                        :disabled="busy && confirmingId !== a.id"
+                        variant="success"
+                        :outline="false"
+                        size="md"
+                        label="Gate In"
+                        confirm-label="Konfirmasi truk masuk?"
+                        testid="gate-in"
+                        @update:open="(v) => (confirmingId = v ? a.id : null)"
+                        @confirm="onGateIn(a)"
+                    />
+                    <ConfirmButton
                         v-else-if="a.status === 'IN_PROGRESS'"
-                        type="button"
-                        :disabled="busy"
-                        class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                        data-testid="gate-out"
-                        @click="onGateOut(a)"
-                    >
-                        Gate Out
-                    </button>
+                        :open="confirmingId === a.id"
+                        :pending="gateOutMutation.isPending.value"
+                        :disabled="busy && confirmingId !== a.id"
+                        variant="primary"
+                        :outline="false"
+                        size="md"
+                        label="Gate Out"
+                        confirm-label="Konfirmasi truk keluar?"
+                        testid="gate-out"
+                        @update:open="(v) => (confirmingId = v ? a.id : null)"
+                        @confirm="onGateOut(a)"
+                    />
                 </li>
             </ul>
         </main>

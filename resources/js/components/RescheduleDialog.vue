@@ -5,6 +5,7 @@ import { useGates } from '@/composables/useGates';
 import { useSlotAvailability } from '@/composables/useSlotAvailability';
 import { useRescheduleAppointment } from '@/composables/useRescheduleAppointment';
 import SkeletonRows from '@/components/SkeletonRows.vue';
+import Spinner from '@/components/Spinner.vue';
 import type { Appointment } from '@/types/api';
 
 const props = defineProps<{ appointment: Appointment }>();
@@ -67,7 +68,7 @@ function extractError(e: unknown): string {
                     <select
                         v-model.number="gate"
                         :disabled="gatesLoading"
-                        class="w-44 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-44 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option :value="null" disabled>Pilih gate</option>
                         <option v-for="g in gates" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -78,7 +79,7 @@ function extractError(e: unknown): string {
                     <input
                         v-model="date"
                         type="date"
-                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     />
                 </label>
             </div>
@@ -96,7 +97,7 @@ function extractError(e: unknown): string {
                         type="button"
                         :disabled="w.remaining <= 0"
                         class="w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm disabled:opacity-40"
-                        :class="selectedWindowId === w.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300 hover:bg-gray-50'"
+                        :class="selectedWindowId === w.id ? 'border-harbor-600 bg-harbor-50' : 'border-gray-300 hover:bg-sand-50'"
                         data-testid="window-option"
                         @click="selectedWindowId = w.id"
                     >
@@ -113,10 +114,11 @@ function extractError(e: unknown): string {
                 <button
                     type="button"
                     :disabled="reschedule.isPending.value"
-                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    class="rounded-md bg-signal-600 text-white px-4 py-2 text-sm font-medium hover:bg-signal-700 disabled:opacity-50 inline-flex items-center gap-1.5"
                     data-testid="reschedule-submit"
                     @click="submit"
                 >
+                    <Spinner v-if="reschedule.isPending.value" />
                     {{ reschedule.isPending.value ? 'Memproses…' : 'Pindahkan' }}
                 </button>
             </div>
