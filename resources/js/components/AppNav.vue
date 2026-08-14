@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import AppLogo from '@/components/AppLogo.vue';
 
 /**
  * Navbar bersama semua halaman ber-auth. Satu-satunya sumber daftar link:
@@ -31,14 +32,7 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
 <template>
     <header class="bg-harbor-900 text-white border-b border-harbor-800 px-4 py-2 flex items-center gap-2 flex-wrap shadow-sm">
         <RouterLink to="/" class="flex items-center gap-2 px-2 py-1" data-testid="brand">
-            <span class="grid h-7 w-7 place-items-center rounded-md bg-signal-500 text-white" aria-hidden="true">
-                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="5" r="2" />
-                    <path d="M12 7v14" />
-                    <path d="M5 12h14" />
-                    <path d="M5 12c0 4 3 8 7 9c4-1 7-5 7-9" />
-                </svg>
-            </span>
+            <AppLogo variant="nav" />
             <span class="font-semibold tracking-wide">TAS</span>
         </RouterLink>
 

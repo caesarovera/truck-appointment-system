@@ -88,6 +88,14 @@ tak 403 admin (list kosong, bukan error), jadi satu-satunya link yang gating tam
 langsung: admin bisa buka 4 menu operasional itu dan semuanya gagal/membingungkan).
 Halaman tidak lagi punya link "← Dashboard" sendiri.
 
+**Logo brand — `components/AppLogo.vue`** (2026-08-14): glyph jangkar (anchor) dulu
+diduplikasi manual di `AppNav` + 2 tempat di `LoginPage` — kini 1 komponen dgn 3 varian
+(`nav`/`hero`/`compact`) mencerminkan 3 pemakaian yang sudah ada. Favicon tab browser
+(`public/favicon.svg`+`favicon-32.png`+`favicon.ico`) pakai glyph yang **sama**, tapi
+di-hardcode hex (di luar pipeline Tailwind) — kalau `AppLogo.vue` berubah, favicon perlu
+disamakan manual. `favicon.ico` sebelumnya **0 byte** (placeholder Laravel default yang tak
+pernah diisi) — kini diisi via GD (`ext-gd`, sudah terpasang sejak slice QR).
+
 ### `app.ts` — bootstrap
 Pasang Pinia, Router, **VueQueryPlugin**, lalu wiring hook 401 (`setUnauthorizedHandler`
 → clearSession + push login). Shell HTML: `resources/views/app.blade.php` + catch-all

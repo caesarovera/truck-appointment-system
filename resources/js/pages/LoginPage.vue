@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { isAxiosError } from 'axios';
 import { useAuthStore } from '@/stores/auth';
+import AppLogo from '@/components/AppLogo.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -73,15 +74,7 @@ function extractError(e: unknown): string {
             </svg>
 
             <div class="relative flex items-center gap-3">
-                <span class="grid h-11 w-11 place-items-center rounded-lg bg-signal-500/90 text-white shadow-lg" aria-hidden="true">
-                    <!-- ikon jangkar -->
-                    <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="5" r="2.2" />
-                        <path d="M12 7.2V21" />
-                        <path d="M5 12h14" />
-                        <path d="M5 12c0 4 3 8 7 9c4-1 7-5 7-9" />
-                    </svg>
-                </span>
+                <AppLogo variant="hero" />
                 <div class="leading-tight">
                     <p class="text-lg font-semibold tracking-wide">TAS</p>
                     <p class="text-xs text-harbor-100/80">Truck Appointment System</p>
@@ -105,14 +98,7 @@ function extractError(e: unknown): string {
         <div class="flex items-center justify-center px-4 py-12">
             <form class="w-full max-w-sm space-y-5" @submit.prevent="submit">
                 <div class="mb-2 flex items-center gap-3 lg:hidden">
-                    <span class="grid h-10 w-10 place-items-center rounded-lg bg-harbor-900 text-white" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="5" r="2.2" />
-                            <path d="M12 7.2V21" />
-                            <path d="M5 12h14" />
-                            <path d="M5 12c0 4 3 8 7 9c4-1 7-5 7-9" />
-                        </svg>
-                    </span>
+                    <AppLogo variant="compact" />
                     <span class="font-semibold text-harbor-900">TAS</span>
                 </div>
 

@@ -10,7 +10,31 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-14` (5) · Sesi: **Commit + push rebrand warna "kepelabuhanan
+- Update terakhir: `2026-08-14` (6) · Sesi: **Logo brand disatukan (`AppLogo.vue`) + favicon
+  tab browser diperbaiki (sebelumnya benar-benar tak ada — `favicon.ico` 0 byte).** Permintaan
+  langsung user ("tambahkan logo dan logo di tabnya"). Glyph jangkar (anchor) yang sebelumnya
+  diduplikasi manual **3x** (`AppNav.vue` + 2 tempat di `LoginPage.vue`, sedikit tak konsisten
+  stroke-width-nya) disatukan jadi `resources/js/components/AppLogo.vue` — 3 varian
+  (`nav`/`hero`/`compact`) mencerminkan 3 pemakaian yang sudah ada, bukan API generik baru.
+  **Favicon:** `public/favicon.ico` bawaan Laravel ternyata **0 byte** — placeholder yang tak
+  pernah diisi siapa pun sejak awal proyek. Percobaan pertama pakai `favicon.svg` (glyph sama,
+  di-hardcode hex karena di luar pipeline Tailwind) + `<link rel="icon" type="image/svg+xml">` —
+  server terbukti benar (dicek `curl`: 200, `Content-Type: image/svg+xml`), tapi **tak muncul
+  di tab browser user bahkan di incognito** (kemungkinan versi browser belum dukung favicon
+  SVG). Fix lebih tahan-banting: generate **PNG 32×32** + **ICO sungguhan** lewat GD (`ext-gd`,
+  sudah terpasang sejak slice QR) — `public/favicon-32.png` + isi ulang `public/favicon.ico`
+  (format ICO modern: `ICONDIR`+1 `ICONDIRENTRY` membungkus PNG, bukan BMP mentah — didukung
+  semua browser terkini). Ketiganya (svg/png/ico) didaftarkan bareng di `app.blade.php`,
+  browser pakai yang paling didukungnya. **Insiden kecil sesi ini:** untuk mematikan server uji
+  coba, sempat pakai `taskkill /F /IM php.exe` yang mematikan SEMUA proses PHP di mesin (termasuk
+  `composer dev` user yang sedang jalan) — dilaporkan ke user, tak diulangi (percobaan berikutnya
+  matikan proses spesifik lewat PID). **Terpisah, bukan bug:** error WebSocket
+  `ws://localhost:8080` di console — `VITE_REVERB_APP_KEY` di `.env` user terisi, jadi Echo
+  selalu mencoba konek, tapi `composer dev` (lihat `composer.json`) **tidak** menyalakan
+  `php artisan reverb:start`. Bukan regresi kode — dijelaskan ke user, bukan diperbaiki (di
+  luar scope "logo").  Verifikasi: `type-check` bersih, 111 Vitest, `npm run build` bersih,
+  file favicon dicek `curl` (Content-Type benar). Docs: `HANDOVER` saja (visual murni).
+- Sesi sebelumnya: `2026-08-14` (5) · Sesi: **Commit + push rebrand warna "kepelabuhanan
   Indonesia" (harbor/signal/sand) — kerja yang sudah ada di working tree sejak sebelum sesi
   ini mulai (lihat komentar `resources/css/app.css`: "Dipilih 2026-08-14 bareng user"), sengaja
   ditahan 2 sesi sebelumnya karena belum diverifikasi/didokumentasikan, kini diverifikasi &
@@ -66,6 +90,9 @@
 - Paket BE baru: `endroid/qr-code:^5.0` (dikonfirmasi user; versi 6 butuh php^8.4, mesin dev 8.3 → `--ignore-platform-req=ext-pcntl,ext-posix` sama seperti Horizon, lihat §Jebakan).
 
 ## Sudah selesai
+- [x] **`AppLogo.vue` (1 sumber glyph, ganti 3x duplikat manual) + favicon tab browser
+  yang sebelumnya benar-benar kosong (0 byte) — kini svg+png+ico (2026-08-14).** Detail di
+  *Status* teratas.
 - [x] **Rebrand warna "kepelabuhanan Indonesia" (harbor/signal/sand) — commit+push
   (2026-08-14).** Kerja visual sudah ada di working tree, kini diverifikasi & tercatat.
   Detail di *Status* teratas.
@@ -619,14 +646,15 @@
    (opsi B) supaya tetap nol-storage. Detail: *Status* teratas & `CODE-WALKTHROUGH §AA`.
    **Semua 7 temuan ronde 4 kini FIXED — tak ada lagi janji kontrak tanpa kode yang diketahui.**
 2. **[SELESAI 2026-08-13] Verifikasi realtime end-to-end di browser.** `BROADCAST_CONNECTION=reverb`, `composer dev` + `php artisan reverb:start`, booking di satu browser (`dispatcher@majulog.test`) → sisa kuota berubah sendiri **tanpa refresh** di browser lain (`dispatcher@sinarkargo.test`) — **dikonfirmasi manual oleh user**. Verifikasi ini sekaligus menemukan 2 bug nyata (dicatat terpisah di *Sudah selesai*): (a) `DemoSeeder` pakai `Carbon::today()` saat di-seed → data demo jadi basi kalau DB tak di-`migrate:fresh --seed` ulang belakangan (bukan bug kode, tapi jebakan operasional — lihat §Jebakan); (b) badge "Tersedia" & pesan error tak bedakan window yang sudah berakhir. `BROADCAST_CONNECTION` dev **dikembalikan ke `log`** (default `CLAUDE.md §Stack`) setelah rangkaian testing manual sesi ini selesai — dipakai `reverb` sementara untuk beberapa verifikasi (realtime kuota, badge "Berakhir", role editor, dashboard fix). Swap ke TOS riil (`LoggingGateEventGateway`) masih opsional, belum dikerjakan.
-3. **[SELESAI 2026-08-14, lokal-only] Polish UI — e2e happy-path.** Loading skeleton **DONE**
-   sejak sebelumnya. E2E: prasyarat `ADR-0005` beres (`.env.e2e`+DB terpisah, `data-testid` di
-   `LoginPage.vue`/`BookingForm.vue`), Playwright + 1 smoke test (login→booking) terpasang &
-   lulus. Detail: *Status* teratas, `docs/SETUP-GUIDE.md §15`. **Sisa yang belum dikerjakan
-   (sengaja, bukan lupa):** e2e **tidak** masuk CI (biaya browser binary ~140MB + waktu run
-   belum sepadan sebelum benar-benar dibutuhkan), dan cakupannya cuma **1** happy-path — belum
-   ada spec untuk reschedule/cancel/gate-in/error path dsb. Perluasan cakupan atau wiring CI =
-   sesi terpisah kalau dibutuhkan.
+3. **[SELESAI 2026-08-14, lokal-only] Polish UI — konfirmasi/loading + e2e.** Loading skeleton
+   **DONE** sejak sebelumnya; konfirmasi eksplisit + spinner di semua tombol aksi lintas role
+   **DONE** (`ConfirmButton`+`Spinner`, lihat *Status*). E2E: prasyarat `ADR-0005` beres,
+   diperluas dari 1 happy-path jadi **5 spec/5 test** (booking-happy-path, booking-errors,
+   gate-in-out, reschedule-cancel ×2) — semua lulus konsisten. Detail: *Status* teratas,
+   `docs/SETUP-GUIDE.md §15`. **Sisa yang belum dikerjakan (sengaja, bukan lupa):** e2e **tidak**
+   masuk CI (biaya browser binary ~140MB + waktu run belum sepadan sebelum benar-benar
+   dibutuhkan), dan belum ada spec untuk admin/planner-utilization/no-show/QR. Wiring CI atau
+   perluasan cakupan lagi = sesi terpisah kalau dibutuhkan.
 4. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
 5. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
 6. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
@@ -634,6 +662,13 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-14` (6): **Logo `AppLogo.vue` (satukan 3x duplikat) + favicon nyata (svg+png+ico).**
+  Kode: `resources/js/components/AppLogo.vue` (baru), `AppNav.vue`/`LoginPage.vue` (pakai
+  `AppLogo`), `public/favicon.svg`+`public/favicon-32.png` (baru), `public/favicon.ico`
+  (diisi ulang — sebelumnya 0 byte), `resources/views/app.blade.php` (3 `<link rel="icon">`).
+  Test: tak ada test baru — type-check, 111 Vitest, build diverifikasi ulang; favicon dicek
+  `curl` (Content-Type benar per file). Docs: HANDOVER §Status/§Sudah selesai saja (visual
+  murni, tak ada perubahan kontrak). Seeder: tak ada. **Alasan:** permintaan langsung user.
 - `2026-08-14` (5): **Rebrand warna harbor/signal/sand — commit+push kerja yang sudah ada di
   working tree.** Kode: `resources/css/app.css` (token warna baru), `AppLayout.vue`/`AppNav.vue`/
   `DashboardPage.vue`/`DriverSchedulePage.vue`/`GateHistoryPage.vue`/`LoginPage.vue`
