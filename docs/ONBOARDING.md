@@ -130,7 +130,7 @@ Target realistis. Setiap hari diakhiri dengan satu hasil nyata.
 | Hari | Fokus | Hasil akhir hari itu |
 |------|-------|----------------------|
 | **1** | Orientasi + kontrak (Tahap 0–1) | Paham peta mental & 3 aturan emas; bisa sebut larangan utama |
-| **2** | Jalankan project (Tahap 2) | `composer test` **194 hijau** + `npm run test:js` **87 hijau** di mesinmu; bisa login SPA |
+| **2** | Jalankan project (Tahap 2) | `composer test` **260 hijau** + `npm run test:js` **111 hijau** di mesinmu (angka ini akan basi lagi, lihat `HANDOVER.md` §Status utk yang terkini); bisa login SPA |
 | **3** | Domain (Tahap 3) | Bisa gambar ulang state machine appointment & jelaskan 5 role |
 | **4** | Golden path (Tahap 4a) | Berhasil booking via curl + uji idempotency; paham `BookAppointmentAction` |
 | **5** | Latihan pertama | Selesaikan 1 latihan kecil (§12) lewat loop TDD; semua gerbang hijau |
@@ -284,7 +284,7 @@ php artisan migrate:fresh --seed     # skema baru + data demo
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
 composer fix                         # Pint (format)
 composer analyse                     # PHPStan level 8
-composer test                        # Pest (244 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
+composer test                        # Pest (260 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
 ./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
 
 # Menjalankan app
@@ -292,7 +292,7 @@ php artisan serve                    # shell + API (buka http://localhost:8000)
 npm run dev                          # Vite HMR (terminal lain)
 
 # Frontend
-npm run test:js                      # Vitest (107 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
+npm run test:js                      # Vitest (111 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
