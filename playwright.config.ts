@@ -13,6 +13,14 @@ export default defineConfig({
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     retries: 0,
+    // 1 worker: backend-nya SATU `php artisan serve` (single-proses, sqlite
+    // file-based) — beberapa spec berjalan bareng lewat >1 worker terbukti
+    // membuat request booking cukup lambat sampai lewat timeout 30dtk (bukan
+    // error, cuma kontensi CPU/IO 4 Chromium + PHP dev server + sqlite di 1
+    // mesin). Ditemukan & diverifikasi 2026-08-14: 4 worker (default) → flaky,
+    // 1 worker → 5/5 lulus konsisten. Cocok untuk suite "lokal-only" ini —
+    // benar dulu, cepat belakangan (lihat SETUP-GUIDE §15).
+    workers: 1,
     reporter: 'list',
     use: {
         baseURL: BASE_URL,

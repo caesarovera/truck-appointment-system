@@ -829,11 +829,20 @@ lalu `migrate:fresh --seed --env=e2e`. **DB e2e terpisah total dari DB dev** (`d
 
 ### 15c. Cakupan saat ini
 
-1 smoke test (`tests/e2e/booking-happy-path.spec.ts`): login transporter → `/slots` → booking
-slot → assert pesan sukses. **Bukan suite e2e penuh** — scope sengaja dipersempit ke 1
-happy-path (lihat `HANDOVER.md` §Langkah berikutnya #3). `data-testid` yang sudah ada:
-`login-*` (`LoginPage.vue`), `booking-*` (`BookingForm.vue`), `slot-card`/`book-button`/
-`booking-success` (`SlotAvailabilityPage.vue`, sudah ada sejak sebelumnya).
+5 spec (`tests/e2e/*.spec.ts`): `booking-happy-path` (login transporter → booking → sukses),
+`booking-errors` (kontainer duplikat di window sama → 409 tampil di UI), `gate-in-out`
+(planner buka window ad-hoc "sekarang ±" → transporter booking → gate-officer gate-in lalu
+gate-out), `reschedule-cancel` (2 test: pindah window, batalkan). **Bukan suite e2e penuh** —
+tak ada spec untuk admin/planner-utilization/no-show/QR (lihat `HANDOVER.md` §Langkah
+berikutnya #3). `data-testid` dipakai: `login-*` (`LoginPage.vue`), `booking-*`
+(`BookingForm.vue`), `slot-card`/`book-button`/`booking-success` (`SlotAvailabilityPage.vue`),
+`booking-row`/`reschedule-*`/`cancel-*`/`confirm-cancel` (`MyBookingsPage.vue`,
+`RescheduleDialog.vue`), `window-option` (`RescheduleDialog.vue`), `open-window`
+(`PlannerWindowsPage.vue`), `queue-row`/`gate-in`/`gate-in-confirm`/`gate-out`/
+`gate-out-confirm` (`GateDashboardPage.vue` — 2 klik sejak `ConfirmButton`, lihat
+`FRONTEND.md` §4). **Wajib `workers: 1`** di `playwright.config.ts` — backend cuma 1 proses
+`php artisan serve` + sqlite file-based, >1 worker paralel terbukti membuat request cukup
+lambat sampai lewat timeout (kontensi CPU/IO, bukan bug logic).
 
 ### Jebakan
 
