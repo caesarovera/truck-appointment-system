@@ -10,7 +10,23 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-14` (4) · Sesi: **Debug 3 spec e2e yang gagal (dilaporkan sesi
+- Update terakhir: `2026-08-14` (5) · Sesi: **Commit + push rebrand warna "kepelabuhanan
+  Indonesia" (harbor/signal/sand) — kerja yang sudah ada di working tree sejak sebelum sesi
+  ini mulai (lihat komentar `resources/css/app.css`: "Dipilih 2026-08-14 bareng user"), sengaja
+  ditahan 2 sesi sebelumnya karena belum diverifikasi/didokumentasikan, kini diverifikasi &
+  dicatat atas permintaan eksplisit user.** `resources/css/app.css` +3 skala warna custom
+  Tailwind v4 (`--color-harbor-*` navy dermaga, `--color-signal-*` oranye peti kemas,
+  `--color-sand-*` latar hangat pengganti `gray-50`) menggantikan `indigo`/`gray` default di
+  8 file FE (`AppLayout`, `AppNav`, `DashboardPage`, `DriverSchedulePage`, `GateHistoryPage`,
+  `LoginPage`, `MyUtilizationPage`, `SlotAvailabilityPage`). **`LoginPage.vue` bukan cuma ganti
+  warna** — didesain ulang jadi split-panel (kiri: hero navy dgn ilustrasi SVG kontainer/crane/
+  ombak + headline; kanan: form) — `data-testid` (`login-email`/`login-password`/`login-submit`/
+  `login-error`) **tak berubah**, jadi tak menyentuh `helpers.ts` e2e maupun test manapun.
+  Sisanya (`AppNav`, dst.) murni penggantian kelas warna, tanpa perubahan struktur/testid.
+  **Verifikasi sebelum commit:** `type-check` bersih, **111 Vitest** hijau, `npm run build`
+  bersih, **5/5 e2e** hijau (1 flaky run karena beban mesin transient — bukan regresi, rerun
+  bersih). Tak ada perubahan backend/kontrak/seeder.
+- Sesi sebelumnya: `2026-08-14` (4) · Sesi: **Debug 3 spec e2e yang gagal (dilaporkan sesi
   sebelumnya) — semua kini hijau, 2 akar masalah lingkungan berbeda + 1 kontensi paralelisme,
   bukan bug bisnis.** Permintaan langsung user ("debug 3 spec e2e yang gagal itu"). Isolasi lewat
   `--workers=1` per file dulu menyingkap 2 penyebab nyata: **(1)** `.env.e2e` `MAIL_MAILER=log` +
@@ -50,6 +66,9 @@
 - Paket BE baru: `endroid/qr-code:^5.0` (dikonfirmasi user; versi 6 butuh php^8.4, mesin dev 8.3 → `--ignore-platform-req=ext-pcntl,ext-posix` sama seperti Horizon, lihat §Jebakan).
 
 ## Sudah selesai
+- [x] **Rebrand warna "kepelabuhanan Indonesia" (harbor/signal/sand) — commit+push
+  (2026-08-14).** Kerja visual sudah ada di working tree, kini diverifikasi & tercatat.
+  Detail di *Status* teratas.
 - [x] **5/5 spec e2e hijau — 2 bug lingkungan (mail sync + timezone helper) + 1 kontensi
   paralelisme diperbaiki (2026-08-14).** Detail lengkap di *Status* teratas & §Jebakan.
 - [x] **Konfirmasi + loading state di semua tombol aksi lintas role (2026-08-14).** Permintaan
@@ -615,6 +634,15 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-08-14` (5): **Rebrand warna harbor/signal/sand — commit+push kerja yang sudah ada di
+  working tree.** Kode: `resources/css/app.css` (token warna baru), `AppLayout.vue`/`AppNav.vue`/
+  `DashboardPage.vue`/`DriverSchedulePage.vue`/`GateHistoryPage.vue`/`LoginPage.vue`
+  (+redesain split-panel, `data-testid` tak berubah)/`MyUtilizationPage.vue`/
+  `SlotAvailabilityPage.vue`. Test: tak ada test baru — diverifikasi ulang 111 Vitest,
+  type-check, build, 5/5 e2e sebelum commit. Docs: HANDOVER §Status/§Sudah selesai saja
+  (murni visual, tak ada perubahan kontrak). Seeder: tak ada. **Alasan:** permintaan langsung
+  user; kerja itu sendiri sudah ada 2 sesi sebelumnya tapi ditahan karena belum
+  diverifikasi/didokumentasikan.
 - `2026-08-14` (4): **Fix 3 spec e2e gagal — mail sync (bottleneck) + `hhmm()` timezone (bug) +
   worker paralel (kontensi).** Kode: `.env.e2e`+`.env.e2e.example` (`MAIL_MAILER=array`),
   `tests/e2e/helpers.ts` (`hhmm()` UTC bukan lokal), `playwright.config.ts` (`workers: 1`).

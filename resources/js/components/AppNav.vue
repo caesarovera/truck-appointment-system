@@ -24,13 +24,23 @@ async function onLogout(): Promise<void> {
     await router.push({ name: 'login' });
 }
 
-const linkClass = 'px-3 py-2 text-sm text-gray-600 hover:text-gray-900 rounded-md hover:bg-gray-100';
-const activeClass = 'text-indigo-700 font-medium bg-indigo-50';
+const linkClass = 'px-3 py-2 text-sm text-harbor-100/80 hover:text-white rounded-md hover:bg-white/10 transition-colors';
+const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-signal-500/60';
 </script>
 
 <template>
-    <header class="bg-white border-b px-4 py-2 flex items-center gap-2 flex-wrap">
-        <RouterLink to="/" class="font-semibold text-gray-900 px-2" data-testid="brand">TAS</RouterLink>
+    <header class="bg-harbor-900 text-white border-b border-harbor-800 px-4 py-2 flex items-center gap-2 flex-wrap shadow-sm">
+        <RouterLink to="/" class="flex items-center gap-2 px-2 py-1" data-testid="brand">
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-signal-500 text-white" aria-hidden="true">
+                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="5" r="2" />
+                    <path d="M12 7v14" />
+                    <path d="M5 12h14" />
+                    <path d="M5 12c0 4 3 8 7 9c4-1 7-5 7-9" />
+                </svg>
+            </span>
+            <span class="font-semibold tracking-wide">TAS</span>
+        </RouterLink>
 
         <nav class="flex items-center gap-1 flex-wrap" data-testid="nav-links">
             <RouterLink v-if="auth.can('slot.read')" to="/slots" :class="linkClass" :exact-active-class="activeClass">
@@ -93,10 +103,10 @@ const activeClass = 'text-indigo-700 font-medium bg-indigo-50';
         </nav>
 
         <div class="ml-auto flex items-center gap-3">
-            <span class="text-sm text-gray-600" data-testid="user-name">{{ auth.user?.name }}</span>
+            <span class="text-sm text-harbor-100/80" data-testid="user-name">{{ auth.user?.name }}</span>
             <button
                 type="button"
-                class="text-sm text-gray-600 hover:text-gray-900"
+                class="text-sm text-harbor-100/80 hover:text-white rounded-md px-2 py-1 hover:bg-white/10 transition-colors"
                 data-testid="logout"
                 @click="onLogout"
             >

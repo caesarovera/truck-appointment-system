@@ -18,9 +18,9 @@ const today = new Date().toISOString().slice(0, 10);
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Jadwal Hari Ini <span class="text-gray-400 font-normal">· {{ today }}</span></h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Jadwal Hari Ini <span class="text-gray-400 font-normal">· {{ today }}</span></h1>
         </header>
 
         <main class="p-6 space-y-4">
@@ -50,7 +50,7 @@ const today = new Date().toISOString().slice(0, 10);
                             {{ a.move_type }} · {{ a.booking_code }}
                             <template v-if="a.containers[0]"> · {{ a.containers[0].container_no }}</template>
                         </p>
-                        <span class="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700 inline-block">{{ a.status }}</span>
+                        <span class="text-xs rounded-full px-2 py-0.5 bg-harbor-50 text-harbor-700 inline-block">{{ a.status }}</span>
                     </div>
                     <!-- Tunjukkan ini di gate (BUSINESS-FLOW §3.4) — hanya muncul kalau
                          backend eager-load slot_window (butuh itu utk hitung TTL token). -->

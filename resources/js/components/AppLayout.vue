@@ -9,7 +9,7 @@ import AppNav from '@/components/AppNav.vue';
     diwariskan dari sini (Vue Router menggabungkan meta parent ke child).
 -->
 <template>
-    <div class="min-h-screen bg-gray-50">
+    <div class="min-h-screen bg-sand-50">
         <AppNav />
         <RouterView />
     </div>

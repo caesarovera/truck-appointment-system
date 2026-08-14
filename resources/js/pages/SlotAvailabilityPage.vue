@@ -48,9 +48,9 @@ function badgeClass(w: SlotWindow): string {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Ketersediaan Slot</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Ketersediaan Slot</h1>
         </header>
 
         <main class="p-6 space-y-6">
@@ -60,7 +60,7 @@ function badgeClass(w: SlotWindow): string {
                     <select
                         v-model.number="gate"
                         :disabled="gatesLoading"
-                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option :value="null" disabled>{{ gatesLoading ? 'Memuat gate…' : 'Pilih gate' }}</option>
                         <option v-for="g in gates" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -71,7 +71,7 @@ function badgeClass(w: SlotWindow): string {
                     <input
                         v-model="date"
                         type="date"
-                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     />
                 </label>
                 <span v-if="isFetching" class="text-sm text-gray-500 pb-2">Memuat…</span>
@@ -115,7 +115,7 @@ function badgeClass(w: SlotWindow): string {
                     <button
                         v-if="canBook && w.remaining > 0 && !w.ended"
                         type="button"
-                        class="w-full rounded-md bg-indigo-600 text-white py-1.5 text-sm font-medium hover:bg-indigo-700"
+                        class="w-full rounded-md bg-signal-600 text-white py-1.5 text-sm font-medium hover:bg-signal-700"
                         data-testid="book-button"
                         @click="selected = w"
                     >

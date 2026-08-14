@@ -7,18 +7,20 @@ const auth = useAuthStore();
 </script>
 
 <template>
-    <main class="p-6 space-y-4">
-            <div class="space-y-2">
-                <p class="text-gray-900">Halo, <strong>{{ auth.user?.name }}</strong></p>
-                <p class="text-sm text-gray-600">Role: {{ auth.user?.roles.join(', ') || '—' }}</p>
-                <p class="text-sm text-gray-600">{{ auth.user?.permissions.length ?? 0 }} izin aktif</p>
+    <main class="p-6 space-y-6">
+            <div class="rounded-xl bg-harbor-900 text-white px-6 py-5 shadow-sm">
+                <p class="text-lg">Selamat datang, <strong>{{ auth.user?.name }}</strong></p>
+                <p class="text-sm text-harbor-100/80 mt-1">
+                    Role: {{ auth.user?.roles.join(', ') || '—' }}
+                    · {{ auth.user?.permissions.length ?? 0 }} izin aktif
+                </p>
             </div>
 
             <nav class="flex flex-wrap gap-3">
                 <RouterLink
                     v-if="auth.can('slot.read')"
                     to="/slots"
-                    class="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm font-medium hover:bg-indigo-700"
+                    class="rounded-md bg-signal-600 text-white px-4 py-2 text-sm font-medium hover:bg-signal-700"
                 >
                     Ketersediaan Slot
                 </RouterLink>
@@ -33,14 +35,14 @@ const auth = useAuthStore();
                 <RouterLink
                     v-if="auth.can('appointment.write') && auth.user?.company_id != null"
                     to="/bookings"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Booking Saya
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('fleet.manage') && auth.user?.company_id != null"
                     to="/trucks"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Armada Truk
                 </RouterLink>
@@ -48,42 +50,42 @@ const auth = useAuthStore();
                 <RouterLink
                     v-if="auth.can('report.read') && auth.user?.company_id != null"
                     to="/reports"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Laporan Perusahaan
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('appointment.read.self') && auth.hasRole('driver')"
                     to="/today"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Jadwal Hari Ini
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('gate.process') && auth.user?.terminal_id != null"
                     to="/gate"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Dashboard Gate
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('slot.manage')"
                     to="/planner"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Kelola Slot
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('slot.manage')"
                     to="/planner/gate-history"
-                    class="rounded-md bg-white border border-indigo-600 text-indigo-700 px-4 py-2 text-sm font-medium hover:bg-indigo-50"
+                    class="rounded-md bg-white border border-harbor-600 text-harbor-700 px-4 py-2 text-sm font-medium hover:bg-harbor-50"
                 >
                     Riwayat Gate
                 </RouterLink>
                 <RouterLink
                     v-if="auth.can('terminal.manage')"
                     to="/admin"
-                    class="rounded-md bg-white border border-gray-600 text-gray-700 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                    class="rounded-md bg-white border border-slate-300 text-slate-700 px-4 py-2 text-sm font-medium hover:bg-slate-50"
                 >
                     Master Data
                 </RouterLink>

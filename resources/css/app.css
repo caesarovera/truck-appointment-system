@@ -9,4 +9,30 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /*
+     * Tema "kepelabuhanan Indonesia": navy dermaga (harbor) sebagai warna
+     * utama/nav/heading, oranye peti kemas (signal) sebagai aksen CTA, sand
+     * sebagai warna latar hangat pengganti gray-50 polos. Dipilih 2026-08-14
+     * bareng user (lihat AskUserQuestion di sesi itu) — jangan diganti sepihak.
+     */
+    --color-harbor-950: #051625;
+    --color-harbor-900: #0a2540;
+    --color-harbor-800: #0f3357;
+    --color-harbor-700: #15436d;
+    --color-harbor-600: #1c5384;
+    --color-harbor-500: #2c6fa8;
+    --color-harbor-400: #5b91c0;
+    --color-harbor-100: #e3ecf3;
+    --color-harbor-50: #f2f6fa;
+
+    --color-signal-700: #c2410c;
+    --color-signal-600: #ea580c;
+    --color-signal-500: #f97316;
+    --color-signal-400: #fb923c;
+    --color-signal-100: #ffedd5;
+    --color-signal-50: #fff7ed;
+
+    --color-sand-100: #f4efe4;
+    --color-sand-50: #faf7f0;
 }

@@ -29,9 +29,9 @@ function formatTime(iso: string | null | undefined): string {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50">
-        <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
-            <h1 class="font-semibold text-gray-900">Riwayat Gate</h1>
+    <div class="min-h-screen bg-sand-50">
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h1 class="font-semibold text-harbor-900 text-lg">Riwayat Gate</h1>
         </header>
 
         <main class="p-6 space-y-6">
@@ -41,7 +41,7 @@ function formatTime(iso: string | null | undefined): string {
                     <select
                         v-model.number="gate"
                         :disabled="gatesLoading"
-                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="w-48 rounded-md border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     >
                         <option :value="null" disabled>Pilih gate</option>
                         <option v-for="g in gates" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -52,7 +52,7 @@ function formatTime(iso: string | null | undefined): string {
                     <input
                         v-model="date"
                         type="date"
-                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-harbor-500"
                     />
                 </label>
             </div>
@@ -75,7 +75,7 @@ function formatTime(iso: string | null | undefined): string {
                 >
                     <div class="flex items-center justify-between">
                         <span class="font-medium text-gray-900">{{ a.booking_code }}</span>
-                        <span class="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{{ a.status }}</span>
+                        <span class="text-xs rounded-full px-2 py-0.5 bg-harbor-50 text-harbor-700">{{ a.status }}</span>
                     </div>
                     <p class="text-sm text-gray-600">
                         <template v-if="a.truck"> {{ a.truck.plate_no }} </template>
