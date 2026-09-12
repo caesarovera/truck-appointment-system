@@ -23,9 +23,12 @@
 > bagian ini akan berubah: §1 (ekstensi SQLite), §2 (`.env`), §7 (migrasi/seeder), §9 (gerbang
 > kualitas → dijalankan di dalam container).
 >
-> **⚠️ SATU HAL SUDAH BERUBAH — slice D1 selesai 2026-09-12.** `composer test` sekarang butuh
-> **MySQL di Docker**, bukan lagi sqlite `:memory:`. Sebelum menjalankan test: `docker compose up -d`.
-> Langkah §0–§13 lainnya masih apa adanya (app tetap native). Rinciannya di **§16**.
+> **⚠️ DUA HAL SUDAH BERUBAH (2026-09-12).**
+> **(D1)** `composer test` butuh **MySQL di Docker**, bukan sqlite `:memory:` → `docker compose up -d`
+> lebih dulu. Rinciannya **§16**.
+> **(D2′)** App Laravel kini **bisa jalan di container** (`docker compose up -d` → `http://localhost:8000`).
+> Rinciannya **§17**. Jalur native §0–§13 **masih berlaku dan masih didukung** — keduanya hidup
+> berdampingan, tak ada yang dipaksa pindah.
 >
 > **Batas pra-Docker ditandai tag git `pre-docker`.** Untuk membaca/menjalankan proyek persis
 > seperti dokumen ini: `git checkout pre-docker`.
@@ -50,6 +53,7 @@
 14. [CI (GitHub Actions)](#14-ci-github-actions) · [14a untuk apa](#14a-untuk-apa-ci-ini-ada) · [14b apa yang dijalankan](#14b-apa-yang-dijalankan) · [14c cara memakai](#14c-cara-memakainya-sehari-hari)
 15. [E2E (Playwright) — lokal-only](#15-e2e-playwright--lokal-only)
 16. [Docker: MySQL untuk test (slice D1)](#16-docker-mysql-untuk-test-slice-d1)
+17. [Docker: app di container (slice D2′)](#17-docker-app-di-container-slice-d2)
 
 ---
 
@@ -955,3 +959,90 @@ gerbang yang sesungguhnya. **Jangan hapus #2** dengan alasan #1 lebih realistis.
 | `Access denied for user 'root'` | password tak cocok dengan `docker-compose.yml` | samakan `DB_PASSWORD` (default `secret`) |
 | `Unknown database 'tas_testing'` | volume dibuat sebelum skrip init ada | `docker compose down -v && docker compose up -d` (**hapus data**) |
 | Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya — ia mencetak keluaran tiap anak |
+
+---
+
+## 17. Docker: app di container (slice D2′)
+
+> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**.
+> Redis, Horizon, dan Reverb **belum** — menyusul di slice berikutnya.
+
+### 17a. Kenapa app dimajukan mendahului Redis
+
+Rencana semula: Redis dulu (D2), containerisasi app belakangan (D4). Rencana itu **cacat** dan
+ketahuan saat D2 mulai dikerjakan: app dan seluruh test suite masih berjalan di **PHP native
+Windows**, dan PHP itu **tak punya klien Redis sama sekali**. Memenuhinya menuntut pemasangan DLL
+`php_redis` ke `php.ini` laragon — bisa (sudah diverifikasi: 6.3.0 ts-vs16-x64 termuat bersih),
+tapi mengubah PHP yang dipakai **semua** proyek di mesin itu, dan akan **terbuang** begitu app
+pindah ke container satu slice kemudian.
+
+Dengan app di container lebih dulu, klien Redis cukup `pecl install redis` di dalam image: satu
+baris, nol sentuhan ke mesin dev.
+
+### 17b. Menjalankan
+
+```bash
+docker compose up -d              # mysql + app
+docker compose ps                 # app "Up", mysql "healthy"
+# aplikasi: http://localhost:8000
+
+docker compose exec app bash                    # masuk ke container
+docker compose exec app composer test           # gerbang, di dalam container
+docker compose exec app php artisan migrate:fresh --seed
+```
+
+Build ulang image hanya perlu kalau `docker/php/Dockerfile` berubah:
+```bash
+docker compose build app && docker compose up -d
+```
+
+### 17c. Apa yang ada di image
+
+| Ekstensi | Untuk apa |
+|----------|-----------|
+| `pdo_mysql` | DB (slice D1) |
+| `pcntl`, `posix` | **Horizon**. Justru inilah yang tak bisa dipenuhi PHP Windows native — salah satu alasan utama containerisasi ini ada |
+| `gd` | `endroid/qr-code` (PngWriter) untuk gambar QR gate-in |
+| `zip` | dipakai Composer |
+| `redis` | klien Redis, siap untuk slice berikutnya |
+
+### 17d. Kode masuk lewat bind mount, bukan COPY
+
+`docker-compose.yml` mem-*bind mount* `.:/var/www/html`, jadi hasil edit di editor Windows
+langsung terlihat di container **tanpa rebuild**. Harganya: bind mount menembus NTFS, dan PHP
+membaca ribuan berkas kecil saat autoload.
+
+**Diukur, bukan ditebak** (`composer test`, 262 test, 12 proses paralel):
+
+| Cara menjalankan | Durasi |
+|---|---|
+| PHP native Windows → MySQL container | 47 detik |
+| Di dalam container (bind mount NTFS) | 80 detik |
+
+Sekitar **1,7× lebih lambat**. Nyata, tapi jauh dari melumpuhkan — dan lebih murah daripada
+memindahkan repo ke filesystem WSL2 (yang mengubah lokasi proyek, jalur IDE, dan kebiasaan kerja).
+
+`vendor/` **sengaja tidak** ditaruh di named volume walau itu akan lebih cepat: host akan
+kehilangan sumbernya, dan **IDE serta PHPStan di Windows ikut buta**.
+
+### 17e. Dua jalur, keduanya didukung
+
+| | Native Windows | Di dalam container |
+|---|---|---|
+| Perintah | `composer test` | `docker compose exec app composer test` |
+| MySQL dihubungi lewat | `127.0.0.1:3307` (port host) | `mysql:3306` (nama service) |
+| Kecepatan | lebih cepat | ~1,7× lebih lambat |
+| Ekstensi `pcntl`/`redis` | **tidak ada** | ada |
+
+Nilai DB di dalam container diberikan sebagai **env var** di `docker-compose.yml`, dan env var
+sungguhan menang atas `.env` (Laravel memuat dotenv secara *immutable*). Jadi tak ada berkas
+`.env` kedua yang harus dijaga.
+
+### 17f. Jebakan
+
+- **`php artisan serve`, bukan nginx + php-fpm.** Slice ini menerjemahkan setup yang sudah ada ke
+  container, bukan sekalian mengganti web server. nginx menyusul kalau memang dibutuhkan.
+- **Skrip init MySQL hanya jalan sekali**, saat volume masih kosong. Mengubah
+  `docker/mysql/init/` menuntut `docker compose down -v` (**hapus data**).
+- **`storage/logs/laravel.log` dibagi dengan host** lewat bind mount, jadi log dari kedua jalur
+  bercampur di satu berkas. Bukan bug, tapi bisa membingungkan saat menelusuri error.

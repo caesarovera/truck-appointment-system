@@ -33,8 +33,11 @@ Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan 
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
-* Infra dev: **native, tanpa Docker** (PHP + SQLite di mesin dev). `docker-compose.yml` **belum ada** — rencana, untuk paritas produksi (Redis/MySQL/Horizon). Jangan tulis "sudah pakai Docker" sebelum file-nya benar-benar ada.
-  * ⏳ **Migrasi ke Docker penuh + Redis + MySQL sudah DIPUTUSKAN & DISETUJUI, belum dieksekusi** — lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)** (urutan slice + biaya yang diterima sadar). Baris-baris §Stack di atas adalah **keadaan pra-Docker** dan tetap benar sampai slice ADR-0007 dikerjakan. Penanda batasnya: tag git **`pre-docker`** + §Batas pra-Docker di `HANDOVER.md`. **Jangan** ubah baris ini jadi "sudah pakai Docker" per slice — ubah hanya saat slice #4 ADR-0007 selesai.
+* Infra dev: **Docker** (`docker-compose.yml` — service `mysql` + `app`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi sedang berjalan, lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**:
+  * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`).
+  * ⏳ **Masih target, BELUM dipakai:** Redis untuk queue/cache/session, Horizon, Reverb di container. Baris Queue/Cache/Session di atas masih menggambarkan keadaan sebenarnya (driver `database`).
+  * **Dua jalur sama-sama hidup:** `composer test` di Windows (MySQL lewat port host 3307) **dan** `docker compose exec app composer test` (MySQL lewat jaringan compose). Container ~1,7× lebih lambat karena bind mount NTFS — diukur, diterima sadar, lihat ADR-0007.
+  * Checkpoint terakhir era native: tag git **`pre-docker`**.
 * CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
 ## Aturan layer (non-negotiable)

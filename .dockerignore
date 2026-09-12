@@ -1,0 +1,18 @@
+# Jangan kirim berkas ini ke build context (bikin build lambat / bocor rahasia).
+# Catatan: kode aplikasi TIDAK di-COPY ke image — ia masuk lewat bind mount di
+# docker-compose.yml, supaya edit di editor langsung terlihat tanpa rebuild.
+.git
+.github
+node_modules
+vendor
+public/build
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+tests/e2e/.playwright
+.env
+.env.*
+!.env.example
+database/*.sqlite
+*.md

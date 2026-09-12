@@ -139,6 +139,37 @@ Pest pindah ke MySQL lewat `phpunit.xml`, dan `tests/Concurrency/ConcurrentBooki
    (menjaga janji). Konsekuensi untuk slice berikutnya: **setiap kali menulis test konkurensi,
    jalankan mutasinya — "realistis" tidak sama dengan "menggigit".**
 
+**[2026-09-12] URUTAN DIUBAH: containerisasi app dimajukan mendahului Redis.** Rencana semula
+D2 = Redis, D4 = containerisasi app. Saat D2 mulai dikerjakan, ketahuan rencana itu **cacat**:
+D2 menaruh cache/session/queue di Redis, tapi app **dan seluruh test suite** masih berjalan di
+PHP native Windows — dan PHP itu tak punya klien Redis sama sekali (`extension_loaded('redis')`
+= false). Memenuhinya menuntut pemasangan DLL `php_redis` ke `php.ini` laragon: sudah diverifikasi
+bisa (6.3.0 ts-vs16-x64, diuji muat lewat `-d`, bersih), tapi itu **mengubah PHP mesin dev yang
+dipakai semua proyek**, dan akan **terbuang** begitu app pindah ke container satu slice kemudian.
+
+Pemilik proyek memilih membalik urutan. Konsekuensinya justru menyederhanakan: di dalam image
+Linux, klien Redis cukup `pecl install redis` — satu baris, nol sentuhan ke mesin dev. Urutan
+berlaku sekarang: **D1 MySQL ✅ · D2′ containerisasi app ✅ · D3′ Redis + Horizon · D4′ CI redis ·
+D5 Reverb (opsional)**.
+
+**Keputusan bind mount: TETAP bind mount, repo TIDAK dipindah ke WSL2.** Ini keputusan yang
+sengaja ditunda sampai slice ini supaya diambil dengan **angka**, bukan kekhawatiran:
+
+| Menjalankan `composer test` (262 test, 12 proses paralel) | Durasi |
+|---|---|
+| PHP native Windows → MySQL container | 47 detik |
+| Di dalam container, kode lewat bind mount NTFS | 80 detik |
+
+Sekitar **1,7×** lebih lambat. Nyata, tapi jauh dari melumpuhkan, dan jelas lebih murah daripada
+memindahkan repo ke filesystem WSL2 (mengubah lokasi proyek, jalur IDE, dan kebiasaan kerja).
+`vendor/` **sengaja tidak** dipindah ke named volume meski itu akan lebih cepat: host akan
+kehilangan sumbernya, dan IDE + PHPStan di Windows ikut buta. Tinjau ulang kalau angkanya
+memburuk atau mulai mengganggu ritme kerja.
+
+**Efek samping yang disengaja:** kedua jalur tetap hidup. `composer test` di Windows masih jalan
+(MySQL lewat port 3307), dan `docker compose exec app composer test` juga jalan (MySQL lewat
+jaringan compose). Tak ada yang dipaksa pindah di tengah slice.
+
 ## Kapan ditinjau ulang
 
 - **Refaktor cache ke `Cache::tags`**: baru boleh **setelah** slice #2 hijau. Sengaja dipisah dari

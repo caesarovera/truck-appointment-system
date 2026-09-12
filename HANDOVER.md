@@ -13,6 +13,33 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-12` (D2′) · **[SELESAI] Containerisasi app — DIMAJUKAN mendahului Redis.**
+  **Kenapa urutan diubah:** D2 (Redis) mulai dikerjakan lalu ketahuan rencananya cacat — Redis
+  untuk cache/session/queue mengandaikan app bisa bicara ke Redis, padahal app **dan seluruh test
+  suite** masih di PHP native Windows yang **tak punya klien Redis sama sekali**
+  (`extension_loaded('redis')` = false). Satu-satunya jalan: pasang DLL `php_redis` ke `php.ini`
+  laragon. Kelayakannya **sudah diverifikasi** (6.3.0 ts-vs16-x64 diunduh, diuji muat lewat flag
+  `-d`, bersih tanpa warning) — tapi itu mengubah PHP yang dipakai **semua** proyek di mesin itu
+  dan akan **terbuang** satu slice kemudian. User memilih membalik urutan; hasilnya justru lebih
+  sederhana: di image Linux klien Redis cukup `pecl install redis`, nol sentuhan ke mesin dev.
+  **Dibangun:** `docker/php/Dockerfile` (baru — PHP 8.3-cli + `pdo_mysql`/`pcntl`/`posix`/`gd`/
+  `zip`/`redis`, Composer dari image resmi, user non-root UID 1000), `.dockerignore` (baru),
+  service `app` di `docker-compose.yml` (bind mount, env DB via compose, `depends_on` mysql
+  healthy). **Terverifikasi:** 262 Pest hijau **di dalam container**, `http://localhost:8000`
+  balas 200, `migrate:fresh --seed` jalan di DB `tas`.
+  **Keputusan bind mount, diambil dengan ANGKA bukan kekhawatiran** (ini yang sengaja ditunda ke
+  slice ini): `composer test` native **47 dtk** vs di container lewat bind mount NTFS **80 dtk** →
+  ~**1,7× lebih lambat**. Diputuskan **TETAP bind mount, repo TIDAK dipindah ke WSL2** — nyata tapi
+  jauh dari melumpuhkan, dan lebih murah daripada memindahkan lokasi proyek + jalur IDE. `vendor/`
+  sengaja **tidak** dipindah ke named volume walau lebih cepat: host akan kehilangan sumbernya dan
+  IDE + PHPStan Windows ikut buta.
+  **Dua jalur tetap hidup** — `composer test` di Windows (MySQL port 3307) dan
+  `docker compose exec app composer test` (MySQL lewat jaringan compose). Tak ada yang dipaksa pindah.
+  **Ditemukan saat verifikasi, TIDAK diperbaiki (di luar scope):** lihat §Temuan D2′ di bawah.
+  Docs: ADR-0007 (+catatan urutan diubah & tabel angka), `CLAUDE.md` §Stack (**naik status**: app
+  kini keadaan, Redis masih target), `SETUP-GUIDE §17` (baru) + banner + daftar isi, `README`,
+  entri ini.
+
 - `2026-09-12` (D1) · **[SELESAI] Slice D1: MySQL di Docker + test konkurensi sungguhan.**
   Menutup §Temuan 2026-09-12 (P1). **262 Pest/671 assert** (dari 260/663), PHPStan lvl 8 bersih,
   Pint bersih. Frontend tak disentuh (111 Vitest tetap, tak dijalankan ulang).
@@ -753,13 +780,31 @@
 > hijau", tapi **"apakah test ini merah kalau fitur yang dijaganya saya rusak?"**. Terapkan ke test
 > mana pun yang menjaga sesuatu yang mahal: konkurensi, otorisasi, audit, idempotency.
 
+## Temuan D2′ 2026-09-12 — endpoint API balas 500 (bukan 401) tanpa header JSON (P3, TERBUKA)
+
+- **[TERBUKA — P3] `Route [login] not defined` → 500.** Request **tak terautentikasi** ke endpoint
+  ber-`auth:sanctum` **tanpa** header `Accept: application/json` membuat Laravel mencoba
+  me-*redirect* ke route bernama `login`, yang **tidak ada** di app API-only ini
+  (`routes/api.php:60` mendaftarkan `Route::post('login', …)` **tanpa** `->name('login')`).
+  Hasilnya `RouteNotFoundException` → **500**, bukan **401**.
+  - **Bukan efek containerisasi** — murni pre-existing, cuma ketahuan saat verifikasi D2′ karena
+    saya menembak endpoint pakai `curl` polos. Dengan `Accept: application/json` responsnya benar:
+    `{"message":"Unauthenticated."}`.
+  - **Dampak terbatas tapi nyata:** SPA selalu mengirim `Accept: application/json` lewat Axios,
+    jadi pengguna sungguhan tak menyentuhnya. Yang kena: siapa pun yang membuka URL API langsung di
+    browser, dan **log produksi** — 401 yang wajar tercatat sebagai 500 yang terlihat seperti
+    server rusak.
+  - **Sengaja TIDAK diperbaiki di slice ini** (kontrak `CLAUDE.md`: lapor, jangan diam-diam
+    perbaiki di luar scope). Perbaikan sebaris kalau nanti disetujui: beri nama route login, atau
+    paksa `expectsJson()` untuk seluruh grup API di `bootstrap/app.php`.
+
 ## Sedang dikerjakan
-- (kosong) — **D1 selesai & hijau**: 262 Pest/671 assert, PHPStan lvl 8, Pint bersih (butuh
-  `docker compose up -d` lebih dulu). Berikutnya **D2** (Redis cache/session/queue + Horizon di
-  container), dan D3 tinggal menambahkan service `redis:7` ke CI. Tak ada pekerjaan setengah
-  jalan yang menggantung.
-- **Belum diverifikasi:** CI service container MySQL belum pernah benar-benar jalan di GitHub —
-  bukti hijaunya baru ada setelah push berikutnya. Jangan tulis "CI hijau untuk D1" sebelum itu.
+- (kosong) — **D1 + D2′ selesai & hijau**: 262 Pest/671 assert (di container **dan** native),
+  PHPStan lvl 8, Pint bersih. Berikutnya **D3′** (Redis cache/session/queue + Horizon di container
+  — kini tanpa hambatan karena klien `redis` sudah ada di image), lalu D4′ (service `redis:7` di CI).
+- **Belum diverifikasi:** CI untuk D1 (service container MySQL) — commit `4ea097b` sudah di-push
+  2026-09-12 tapi hasil run-nya **belum pernah dibaca**: repo privat, `gh` tak terpasang, tak ada
+  token di sesi itu. Cek manual di tab Actions. Jangan tulis "CI hijau" sebelum benar-benar dilihat.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
@@ -780,18 +825,20 @@
    (`tas_testing_test_{TEST_TOKEN}` lewat `ParallelTesting::setUpTestDatabase`), cek migrasi jalan di
    MySQL (FK lebih ketat dari SQLite — lihat komentar di `create_users_table.php`).
 
-**D2. Redis (cache/session/queue) + Horizon di container** ← *mulai dari sini*
+**D2′. Containerisasi app** — ✅ **SELESAI 2026-09-12** (dimajukan dari D4, lihat §Status)
+
+**D3′. Redis (cache/session/queue) + Horizon di container** ← *mulai dari sini*
    `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` → `redis`, klien **`phpredis`** (pecl, di dalam
    image — **bukan** package Composer baru). Horizon pertama kali benar-benar bisa jalan
    (`ext-pcntl` tak ada di PHP Windows). **Wajib diverifikasi manual, bukan cuma test hijau:**
    semantik `ShouldBeUnique` + `WithoutOverlapping` **berbeda** antara driver `database` (lama) dan
    Redis — jalankan skenario double-dispatch dan pastikan job kedua benar-benar ditolak.
 
-**D3. CI service containers** — **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
+**D4′. CI service containers** — **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
    (kalau ditunda, CI pasti merah begitu `composer test` menuntut MySQL). Sisa D3 tinggal
    **menambahkan service `redis:7`** ke `.github/workflows/ci.yml` bersamaan dengan D2.
 
-**D4. Containerisasi app penuh + docs + tutup selisih §Stack**
+**D5′. Sisa penutup §Stack + docs** (yang belum tertutup D2′)
    App + `Dockerfile` + `docker-compose.yml` lengkap. Di sini keputusan **pindah repo ke filesystem
    WSL2** diambil sadar (bind mount NTFS → container Linux lambat untuk autoload PHP; kalau `vendor/`
    dipindah ke named volume, IDE & PHPStan di host kehilangan sumbernya → semua gerbang harus jalan
@@ -799,7 +846,7 @@
    `CLAUDE.md` §Stack naik status dari *target* → *keadaan*, banner pra-Docker di `SETUP-GUIDE`/
    `ONBOARDING`/`README` dicabut, dan §Batas pra-Docker di file ini ditutup.
 
-**D5. Reverb ke container — terakhir, boleh dilewati**
+**D6′. Reverb ke container — terakhir, boleh dilewati**
    Sudah jalan native & terverifikasi manual. Memindahkannya = risiko merusak yang bekerja demi
    selisih belajar paling tipis. Kerjakan hanya bila ada kebutuhan nyata.
 
@@ -847,6 +894,14 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-12` (D2′): **Containerisasi app, dimajukan mendahului Redis.** Kode/infra:
+  `docker/php/Dockerfile` (**baru**), `.dockerignore` (**baru**), `docker-compose.yml` (+service
+  `app`). **Tak ada kode aplikasi (`app/`, `tests/`) yang berubah.** Docs: ADR-0007 (+catatan
+  urutan diubah + tabel pengukuran bind mount), `CLAUDE.md` §Stack (**app naik dari target ke
+  keadaan**; Redis tetap target), `SETUP-GUIDE §17` (**baru**) + banner + daftar isi, `README`,
+  `HANDOVER` §Status/§Temuan D2′ (**baru**, bug 500-vs-401)/§Langkah berikutnya (dinomori ulang
+  D2′–D6′)/changelog ini. Seeder: **tak ada**. Alasan: PHP Windows native tak punya klien Redis,
+  jadi Redis-sebelum-container menuntut DLL yang akan terbuang satu slice kemudian.
 - `2026-09-12` (D1): **MySQL di Docker + test konkurensi sungguhan + CI service container.**
   Kode/infra: `docker-compose.yml` (**baru**, MySQL 8.4 saja), `docker/mysql/init/01-databases.sql`
   (**baru**), `phpunit.xml` (DB → MySQL, +testsuite `Concurrency`), `tests/Pest.php`

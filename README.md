@@ -16,11 +16,13 @@ Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horiz
 *target* produksi — belum dipakai**, lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
 
 > ⏳ **Migrasi ke Docker sedang berjalan** — [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
-> **Slice D1 SELESAI (2026-09-12):** test kini berjalan di **MySQL dalam Docker**, bukan sqlite,
-> karena sqlite tak menerbitkan `SELECT … FOR UPDATE` sehingga gerbang anti-race mustahil jujur
-> di atasnya. **Sebelum `composer test`: `docker compose up -d`.**
-> Sisanya (Redis, Horizon, containerisasi app) belum — baris Stack di atas masih berlaku untuk
-> runtime app. Checkpoint terakhir era native ada di tag git `pre-docker`.
+> **Sudah jadi kenyataan:** **MySQL** untuk test (sqlite tak menerbitkan `SELECT … FOR UPDATE`,
+> sehingga gerbang anti-race mustahil jujur di atasnya) dan **app Laravel di container**.
+> **Belum:** Redis untuk queue/cache/session, Horizon, Reverb — baris Stack di atas masih
+> menggambarkan keadaan sebenarnya untuk ketiganya.
+> **Sebelum menjalankan apa pun: `docker compose up -d`.** Jalur native Windows **tetap
+> didukung** — lihat [`docs/SETUP-GUIDE.md §16-§17`](docs/SETUP-GUIDE.md).
+> Checkpoint terakhir era native ada di tag git `pre-docker`.
 
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
