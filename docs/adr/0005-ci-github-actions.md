@@ -81,3 +81,12 @@ binary (~140 MB) + waktu run tiap push belum sepadan sebelum benar-benar dibutuh
 Tinjau ulang **workflow-nya sendiri** saat: menambah gerbang kualitas baru, pindah dari SQLite
 ke MySQL untuk test, atau menaikkan versi PHP/Node di mesin dev (versi di workflow sengaja
 dipatok menyamai mesin dev: PHP 8.3, Node 22).
+
+**[2026-09-12] Trigger "pindah dari SQLite ke MySQL untuk test" TERPENUHI — lihat
+[ADR-0007](0007-docker-redis-mysql-migration.md).** Dua konsekuensi langsung pada workflow ini:
+(1) klaim "Tak perlu service container DB: `phpunit.xml` memaksa sqlite `:memory:`" di §Consequences
+di atas **berhenti berlaku** begitu ADR-0007 slice #3 dikerjakan — job `backend` akan menumbuhkan
+service container `mysql:8` + `redis:7`; (2) pemicunya bukan kerapian, melainkan temuan bahwa test
+race-condition tidak menjaga `lockForUpdate()` sama sekali (dibuktikan lewat mutasi, detail di
+ADR-0007 §Context). Prinsip "CI menjalankan perintah yang sama persis dengan lokal" **tetap** berlaku
+dan justru makin penting: lokal pun kini berjalan di atas MySQL/Redis yang sama lewat Docker.

@@ -34,6 +34,7 @@ Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan 
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
 * Infra dev: **native, tanpa Docker** (PHP + SQLite di mesin dev). `docker-compose.yml` **belum ada** — rencana, untuk paritas produksi (Redis/MySQL/Horizon). Jangan tulis "sudah pakai Docker" sebelum file-nya benar-benar ada.
+  * ⏳ **Migrasi ke Docker penuh + Redis + MySQL sudah DIPUTUSKAN & DISETUJUI, belum dieksekusi** — lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)** (urutan slice + biaya yang diterima sadar). Baris-baris §Stack di atas adalah **keadaan pra-Docker** dan tetap benar sampai slice ADR-0007 dikerjakan. Penanda batasnya: tag git **`pre-docker`** + §Batas pra-Docker di `HANDOVER.md`. **Jangan** ubah baris ini jadi "sudah pakai Docker" per slice — ubah hanya saat slice #4 ADR-0007 selesai.
 * CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
 ## Aturan layer (non-negotiable)
@@ -65,6 +66,7 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 
 ### Race condition (INTI proyek ini)
 * Booking slot: kuota terakhir diperebutkan 2 transporter → `SlotWindow::lockForUpdate()` di dalam `DB::transaction()`. Tolak jika `bookedCount >= capacity`.
+* ⚠️ **Lock ini BELUM dijaga test (temuan 2026-09-12).** `it('never over-books the last slot')` memanggil Action **dua kali berurutan dalam satu proses** → tetap PASS walau `->lockForUpdate()` dihapus total (dibuktikan lewat mutasi). Yang teruji cuma aturan `bookedCount >= capacity`, **bukan** locking-nya. SQLite juga tak menerbitkan `SELECT … FOR UPDATE`, jadi test jujur menuntut MySQL dulu. Ditutup di slice #1 [ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md). **Sampai itu selesai: jangan klaim race-handling "teruji" di dokumen mana pun.**
 * Reschedule appointment → optimistic lock kolom `version` (transporter & planner bisa edit bersamaan).
 * Counter `booked_count` per slot window → naik/turun di dalam transaksi yang sama dengan create/cancel appointment.
 

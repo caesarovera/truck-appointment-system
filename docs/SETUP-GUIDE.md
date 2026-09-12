@@ -12,6 +12,23 @@
 
 ---
 
+> ## ⏳ Dokumen ini menjelaskan stack **PRA-DOCKER**
+>
+> Seluruh langkah di bawah menggambarkan **dev native Windows**: PHP native, **SQLite**,
+> queue/cache/session driver `database`. Per **2026-09-12** stack ini masih **benar dan berlaku** —
+> ia belum diganti apa pun.
+>
+> Yang sudah diputuskan tapi **belum dieksekusi**: migrasi ke **Docker penuh + Redis + MySQL**,
+> lihat **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**. Saat slice ADR-0007 dikerjakan,
+> bagian-bagian berikut akan berubah: §0 (prasyarat), §1 (ekstensi SQLite), §2 (`.env`), §7
+> (migrasi/seeder), §9 (gerbang kualitas → dijalankan di dalam container), §14 (CI + service
+> containers).
+>
+> **Batas pra-Docker ditandai tag git `pre-docker`.** Untuk membaca/menjalankan proyek persis
+> seperti dokumen ini: `git checkout pre-docker`.
+
+---
+
 ## Daftar Isi
 0. [Prasyarat & versi](#0-prasyarat--versi)
 1. [Aktifkan ekstensi PHP (SQLite)](#1-aktifkan-ekstensi-php-sqlite)

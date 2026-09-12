@@ -655,6 +655,18 @@ public function lockForUpdate(int $slotWindowId): ?SlotWindow
 sampai transaksi selesai. Transporter kedua yang mengincar slot sama **menunggu**
 sampai yang pertama commit, lalu membaca `booked_count` terbaru. Inilah inti anti-race.
 
+> ⚠️ **Tapi baca ini sebelum percaya paragraf di atas (temuan 2026-09-12).** Kodenya benar,
+> **penjaganya belum ada**. Test `it('never over-books the last slot')`
+> (`tests/Feature/Booking/BookAppointmentActionTest.php:140`) memanggil Action **dua kali
+> berurutan dalam satu proses** — eksekusi sekuensial tak pernah bisa membuktikan sebuah lock.
+> Dibuktikan lewat mutasi: `->lockForUpdate()` dihapus **total**, test **tetap PASS**. Yang
+> dijaga test itu adalah aturan `bookedCount >= capacity`, bukan locking-nya.
+>
+> Dua hal yang mengikuti: (1) SQLite dev **tak menerbitkan** `SELECT … FOR UPDATE` sama sekali,
+> jadi test konkurensi yang jujur menuntut MySQL lebih dulu; (2) sampai slice #1
+> **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)** selesai, perilaku dua transporter yang
+> menekan Booking di detik yang sama **belum pernah diuji sekali pun** di proyek ini.
+
 Cache ketersediaan (anti-stampede):
 ```php
 return Cache::flexible($key, [10, 30], fn () => $this->queryAvailability($gateId, $date));

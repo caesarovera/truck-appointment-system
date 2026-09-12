@@ -10,7 +10,49 @@
 ---
 
 ## Status
-- Update terakhir: `2026-08-14` (6) · Sesi: **Logo brand disatukan (`AppLogo.vue`) + favicon
+
+> # ═══ BATAS PRA-DOCKER ═══
+>
+> **Semua yang tercatat di bawah entri 2026-09-12 adalah keadaan stack PRA-DOCKER**: dev native
+> Windows, SQLite, queue/cache/session driver `database`. Keadaan itu **masih berlaku hari ini** —
+> belum ada satu pun yang diganti.
+>
+> **Tag git: `pre-docker`** (commit terakhir era native). Untuk kembali ke keadaan itu persis:
+> `git checkout pre-docker`.
+>
+> Migrasi ke **Docker penuh + Redis + MySQL** sudah **diputuskan & disetujui, belum dieksekusi** →
+> **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**. Urutan slice-nya ada di
+> *Langkah berikutnya* di bawah. Setiap slice yang selesai **wajib** menambah entri baru di atas
+> batas ini, supaya "sebelum" dan "sesudah" tak pernah tercampur.
+
+- Update terakhir: `2026-09-12` · Sesi: **Audit prioritas + keputusan migrasi Docker/Redis/MySQL
+  (ADR-0007) + TEMUAN: test race-condition tidak menjaga `lockForUpdate()` sama sekali.**
+  **Tak ada kode aplikasi yang disentuh sesi ini** — murni analisis, keputusan, dan dokumen.
+  **(1) Audit sisa pekerjaan:** semua gerbang diverifikasi ulang sendiri & hijau (260 Pest/663
+  assert, PHPStan lvl 8, 111 Vitest, vue-tsc) — tak ada TODO/FIXME tertinggal di `app/`,
+  `resources/`, `routes/`. Sisa pekerjaan nyata: Redis/Horizon/MySQL (item #1), token abilities
+  sempit (ADR-0003), perluasan e2e, swap gateway TOS. **(2) Prioritas dipilih user = migrasi
+  infra**, lalu framing-nya diklarifikasi user jadi **pembelajaran**, bukan tenggat rilis — ini
+  mengubah bobot penilaian dan urutan eksekusi. **(3) Temuan utama sesi ini** (lihat §Temuan
+  2026-09-12 di bawah): klaim "race condition = inti proyek & sudah teruji" **diuji lewat mutasi**
+  dan **gagal** — `->lockForUpdate()` dihapus total dari `SlotRepository`, test
+  `it('never over-books the last slot')` **tetap PASS**. Sebabnya struktural: test memanggil
+  Action 2× **berurutan dalam satu proses**, dan eksekusi sekuensial tak pernah bisa membuktikan
+  lock. Perilaku 2 transporter menekan Booking di detik yang sama **belum pernah diuji sekali pun**.
+  Kode `lockForUpdate()` sendiri **benar** — yang bolong gerbangnya, bukan kodenya (kebalikan dari
+  4 temuan sekelas sebelumnya: `INACTIVE`, `driver_invalid_role`, toleransi gate-in, badge
+  "Berakhir" — di sana kodenya yang bolong). Mutasi langsung di-`git checkout`, working tree bersih.
+  **(4) Konsekuensi pada plan:** urutan plan awal (infra dulu, test-truth di tahap 6 dari 7)
+  **ditolak** — direvisi jadi **kebenaran dulu**: MySQL + test konkurensi sungguhan jadi slice #1.
+  **(5) 3 keputusan teknis dikunci bersama user** (detail + alasan di ADR-0007): Docker **penuh**
+  (app+Reverb+Horizon+Redis+MySQL — user menolak opsi hibrida yang saya rekomendasikan, alasannya
+  nilai belajar orkestrasi), klien Redis **`phpredis`** (bukan `predis` — hambatan DLL Windows hilang
+  begitu PHP pindah ke container Linux, **tak ada package Composer baru**), dan Pest+CI **ikut pindah**
+  ke MySQL/Redis nyata (tanpa ini temuan #3 tak bisa ditutup). **(6) Dokumen:** ADR-0007 (baru),
+  ADR-0005 (+catatan trigger "SQLite→MySQL" terpenuhi), `CLAUDE.md` §Stack + §Hardening/Race,
+  `ARCHITECTURE §7` (**klaim salah dikoreksi**), `CODE-WALKTHROUGH §J.1`, `SETUP-GUIDE` (banner
+  pra-Docker), `ONBOARDING` (banner), `README`, `HANDOVER` (batas + entri + temuan + langkah).
+- Sesi sebelumnya: `2026-08-14` (6) · Sesi: **Logo brand disatukan (`AppLogo.vue`) + favicon
   tab browser diperbaiki (sebelumnya benar-benar tak ada — `favicon.ico` 0 byte).** Permintaan
   langsung user ("tambahkan logo dan logo di tabnya"). Glyph jangkar (anchor) yang sebelumnya
   diduplikasi manual **3x** (`AppNav.vue` + 2 tempat di `LoginPage.vue`, sedikit tak konsisten
@@ -629,15 +671,108 @@
 - **[masih terbuka dari ronde 3]** `DemoSeeder` tak punya truk `INACTIVE` (keenam truk
   `'status' => 'ACTIVE'`) — jalur 422 `truck_inactive` tak bisa didemokan dari data demo.
 
+## Temuan 2026-09-12 — test race-condition tidak menjaga lock (P1, TERBUKA)
+
+- **[TERBUKA — P1] `it('never over-books the last slot')` tetap PASS walau `->lockForUpdate()`
+  dihapus total.** Dibuktikan lewat **mutasi**, bukan dugaan: baris `->lockForUpdate()` dicabut dari
+  `SlotRepository::lockForUpdate()` (`app/Repositories/SlotRepository.php:43`), test dijalankan →
+  **1 passed (2 assertions)**. Kode langsung dikembalikan (`git checkout`), working tree bersih.
+  - **Sebab struktural:** test di `tests/Feature/Booking/BookAppointmentActionTest.php:140` memanggil
+    `BookAppointmentAction` **dua kali berurutan dalam satu proses**. Eksekusi sekuensial **tak akan
+    pernah** bisa membuktikan sebuah lock, berapa pun mesin databasenya. Yang dijaga test itu adalah
+    aturan bisnis `bookedCount >= capacity` → tolak. Aturan itu benar dan tetap berharga; ia hanya
+    bukan bukti locking.
+  - **Dampak:** perilaku yang oleh `CLAUDE.md` disebut **"INTI proyek ini"** — dua transporter
+    menekan Booking pada detik yang sama untuk slot terakhir — **belum pernah diuji sekali pun**.
+    260 test hijau selama ini memberi rasa aman yang tak ditopang bukti pada titik justru paling
+    penting.
+  - **Beda dari 4 temuan sekelas sebelumnya** (`TruckStatus::INACTIVE`, `driver_invalid_role`,
+    toleransi jendela gate-in, badge "Berakhir"): di sana **kodenya** yang bolong sementara dokumen
+    benar. Di sini **kodenya benar** — `lockForUpdate()` sudah tepat sejak awal — yang bolong
+    **gerbangnya**. Kelas barunya: *"kode benar, tapi tak ada yang menjaganya tetap benar"*. Hapus
+    lock-nya besok karena salah paham, dan **tak ada** yang memberi tahu.
+  - **Kenapa tak bisa ditutup sekarang juga:** SQLite tak menerbitkan `SELECT … FOR UPDATE` (ia
+    menyerialkan tulisan di level file/DB), jadi test konkurensi yang jujur **menuntut MySQL lebih
+    dulu**. Inilah alasan migrasi infra dan kebenaran uji digabung, dan alasan MySQL naik jadi
+    **slice #1** di *Langkah berikutnya* — bukan tahap 6 seperti draf plan pertama.
+  - **Ditutup di:** slice #1 [ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md). Ditulis
+    **merah dulu** (loop TDD kontrak): test konkurensi sungguhan (proses paralel / request bersamaan)
+    harus **gagal** saat lock dicabut, baru ia layak disebut penjaga.
+  - **Dokumen yang ikut dikoreksi hari ini** karena klaimnya tak benar: `ARCHITECTURE §7`
+    ("race-handling **teruji**" → dikoreksi), `CODE-WALKTHROUGH §J.1` (+peringatan), `CLAUDE.md`
+    §Hardening/Race (+peringatan & larangan mengklaim "teruji" sampai slice #1 selesai).
+
+> **Pelajaran metodologis (transferable, di luar proyek ini).** Kebiasaan **membuktikan gerbang itu
+> menggigit lewat mutasi** — yang sudah dipakai proyek ini saat menguji audit trail
+> (`CODE-WALKTHROUGH §Y`, di sana ia menemukan lubang di test-nya sendiri) — menemukan lubang di
+> test terpenting proyek ini dalam waktu **di bawah satu menit**. Pertanyaannya bukan "apakah test
+> hijau", tapi **"apakah test ini merah kalau fitur yang dijaganya saya rusak?"**. Terapkan ke test
+> mana pun yang menjaga sesuatu yang mahal: konkurensi, otorisasi, audit, idempotency.
+
 ## Sedang dikerjakan
-- (kosong) — checkpoint hijau (219 Pest / 87 Vitest + **CI hijau di GitHub untuk kedua commit, masing-masing punya run sendiri**); terakhir: kedua temuan P1 ronde 4 ditutup (toleransi jendela gate-in, reminder saat reschedule).
+- (kosong) — checkpoint **pra-Docker** hijau & tertandai (tag `pre-docker`): 260 Pest/663 assert,
+  PHPStan lvl 8, 111 Vitest, vue-tsc, build — semuanya diverifikasi ulang 2026-09-12. Berikutnya:
+  slice #1 ADR-0007 (MySQL + test konkurensi sungguhan). Tak ada pekerjaan setengah jalan yang
+  menggantung.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
 
-> Urutan di bawah **berubah setelah ronde 4**: temuan "janji kontrak tanpa kode" naik ke atas,
-> di depan item infrastruktur. Alasannya sama dengan alasan CI didahulukan atas e2e (ADR-0005):
-> menambah lapisan baru di atas fondasi yang gerbangnya bolong = urutan terbalik.
+> **Urutan di bawah dirombak 2026-09-12** ([ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)).
+> Prinsipnya sama seperti saat CI didahulukan atas e2e (ADR-0005), cuma diterapkan lebih tajam:
+> **kebenaran paling mahal dibayar paling dulu, kosmetik terakhir.** Draf plan pertama menaruh
+> migrasi test di tahap 6 dari 7 — itu menuntut 5 tahap setup dibayar sebelum pemilik proyek tahu
+> apakah jantung sistemnya aman. Ditolak setelah temuan mutasi (§Temuan 2026-09-12).
+
+### 🔜 AKTIF — slice ADR-0007 (migrasi Docker/Redis/MySQL)
+
+**D1. MySQL + test konkurensi sungguhan** ← *mulai dari sini*
+   Container **MySQL saja** (belum containerisasi app), arahkan Pest ke sana, lalu tulis test yang
+   benar-benar konkuren (proses paralel / request bersamaan) untuk `BookAppointmentAction`.
+   **Ditulis merah dulu**: harus GAGAL saat `->lockForUpdate()` dicabut, baru layak disebut penjaga.
+   Menutup §Temuan 2026-09-12 (P1). Butuh: `.env.testing`, skema per-proses paralel
+   (`tas_testing_test_{TEST_TOKEN}` lewat `ParallelTesting::setUpTestDatabase`), cek migrasi jalan di
+   MySQL (FK lebih ketat dari SQLite — lihat komentar di `create_users_table.php`).
+
+**D2. Redis (cache/session/queue) + Horizon di container**
+   `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` → `redis`, klien **`phpredis`** (pecl, di dalam
+   image — **bukan** package Composer baru). Horizon pertama kali benar-benar bisa jalan
+   (`ext-pcntl` tak ada di PHP Windows). **Wajib diverifikasi manual, bukan cuma test hijau:**
+   semantik `ShouldBeUnique` + `WithoutOverlapping` **berbeda** antara driver `database` (lama) dan
+   Redis — jalankan skenario double-dispatch dan pastikan job kedua benar-benar ditolak.
+
+**D3. CI service containers**
+   `.github/workflows/ci.yml` job `backend` + blok `services:` (`mysql:8`, `redis:7`, dengan
+   healthcheck). Mengunci hasil D1+D2 supaya tak diam-diam mundur saat push. Catatan ADR-0005
+   ("tak perlu service container DB") berhenti berlaku di sini — sudah ditandai di ADR-0005.
+
+**D4. Containerisasi app penuh + docs + tutup selisih §Stack**
+   App + `Dockerfile` + `docker-compose.yml` lengkap. Di sini keputusan **pindah repo ke filesystem
+   WSL2** diambil sadar (bind mount NTFS → container Linux lambat untuk autoload PHP; kalau `vendor/`
+   dipindah ke named volume, IDE & PHPStan di host kehilangan sumbernya → semua gerbang harus jalan
+   di dalam container). Nasib `composer dev` diputuskan di sini. Baru **setelah slice ini**:
+   `CLAUDE.md` §Stack naik status dari *target* → *keadaan*, banner pra-Docker di `SETUP-GUIDE`/
+   `ONBOARDING`/`README` dicabut, dan §Batas pra-Docker di file ini ditutup.
+
+**D5. Reverb ke container — terakhir, boleh dilewati**
+   Sudah jalan native & terverifikasi manual. Memindahkannya = risiko merusak yang bekerja demi
+   selisih belajar paling tipis. Kerjakan hanya bila ada kebutuhan nyata.
+
+> **Opsional setelah D2 hijau (sengaja dipisah):** refaktor cache explicit-key `Cache::forget` →
+> `Cache::tags(['slot', "gate:{$gateId}"])`. Baru **boleh** setelah Redis nyata dipakai. Dipisah dari
+> migrasi supaya perubahan perilaku cache tak bercampur dengan perubahan infrastruktur dalam satu
+> commit yang sulit di-*revert* terpisah.
+
+### Backlog (tak terikat ADR-0007)
+
+**B1. Token abilities sempit** (ADR-0003) — tegakkan saat ada token ber-scope sempit. Belum ada
+   konsumen nyata; mengerjakannya sekarang = menambah permukaan sebelum ada yang memakainya.
+**B2. Perluasan e2e** — belum ada spec untuk admin, utilisasi planner, no-show, QR. E2E juga masih
+   lokal-only (belum di CI). Keputusan biaya, bukan kelupaan — lihat item lama #3 di bawah.
+**B3. Swap gateway TOS** (`LoggingGateEventGateway` → integrasi TOS sungguhan) — terikat spek API
+   eksternal yang belum ada di tangan. Bukan soal prioritas, tapi menunggu input dari luar proyek.
+
+### ✅ Riwayat item yang sudah selesai (arsip, jangan dikerjakan ulang)
 
 1. **[SELESAI 2026-08-14] QR (P3, ronde 4) — satu-satunya sisa janji kontrak tanpa kode.**
    `dwell_time` **[FIXED 2026-08-13]**, no-show manual **[FIXED 2026-08-13]**. QR: user
@@ -657,11 +792,32 @@
    perluasan cakupan lagi = sesi terpisah kalau dibutuhkan.
 4. **[SELESAI 2026-07-25]** Audit klaim `CLAUDE.md` vs kenyataan tuntas: baris Docker Compose, baris CI, baris `Queue/Cache/Session`, dan aturan `Cache::tags` di §Hardening — semuanya kini selaras dengan `.env` & kode. **Sisa pekerjaan nyata (bukan dokumen):** benar-benar pindah ke **Redis + Horizon + MySQL** untuk paritas produksi (butuh `docker-compose.yml`) — sesi tersendiri. Saat itu dikerjakan, dua hal ikut berubah: cache boleh direfaktor dari explicit-key `Cache::forget` ke `Cache::tags`, dan §Stack CLAUDE.md naik status dari **target** jadi **keadaan**.
 5. **[DIPUTUSKAN 2026-07-27 → ADR-0006] CRUD sopir: TIDAK dibuat di MVP — sopir dikelola admin.** Pertanyaan produk yang menggantung di item ini ("transporter boleh bikin akun user sendiri?") kini dijawab: **tidak**. Sopir = `User` ber-role `driver`, jadi self-service berarti transporter menerbitkan **akun login** — permukaan keamanan baru (undangan/password sementara, dan role/`company_id` wajib dipaksa server) yang tak sepadan dengan nilainya, sementara CRUD truk sudah mendemonstrasikan pola company-scoped CRUD-nya secara lengkap. Jalur resmi: Admin User CRUD (§V) yang sudah ber-guard. Transporter tetap **melihat** sopirnya via `GET /me/fleet` (read-only, sudah ada). `PRD §3` sudah dikoreksi supaya kontrak tak lagi menjanjikan yang tak dibangun. Pemicu tinjau ulang ada di `docs/adr/0006-driver-management-admin-only.md`.
-6. **Backlog hardening sisa:** token abilities sempit (ADR-0003, tegakkan saat ada token ber-scope sempit).
+6. **[DIPINDAH 2026-09-12 → B1]** Backlog hardening token abilities sempit (ADR-0003). Kini tercatat
+   di *Backlog* di atas supaya tak tercampur arsip.
+
+> **Catatan arsip:** item 4 di atas menyisakan "pindah ke Redis + Horizon + MySQL" sebagai pekerjaan
+> nyata. Sisa itu **bukan lagi menggantung** — ia kini terurai jadi slice **D1–D5** di atas dengan
+> alasan & biaya tertulis di [ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-12`: **Keputusan migrasi Docker/Redis/MySQL (ADR-0007) + penanda batas pra-Docker +
+  koreksi klaim "race-handling teruji".** **Tak ada kode aplikasi yang berubah** — dokumen &
+  keputusan saja. Docs: `docs/adr/0007-docker-redis-mysql-migration.md` (**baru** — 3 keputusan
+  teknis + urutan slice D1–D5 + biaya yang diterima sadar), `docs/adr/README.md` (+baris 0007),
+  `docs/adr/0005-ci-github-actions.md` (+catatan trigger "SQLite→MySQL untuk test" **terpenuhi**,
+  dan klaim "tak perlu service container DB" ditandai akan berhenti berlaku di D3), `CLAUDE.md`
+  (§Stack +status migrasi disetujui-belum-dieksekusi & larangan mengubah baris Docker per slice;
+  §Hardening/Race +peringatan lock belum dijaga test), `docs/ARCHITECTURE.md` §7 (**klaim
+  "race-handling teruji" DIKOREKSI** — tak benar sejak ditulis), `docs/CODE-WALKTHROUGH.md` §J.1
+  (+peringatan di tempat `lockForUpdate()` dijelaskan), `docs/SETUP-GUIDE.md` (+banner "dokumen ini
+  = stack pra-Docker" + daftar § yang akan berubah), `docs/ONBOARDING.md` (+banner 2 hal untuk
+  developer baru), `README.md` (+catatan pra-Docker), `HANDOVER.md` (§Batas pra-Docker, entri
+  Status, §Temuan 2026-09-12, §Langkah berikutnya dirombak jadi D1–D5 + B1–B3 + arsip).
+  Seeder: **tak ada perubahan**. Alasan: temuan mutasi (test race-condition tetap PASS tanpa
+  `lockForUpdate()`) membalik urutan plan — kebenaran uji naik jadi slice #1 — dan batas pra/pasca
+  Docker perlu ditandai eksplisit sebelum satu baris infra pun disentuh.
 - `2026-08-14` (6): **Logo `AppLogo.vue` (satukan 3x duplikat) + favicon nyata (svg+png+ico).**
   Kode: `resources/js/components/AppLogo.vue` (baru), `AppNav.vue`/`LoginPage.vue` (pakai
   `AppLogo`), `public/favicon.svg`+`public/favicon-32.png` (baru), `public/favicon.ico`

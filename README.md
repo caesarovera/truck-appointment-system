@@ -14,6 +14,10 @@ Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA ter
 Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
 Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horizon masih
 *target* produksi — belum dipakai**, lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
+
+> ⏳ **Keadaan ini = "pra-Docker" (tag git `pre-docker`).** Migrasi ke **Docker penuh + Redis +
+> MySQL** sudah diputuskan & disetujui, **belum dieksekusi** — alasan, urutan slice, dan biaya
+> yang diterima sadar ada di [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 

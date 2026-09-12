@@ -10,6 +10,20 @@
 
 ---
 
+> ## ⏳ Dua hal yang harus kamu tahu sebelum mulai (per 2026-09-12)
+>
+> **1. Panduan ini menjelaskan stack pra-Docker.** Dev native Windows + SQLite + driver
+> `database` — masih **benar dan berlaku**. Migrasi ke **Docker penuh + Redis + MySQL** sudah
+> diputuskan tapi **belum dieksekusi**: [ADR-0007](adr/0007-docker-redis-mysql-migration.md).
+> Batasnya ditandai tag git **`pre-docker`**.
+>
+> **2. Jangan percaya kalimat "race condition sudah teruji" di dokumen lama.** Lock booting
+> (`lockForUpdate()`) **belum dijaga test** — test yang ada memanggil Action dua kali berurutan
+> dalam satu proses, jadi ia tetap hijau walau lock-nya dihapus. Ini justru **latihan terbaik**
+> untuk memahami kenapa "test hijau" ≠ "perilaku terjamin". Detail: `CODE-WALKTHROUGH §J.1`.
+
+---
+
 ## Daftar Isi
 1. [Inti yang harus dipahami lebih dulu (peta mental)](#1-inti-yang-harus-dipahami-lebih-dulu-peta-mental)
 2. [Glosarium — istilah yang akan terus muncul](#2-glosarium--istilah-yang-akan-terus-muncul)
