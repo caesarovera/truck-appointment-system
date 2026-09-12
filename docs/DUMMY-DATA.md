@@ -1,6 +1,8 @@
 # docs/DUMMY-DATA.md — truck-appointment-system
 
-Jalankan: `php artisan migrate:fresh --seed`
+Jalankan: `docker compose exec app php artisan migrate:fresh --seed` (di container, DB `tas`)
+atau `php artisan migrate:fresh --seed` (jalur native, DB SQLite). Sejak ADR-0007 keduanya
+mengisi **database yang berbeda** — lihat `SETUP-GUIDE §16d`.
 
 **Prasyarat:** `DatabaseSeeder.php` (bawaan Laravel, sudah ada) harus memanggil keduanya dengan urutan ini:
 ```php

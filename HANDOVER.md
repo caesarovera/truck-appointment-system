@@ -839,10 +839,39 @@
     paksa `expectsJson()` untuk seluruh grup API di `bootstrap/app.php`.
 
 ## Sedang dikerjakan
-- (kosong) — **D1 + D2′ + D3′ selesai & hijau**: **265 Pest** di container, **262 + 3 skip** di
-  native Windows, PHPStan lvl 8, Pint bersih. D4′ (service `redis` di CI) **sudah ikut dikerjakan
-  di D3′** dengan alasan sama seperti MySQL di D1: gerbang baru yang tak dipasang di CI tak berlaku
-  saat push. Sisa: **D5′** (penutup §Stack/docs) & **D6′** (Reverb, opsional).
+- (kosong) — **sesi ditutup 2026-09-12 dalam keadaan bersih.** D1 + D2′ + D3′ + D4′ selesai,
+  semua di-commit & di-push, working tree bersih. **265 Pest** di container, **262 + 3 skip** di
+  native Windows, PHPStan lvl 8, Pint bersih.
+
+### ▶️ MULAI SESI BERIKUTNYA DARI SINI
+
+**1. Nyalakan infra dulu** — tanpa ini `composer test` gagal konek, bukan bug:
+```bash
+docker compose up -d          # mysql + redis + app + horizon
+docker compose ps             # mysql & redis harus "healthy"
+```
+Dua jalur sama-sama sah: `docker compose exec app composer test` (265 test) atau
+`composer test` di Windows (262 + 3 skip). Rinci: `SETUP-GUIDE §16–§18`.
+
+**2. Yang perlu mata manusia (agent tak bisa):** CI untuk commit **`8319cf6` (D3′) BELUM
+diverifikasi** — repo privat, `gh` tak terpasang, tak ada token di sesi ini. Cek tab Actions.
+`4ea097b` (D1) & `3e1f0c2` (D2′) **sudah dikonfirmasi hijau** oleh user. Risiko khusus di run D3′:
+service container `redis` + ekstensi `redis` baru pertama kali dieksekusi di runner.
+
+**3. Pekerjaan tersisa, urut:**
+- **D5′** — penutup §Stack/docs. Sebagian besar sudah tertutup sambil jalan di D2′/D3′; sisanya
+  tinggal menyisir klaim yang masih menggambarkan jalur native sebagai satu-satunya.
+- **D6′** — Reverb ke container. **Opsional**, boleh dilewati: sudah jalan native & terverifikasi.
+- **[P3, TERBUKA]** bug 500-vs-401 — lihat §Temuan D2′. Sengaja tak diperbaiki (di luar scope),
+  menunggu keputusan user. Perbaikannya sebaris.
+- **Opsional, kini SAH secara teknis tapi sengaja belum:** refaktor `Cache::forget` →
+  `Cache::tags`. Jangan dikerjakan sebelum diputuskan terpisah — selama jalur native (driver
+  `database`, tak dukung tag) masih didukung, key eksplisit satu-satunya yang benar di kedua jalur.
+
+**4. Catatan mesin:** container memakai `restart: unless-stopped`, jadi ia hidup lagi setelah
+reboot. Matikan dengan `docker compose down` (data aman di volume). Ada juga berkas sisa
+`php.ini.bak-pre-redis-20260912` di folder PHP laragon — salinan `php.ini` yang batal diubah,
+aman dihapus.
 - **CI TERVERIFIKASI HIJAU** untuk `4ea097b` (D1) & `3e1f0c2` (D2′) — dikonfirmasi user
   2026-09-12 dengan melihat langsung tab Actions (repo privat + `gh` tak terpasang di sesi ini,
   jadi agent tak bisa membacanya sendiri). Yang penting dari run D1: **service container MySQL +
@@ -937,6 +966,17 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-12` (penutup sesi): **Sinkronisasi dokumen dengan keadaan pasca-D3′ + catatan mulai
+  sesi berikutnya.** **Tak ada kode/infra yang berubah — dokumen saja.** Menambal 6 klaim yang
+  jadi tidak akurat setelah migrasi: `README` §Stack ("Redis masih target — belum dipakai"),
+  `SETUP-GUIDE` banner ("stack ini belum diganti apa pun" → tabel D1/D2′/D3′),
+  `ONBOARDING` banner (**"migrasi belum dieksekusi"** + poin race-condition yang sudah ditutup D1)
+  & 2 baris cheat-sheet jebakan (Horizon, `Cache::tags`) & blok perintah harian (`php artisan
+  horizon` manual → service container), `DUMMY-DATA` (`migrate:fresh --seed` kini mengisi DB
+  berbeda di tiap jalur). `HANDOVER` §Sedang dikerjakan diganti blok **"MULAI SESI BERIKUTNYA
+  DARI SINI"** (nyalakan infra, CI D3′ yang belum diverifikasi, sisa pekerjaan, catatan mesin).
+  Alasan: dokumen adalah satu-satunya yang menyeberangi sesi, dan klaim basi di dalamnya persis
+  yang menyesatkan sesi berikutnya.
 - `2026-09-12` (D3′): **Redis + Horizon + gerbang ShouldBeUnique berbasis perilaku.** Kode/infra:
   `docker-compose.yml` (+service `redis` & `horizon`, env redis di `app`), `phpunit.xml`
   (**`force="true"` pada baris isolasi** + `REDIS_DB`/`REDIS_CACHE_DB`=15),

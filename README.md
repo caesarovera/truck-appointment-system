@@ -12,8 +12,8 @@ Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA ter
 ## Stack
 **Backend:** Laravel 12 · PHP 8.3+ · Sanctum · Reverb (WebSocket) ·
 Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
-Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horizon masih
-*target* produksi — belum dipakai**, lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
+Queue/cache/session: **Redis 7 + Horizon di container** (sudah dipakai, bukan lagi target);
+jalur native Windows masih driver `database`. Lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
 
 > ⏳ **Migrasi ke Docker sedang berjalan** — [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
 > **Sudah jadi kenyataan:** **MySQL** untuk test (sqlite tak menerbitkan `SELECT … FOR UPDATE`,

@@ -12,23 +12,25 @@
 
 ---
 
-> ## ⏳ Dokumen ini menjelaskan stack **PRA-DOCKER**
+> ## ⏳ §0–§13 menjelaskan jalur **NATIVE**; Docker ada di §16–§18
 >
-> Seluruh langkah di bawah menggambarkan **dev native Windows**: PHP native, **SQLite**,
-> queue/cache/session driver `database`. Per **2026-09-12** stack ini masih **benar dan berlaku** —
-> ia belum diganti apa pun.
+> Langkah §0–§13 di bawah menggambarkan **dev native Windows** (PHP native, SQLite, driver
+> `database`). Jalur itu **masih didukung dan masih jalan** — tapi ia **bukan lagi satu-satunya**,
+> dan untuk beberapa hal ia bukan lagi yang utama.
 >
-> Yang sudah diputuskan: migrasi ke **Docker penuh + Redis + MySQL**,
-> lihat **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**. Saat slice berikutnya dikerjakan,
-> bagian ini akan berubah: §1 (ekstensi SQLite), §2 (`.env`), §7 (migrasi/seeder), §9 (gerbang
-> kualitas → dijalankan di dalam container).
+> **Sudah berubah per 2026-09-12** ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)):
 >
-> **⚠️ DUA HAL SUDAH BERUBAH (2026-09-12).**
-> **(D1)** `composer test` butuh **MySQL di Docker**, bukan sqlite `:memory:` → `docker compose up -d`
-> lebih dulu. Rinciannya **§16**.
-> **(D2′)** App Laravel kini **bisa jalan di container** (`docker compose up -d` → `http://localhost:8000`).
-> Rinciannya **§17**. Jalur native §0–§13 **masih berlaku dan masih didukung** — keduanya hidup
-> berdampingan, tak ada yang dipaksa pindah.
+> | Slice | Perubahan | Rinci |
+> |---|---|---|
+> | **D1** | `composer test` butuh **MySQL di Docker**, bukan sqlite `:memory:` | §16 |
+> | **D2′** | App Laravel jalan di container → `http://localhost:8000` | §17 |
+> | **D3′** | **Redis + Horizon** untuk cache/session/queue di container | §18 |
+>
+> **Karena itu: `docker compose up -d` dulu sebelum menjalankan test apa pun.**
+>
+> Yang **belum** berubah di §0–§13: app native masih SQLite + driver `database` (PHP Windows tak
+> punya ekstensi redis), dan frontend/Vite memang tetap native. Checkpoint terakhir era murni
+> native ada di tag git **`pre-docker`**.
 >
 > **Batas pra-Docker ditandai tag git `pre-docker`.** Untuk membaca/menjalankan proyek persis
 > seperti dokumen ini: `git checkout pre-docker`.

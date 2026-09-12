@@ -12,15 +12,21 @@
 
 > ## ⏳ Dua hal yang harus kamu tahu sebelum mulai (per 2026-09-12)
 >
-> **1. Panduan ini menjelaskan stack pra-Docker.** Dev native Windows + SQLite + driver
-> `database` — masih **benar dan berlaku**. Migrasi ke **Docker penuh + Redis + MySQL** sudah
-> diputuskan tapi **belum dieksekusi**: [ADR-0007](adr/0007-docker-redis-mysql-migration.md).
-> Batasnya ditandai tag git **`pre-docker`**.
+> **1. Proyek ini sudah pindah ke Docker, dan panduan ini belum seluruhnya menyusul.**
+> Per 2026-09-12: **MySQL, app Laravel, Redis, dan Horizon sudah jalan di container**
+> ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)). **Jalankan `docker compose up -d` dulu**
+> — tanpa itu `composer test` gagal konek. Langkah native di panduan ini masih didukung dan masih
+> benar untuk app, tapi bukan lagi satu-satunya jalur. Baca `SETUP-GUIDE §16–§18`.
+> Checkpoint terakhir era murni native: tag git **`pre-docker`**.
 >
-> **2. Jangan percaya kalimat "race condition sudah teruji" di dokumen lama.** Lock booting
-> (`lockForUpdate()`) **belum dijaga test** — test yang ada memanggil Action dua kali berurutan
-> dalam satu proses, jadi ia tetap hijau walau lock-nya dihapus. Ini justru **latihan terbaik**
-> untuk memahami kenapa "test hijau" ≠ "perilaku terjamin". Detail: `CODE-WALKTHROUGH §J.1`.
+> **2. Pelajaran terpenting proyek ini, dan ia lahir dari kesalahan nyata.** Sampai 2026-09-12,
+> dokumen mengklaim "race condition sudah teruji" — **tidak benar**. Test yang ada memanggil
+> Action dua kali **berurutan dalam satu proses**, jadi ia tetap hijau walau `lockForUpdate()`
+> dihapus total. Sudah ditutup (`tests/Concurrency/`), tapi cara menemukannya yang wajib kamu
+> tiru: **jangan tanya "apakah test hijau", tanya "apakah test ini MERAH kalau fitur yang
+> dijaganya saya rusak?"** — lalu rusak beneran dan jalankan. Namanya mutation testing, butuh
+> kurang dari satu menit, dan di proyek ini ia sudah dua kali menemukan gerbang bolong.
+> Detail: `CODE-WALKTHROUGH §J.1` & `§O.3`.
 
 ---
 
@@ -281,8 +287,8 @@ Junior hampir pasti kena ini; semua sudah pernah terjadi & dicatat:
 | PHPStan `property.notFound` pada `$this->route('x')->id` | Bertipe `object\|string` → `$m instanceof X ? $m->id : null` | §V.4 |
 | PHPStan "Strict comparison always false" (enum) | Tambah `@property AppointmentStatus $status` di model | SETUP §11 |
 | PHPStan `method.childReturnType` di factory `definition()` | Hapus docblock `@return array<...>` (warisi tipe induk) | SETUP §11 |
-| `Cache::tags() does not support tagging` | Store dev `database` tak dukung tag → key eksplisit + `Cache::forget` | HANDOVER changelog |
-| Horizon gagal di Windows | Butuh `ext-pcntl` → jalankan di **Docker (Linux)**. **Reverb TIDAK butuh pcntl** — jalan native | HANDOVER *Jebakan* |
+| `Cache::tags() does not support tagging` | Muncul di jalur native (store `database`). Redis di container mendukung tag, tapi refaktornya **sengaja belum dikerjakan** → tetap key eksplisit + `Cache::forget` di kedua jalur | CLAUDE.md §Cache |
+| Horizon gagal di Windows | Butuh `ext-pcntl` yang tak ada di PHP Windows → **sudah jadi service container** sejak D3′: `docker compose up -d`, cek `docker compose exec app php artisan horizon:status`. **Reverb TIDAK butuh pcntl** — masih jalan native | SETUP §18 |
 | Test "menghapus" data dev | Aktifkan `:memory:` di `phpunit.xml` | SETUP §8c |
 | "could not find driver" saat migrate | Aktifkan `pdo_sqlite` + `sqlite3` di php.ini | SETUP §1 |
 | `Declaration ...::data() must be compatible` | Form Request sudah punya `data()`/`date()` → ganti nama (`toData()`) | SETUP §11 |
@@ -318,8 +324,9 @@ npm run build                        # bundel produksi
 php artisan reverb:start             # websocket (butuh BROADCAST_CONNECTION=reverb + worker)
 php artisan queue:listen             # proses job broadcast (ShouldBroadcast → queue)
 
-# Hanya Horizon yang butuh ext-pcntl (Docker/Linux):
-php artisan horizon                  # dashboard + queue worker (opsional, ganti queue:listen)
+# Horizon: SUDAH jadi service container sejak D3' — tak perlu dijalankan manual.
+docker compose up -d                 # menyalakan mysql + redis + app + horizon
+docker compose exec app php artisan horizon:status   # -> Horizon is running
 ```
 
 Buka app di **`http://localhost:8000`** (Laravel), **bukan** port 5173 (itu Vite HMR saja).
