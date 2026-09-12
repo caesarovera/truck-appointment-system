@@ -11,6 +11,12 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!-- Terpisah dari Feature karena butuh trait DB yang BERBEDA: DatabaseTruncation,
+             bukan RefreshDatabase (lihat tests/Pest.php). Test di sini menyalakan proses
+             PHP sungguhan, jadi datanya wajib benar-benar ter-commit. -->
+        <testsuite name="Concurrency">
+            <directory>tests/Concurrency</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -23,8 +29,19 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!-- SLICE D1 (ADR-0007): test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
+             Alasannya BUKAN kerapian: sqlite tak menerbitkan `SELECT ... FOR UPDATE`, jadi
+             test konkurensi (jantung proyek ini) mustahil jujur di atasnya. Lihat
+             HANDOVER.md §Temuan 2026-09-12.
+             Nilai di bawah = default yang cocok dengan docker-compose.yml. PHPUnit TIDAK
+             menimpa env var yang sudah ada di environment (tanpa force="true"), jadi CI atau
+             mesin dengan port lain cukup meng-export DB_* sendiri tanpa mengubah file ini. -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3307"/>
+        <env name="DB_DATABASE" value="tas_testing"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value="secret"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

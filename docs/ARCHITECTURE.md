@@ -171,15 +171,16 @@ Detail: `docs/FRONTEND.md`.
 | Tiap peran punya tempat jelas → mudah dicari, dites terisolasi | Satu fitur tersebar di banyak folder |
 | Aliran satu arah → kebocoran layer ketahuan (PHPStan lvl 8) | Lebih banyak file/boilerplate dari MVC |
 | Port & adapter → integrasi eksternal swappable | Kurva belajar lebih curam untuk junior |
-| Action ber-lock terpusat → race-handling **terpusat di satu tempat** | Terpusat ≠ teruji: lock-nya sendiri **belum dijaga test** (lihat catatan di bawah) |
+| Action ber-lock terpusat → race-handling terpusat **dan kini benar-benar teruji** (`tests/Concurrency/`) | Butuh MySQL untuk menguji jujur — sqlite tak punya `FOR UPDATE` |
 
-> ⚠️ **Koreksi 2026-09-12.** Baris terakhir tabel sebelumnya berbunyi "race-handling **teruji**".
-> Klaim itu **tidak benar sejak ditulis**: `it('never over-books the last slot')` memanggil Action
-> dua kali **berurutan dalam satu proses**, jadi ia tetap PASS walau `->lockForUpdate()` dihapus
-> total (dibuktikan lewat mutasi). Yang teruji adalah aturan `bookedCount >= capacity`, bukan
-> lock-nya. Perilaku konkuren sungguhan ditutup di slice #1
-> **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**, yang menuntut MySQL lebih dulu karena
-> SQLite tak menerbitkan `SELECT … FOR UPDATE`.
+> **Riwayat klaim ini (2026-09-12).** Baris tabel di atas dulu berbunyi "race-handling teruji"
+> padahal **tidak benar sejak ditulis**: satu-satunya test yang relevan memanggil Action dua kali
+> **berurutan dalam satu proses**, jadi ia tetap hijau walau `->lockForUpdate()` dicabut total.
+> Ditutup hari yang sama lewat slice D1 **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**:
+> test pindah ke MySQL dan `tests/Concurrency/ConcurrentBookingTest.php` lahir — 4 proses PHP
+> sungguhan memperebutkan slot terakhir, plus satu assertion deterministik atas `for update`.
+> Dicatat di sini supaya klaim "teruji" yang sekarang punya jejak buktinya, bukan sekadar
+> kalimat yang dipercaya lagi.
 
 **Alternatif yang sengaja tidak dipakai:** *package-by-feature* (folder `app/Booking/`
 berisi semua lapisan fitur itu). Untuk proyek yang menekankan disiplin layer & konkurensi,

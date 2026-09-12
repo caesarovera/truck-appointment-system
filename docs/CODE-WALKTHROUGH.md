@@ -655,17 +655,25 @@ public function lockForUpdate(int $slotWindowId): ?SlotWindow
 sampai transaksi selesai. Transporter kedua yang mengincar slot sama **menunggu**
 sampai yang pertama commit, lalu membaca `booked_count` terbaru. Inilah inti anti-race.
 
-> ⚠️ **Tapi baca ini sebelum percaya paragraf di atas (temuan 2026-09-12).** Kodenya benar,
-> **penjaganya belum ada**. Test `it('never over-books the last slot')`
-> (`tests/Feature/Booking/BookAppointmentActionTest.php:140`) memanggil Action **dua kali
-> berurutan dalam satu proses** — eksekusi sekuensial tak pernah bisa membuktikan sebuah lock.
-> Dibuktikan lewat mutasi: `->lockForUpdate()` dihapus **total**, test **tetap PASS**. Yang
-> dijaga test itu adalah aturan `bookedCount >= capacity`, bukan locking-nya.
+> **Siapa yang menjaga kalimat di atas — dan kenapa butuh DUA test (D1, 2026-09-12).**
+> Sampai 2026-09-12 jawabannya: **tak ada**. `it('never over-books the last slot')`
+> (`tests/Feature/Booking/BookAppointmentActionTest.php:140`) memanggil Action dua kali
+> **berurutan dalam satu proses**, dan eksekusi sekuensial tak pernah bisa membuktikan lock —
+> dibuktikan lewat mutasi: lock dicabut total, test tetap PASS.
 >
-> Dua hal yang mengikuti: (1) SQLite dev **tak menerbitkan** `SELECT … FOR UPDATE` sama sekali,
-> jadi test konkurensi yang jujur menuntut MySQL lebih dulu; (2) sampai slice #1
-> **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)** selesai, perilaku dua transporter yang
-> menekan Booking di detik yang sama **belum pernah diuji sekali pun** di proyek ini.
+> Penggantinya `tests/Concurrency/ConcurrentBookingTest.php` (butuh MySQL — sqlite tak punya
+> `FOR UPDATE`), dan ia sengaja berisi **dua** test:
+>
+> 1. **4 proses PHP sungguhan** memperebutkan slot berkapasitas 1 → tepat satu menang, tiga
+>    ditolak `SlotUnavailableException`, `booked_count` tetap 1.
+> 2. **Assertion deterministik** bahwa `select … for update` benar-benar diterbitkan.
+>
+> Kenapa tidak cukup #1 saja, ini bagian yang penting: saat lock dicabut, **#1 tetap hijau**.
+> Sebabnya `increment('booked_count')` tetap meminta lock baris pada UPDATE-nya, transaksi
+> berbaris di titik itu, lalu `DB::transaction(attempts: 3)` mengulang closure yang kalah dan
+> pengulangan itu membaca kuota yang sudah benar. Sistem selamat lewat jalur yang tak dirancang
+> untuk menyelamatkannya, dan keselamatan itu bergantung pada penjadwalan OS. **Test perilaku
+> konkuren membuktikan janji, tapi bukan gerbang yang andal; #2-lah gerbangnya.**
 
 Cache ketersediaan (anti-stampede):
 ```php

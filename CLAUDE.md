@@ -66,7 +66,8 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 
 ### Race condition (INTI proyek ini)
 * Booking slot: kuota terakhir diperebutkan 2 transporter → `SlotWindow::lockForUpdate()` di dalam `DB::transaction()`. Tolak jika `bookedCount >= capacity`.
-* ⚠️ **Lock ini BELUM dijaga test (temuan 2026-09-12).** `it('never over-books the last slot')` memanggil Action **dua kali berurutan dalam satu proses** → tetap PASS walau `->lockForUpdate()` dihapus total (dibuktikan lewat mutasi). Yang teruji cuma aturan `bookedCount >= capacity`, **bukan** locking-nya. SQLite juga tak menerbitkan `SELECT … FOR UPDATE`, jadi test jujur menuntut MySQL dulu. Ditutup di slice #1 [ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md). **Sampai itu selesai: jangan klaim race-handling "teruji" di dokumen mana pun.**
+* ✅ **Lock dijaga `tests/Concurrency/ConcurrentBookingTest.php`** (temuan 2026-09-12 ditutup di slice D1 ADR-0007). Dua test, keduanya wajib ada: (1) 4 proses PHP sungguhan memperebutkan slot terakhir → tepat 1 menang; (2) assert `select … for update` benar-benar diterbitkan. **Jangan hapus test (2)** dengan alasan test (1) lebih realistis — mutasi membuktikan test (1) SENDIRIAN tetap hijau walau lock dicabut (`increment()` tak sengaja menyelamatkannya lewat lock UPDATE + retry deadlock). Test (2)-lah gerbang yang sebenarnya.
+* Test butuh **MySQL** (`docker compose up -d`). SQLite tak menerbitkan `SELECT … FOR UPDATE` sama sekali, jadi test race di atasnya tak pernah jujur.
 * Reschedule appointment → optimistic lock kolom `version` (transporter & planner bisa edit bersamaan).
 * Counter `booked_count` per slot window → naik/turun di dalam transaksi yang sama dengan create/cancel appointment.
 

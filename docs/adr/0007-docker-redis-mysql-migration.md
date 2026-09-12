@@ -112,6 +112,33 @@ sistemnya aman.
 - Tak ada perubahan pada Action, Repository, Policy, atau state machine. Migrasi ini menyentuh
   infrastruktur dan gerbang uji, **bukan** logika domain.
 
+## Catatan eksekusi
+
+**[2026-09-12] Slice D1 SELESAI.** `docker-compose.yml` (MySQL 8.4 saja), `docker/mysql/init/`,
+Pest pindah ke MySQL lewat `phpunit.xml`, dan `tests/Concurrency/ConcurrentBookingTest.php` lahir.
+262 Pest (dari 260), PHPStan lvl 8 & Pint bersih. Empat hal yang tak terduga saat ADR ini ditulis:
+
+1. **Port 3306 sudah dipakai laragon** di mesin dev, jadi container dipetakan ke **3307**.
+   `phpunit.xml` memuat 3307 sebagai default; CI memakai 3306 lewat `env:` pada step Pest
+   (PHPUnit tak menimpa env var yang sudah ada, jadi tak perlu dua berkas konfigurasi).
+2. **Service container MySQL di CI dikerjakan sekarang, bukan ditunda ke D3.** Begitu
+   `composer test` menuntut MySQL, workflow tanpa service container akan merah di push
+   berikutnya — membiarkan gerbang rusak beberapa slice adalah cara tercepat mengajari orang
+   mengabaikannya. **D3 karena itu menyusut** tinggal menambahkan Redis.
+3. **Test konkurensi butuh `DatabaseTruncation`, bukan `RefreshDatabase`.** RefreshDatabase
+   membungkus tiap test dalam transaksi yang di-rollback, sehingga data parent tak pernah
+   terlihat oleh proses anak. Test konkurensi karena itu hidup di testsuite terpisah
+   (`tests/Concurrency`), bukan di `tests/Feature`.
+4. **Temuan metodologis, yang paling berharga dari slice ini.** Rencana awal menganggap "test
+   konkurensi sungguhan" otomatis jadi gerbang. Mutasi membuktikan **tidak**: dengan
+   `->lockForUpdate()` dicabut, test 4-proses itu **tetap hijau**, karena
+   `increment('booked_count')` tetap mengunci baris di UPDATE-nya dan `DB::transaction(attempts: 3)`
+   mengulang closure yang kalah. Sistem selamat lewat jalur yang tak dirancang untuk itu, dan
+   keselamatannya bergantung pada penjadwalan OS. Karena itu berkas test memuat **dua** test:
+   yang realistis (membuktikan janji) dan yang deterministik atas `select … for update`
+   (menjaga janji). Konsekuensi untuk slice berikutnya: **setiap kali menulis test konkurensi,
+   jalankan mutasinya — "realistis" tidak sama dengan "menggigit".**
+
 ## Kapan ditinjau ulang
 
 - **Refaktor cache ke `Cache::tags`**: baru boleh **setelah** slice #2 hijau. Sengaja dipisah dari

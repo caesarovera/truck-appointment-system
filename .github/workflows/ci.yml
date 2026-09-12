@@ -21,6 +21,32 @@ jobs:
     name: Backend — Pint · PHPStan · Pest
     runs-on: ubuntu-latest
 
+    # ADR-0007 slice D1: test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
+    # Ini BUKAN kerapian — sqlite tak menerbitkan `SELECT ... FOR UPDATE`, jadi test
+    # konkurensi booking (tests/Concurrency) mustahil jujur di atasnya.
+    #
+    # Ditambahkan bersama D1, bukan ditunda ke D3: begitu `composer test` menuntut MySQL,
+    # workflow tanpa service container ini akan MERAH di push berikutnya. Gerbang yang
+    # dibiarkan rusak beberapa slice = gerbang yang orang belajar abaikan.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          # DB dasar. Pest --parallel menumbuhkan tas_testing_test_1..N sendiri saat
+          # runtime (butuh hak CREATE DATABASE — itu sebabnya konek sebagai root).
+          MYSQL_DATABASE: tas_testing
+        ports:
+          - 3306:3306
+        # Tanpa healthcheck, step Pest bisa mulai sebelum MySQL selesai inisialisasi
+        # dan gagal konek — kegagalan yang terlihat seperti bug test, padahal timing.
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -psecret"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+          --health-start-period=30s
+
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +63,10 @@ jobs:
           # require keras), jadi composer install tak akan gagal kalau ini
           # lupa ditambah, tapi QrImageTest akan meledak runtime. Eksplisit di
           # sini biar tak bergantung asumsi "ubuntu runner biasanya sudah ada gd".
-          extensions: pcntl, posix, pdo_sqlite, sqlite3, mbstring, gd
+          # pdo_mysql: WAJIB sejak D1 — test berjalan di MySQL (lihat services: di atas).
+          # pdo_sqlite/sqlite3 dipertahankan: .env.example masih DB_CONNECTION=sqlite dan
+          # dipakai perintah artisan di luar test.
+          extensions: pcntl, posix, pdo_mysql, pdo_sqlite, sqlite3, mbstring, gd
           coverage: none
 
       - name: Cache dependensi Composer
@@ -51,8 +80,8 @@ jobs:
         run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Siapkan .env + APP_KEY
-        # Test butuh APP_KEY (enkripsi/hash). DB tidak disiapkan di sini: phpunit.xml
-        # memaksa sqlite :memory:, jadi CI tak perlu service container database.
+        # Test butuh APP_KEY (enkripsi/hash). Kredensial DB TIDAK ditaruh di sini —
+        # diberikan sebagai env pada step Pest, lihat catatan di sana.
         run: |
           cp .env.example .env
           php artisan key:generate
@@ -68,6 +97,17 @@ jobs:
 
       - name: Pest
         if: ${{ !cancelled() }}
+        # phpunit.xml sudah memuat nilai default yang cocok untuk mesin dev (port 3307,
+        # karena laragon memakai 3306 di sana). Di CI port-nya 3306. PHPUnit TIDAK
+        # menimpa env var yang sudah ada di environment — tanpa force="true" — jadi
+        # nilai di sini menang tanpa perlu menyentuh phpunit.xml.
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: tas_testing
+          DB_USERNAME: root
+          DB_PASSWORD: secret
         run: composer test
 
   frontend:

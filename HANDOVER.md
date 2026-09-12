@@ -11,6 +11,44 @@
 
 ## Status
 
+### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
+
+- `2026-09-12` (D1) · **[SELESAI] Slice D1: MySQL di Docker + test konkurensi sungguhan.**
+  Menutup §Temuan 2026-09-12 (P1). **262 Pest/671 assert** (dari 260/663), PHPStan lvl 8 bersih,
+  Pint bersih. Frontend tak disentuh (111 Vitest tetap, tak dijalankan ulang).
+  **Yang dibangun:** `docker-compose.yml` (**MySQL 8.4 saja** — Redis/Horizon/app menyusul,
+  sengaja tak ditambah sebelum slice-nya), `docker/mysql/init/01-databases.sql`, `phpunit.xml`
+  (sqlite `:memory:` → MySQL + testsuite ketiga `Concurrency`), `tests/Pest.php`
+  (`DatabaseTruncation` untuk Concurrency), `tests/Concurrency/ConcurrentBookingTest.php` +
+  `tests/Concurrency/bin/book-once.php` (baru), `.github/workflows/ci.yml` (+service container
+  MySQL).
+  **4 hal yang tak terduga waktu plan ditulis:**
+  **(1) Port 3306 sudah dipakai laragon** → container dipetakan ke **3307**; `phpunit.xml` memuat
+  3307 sebagai default, CI memakai 3306 lewat `env:` di step Pest (PHPUnit tak menimpa env var
+  yang sudah ada, jadi cukup satu berkas konfigurasi).
+  **(2) Service container MySQL di CI dikerjakan SEKARANG, bukan ditunda ke D3** — begitu
+  `composer test` menuntut MySQL, workflow tanpa service container pasti merah di push berikutnya.
+  **D3 karena itu menyusut** tinggal menambahkan Redis.
+  **(3) Test konkurensi wajib `DatabaseTruncation`, bukan `RefreshDatabase`** — RefreshDatabase
+  membungkus tiap test dalam transaksi yang di-rollback, jadi data parent tak pernah terlihat oleh
+  proses anak. Karena itu ia hidup di testsuite terpisah, bukan di `tests/Feature`.
+  **(4) TEMUAN METODOLOGIS, yang paling berharga dari slice ini:** rencana menganggap "test
+  konkurensi sungguhan" otomatis jadi gerbang. **Salah.** Mutasi membuktikan: dengan
+  `->lockForUpdate()` dicabut, test 4-proses itu **TETAP HIJAU** — `increment('booked_count')`
+  tetap mengunci baris di UPDATE-nya, transaksi berbaris di sana, lalu
+  `DB::transaction(attempts: 3)` mengulang closure yang kalah dan pengulangan itu membaca kuota
+  yang sudah benar. Sistem "kebetulan selamat" lewat jalur yang sama sekali tak dirancang untuk
+  itu, dan keselamatannya bergantung pada penjadwalan OS. Karena itu berkas test memuat **dua**
+  test: yang realistis (membuktikan janji, 4 proses PHP sungguhan lewat `symfony/process` dengan
+  barrier waktu) dan yang deterministik atas `select … for update` (**menjaga** janji).
+  Aturan yang lahir dari ini: **setiap menulis test konkurensi, jalankan mutasinya — "realistis"
+  tidak sama dengan "menggigit".**
+  **Verifikasi mutasi terakhir:** lock dicabut → test #2 MERAH; lock dikembalikan → 2/2 hijau;
+  `git checkout` dipastikan bersih. **Belum di-push** (CI service container belum pernah dieksekusi
+  di GitHub — bukti hijaunya menyusul di push berikutnya).
+  Docs: ADR-0007 §Catatan eksekusi, `CLAUDE.md` §Hardening/Race (peringatan → ✅ + larangan hapus
+  test #2), `ARCHITECTURE §7`, `CODE-WALKTHROUGH §J.1`, `SETUP-GUIDE §16` (baru) + banner, entri ini.
+
 > # ═══ BATAS PRA-DOCKER ═══
 >
 > **Semua yang tercatat di bawah entri 2026-09-12 adalah keadaan stack PRA-DOCKER**: dev native
@@ -671,9 +709,15 @@
 - **[masih terbuka dari ronde 3]** `DemoSeeder` tak punya truk `INACTIVE` (keenam truk
   `'status' => 'ACTIVE'`) — jalur 422 `truck_inactive` tak bisa didemokan dari data demo.
 
-## Temuan 2026-09-12 — test race-condition tidak menjaga lock (P1, TERBUKA)
+## Temuan 2026-09-12 — test race-condition tidak menjaga lock (P1, **FIXED hari yang sama**)
 
-- **[TERBUKA — P1] `it('never over-books the last slot')` tetap PASS walau `->lockForUpdate()`
+> **[FIXED 2026-09-12 lewat slice D1]** Ditutup `tests/Concurrency/ConcurrentBookingTest.php`
+> (2 test: 4 proses PHP sungguhan + assertion deterministik `for update`). Temuan aslinya
+> dibiarkan utuh di bawah — ia menjelaskan KENAPA bentuk penutupannya seperti itu, dan slice D1
+> menemukan satu hal lagi yang tak terduga: test konkurensi realistis **sendirian tetap hijau**
+> saat lock dicabut. Lihat entri D1 di §Status poin (4).
+
+- **[FIXED — P1] `it('never over-books the last slot')` tetap PASS walau `->lockForUpdate()`
   dihapus total.** Dibuktikan lewat **mutasi**, bukan dugaan: baris `->lockForUpdate()` dicabut dari
   `SlotRepository::lockForUpdate()` (`app/Repositories/SlotRepository.php:43`), test dijalankan →
   **1 passed (2 assertions)**. Kode langsung dikembalikan (`git checkout`), working tree bersih.
@@ -710,10 +754,12 @@
 > mana pun yang menjaga sesuatu yang mahal: konkurensi, otorisasi, audit, idempotency.
 
 ## Sedang dikerjakan
-- (kosong) — checkpoint **pra-Docker** hijau & tertandai (tag `pre-docker`): 260 Pest/663 assert,
-  PHPStan lvl 8, 111 Vitest, vue-tsc, build — semuanya diverifikasi ulang 2026-09-12. Berikutnya:
-  slice #1 ADR-0007 (MySQL + test konkurensi sungguhan). Tak ada pekerjaan setengah jalan yang
-  menggantung.
+- (kosong) — **D1 selesai & hijau**: 262 Pest/671 assert, PHPStan lvl 8, Pint bersih (butuh
+  `docker compose up -d` lebih dulu). Berikutnya **D2** (Redis cache/session/queue + Horizon di
+  container), dan D3 tinggal menambahkan service `redis:7` ke CI. Tak ada pekerjaan setengah
+  jalan yang menggantung.
+- **Belum diverifikasi:** CI service container MySQL belum pernah benar-benar jalan di GitHub —
+  bukti hijaunya baru ada setelah push berikutnya. Jangan tulis "CI hijau untuk D1" sebelum itu.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
@@ -726,7 +772,7 @@
 
 ### 🔜 AKTIF — slice ADR-0007 (migrasi Docker/Redis/MySQL)
 
-**D1. MySQL + test konkurensi sungguhan** ← *mulai dari sini*
+**D1. MySQL + test konkurensi sungguhan** — ✅ **SELESAI 2026-09-12** (detail di §Status)
    Container **MySQL saja** (belum containerisasi app), arahkan Pest ke sana, lalu tulis test yang
    benar-benar konkuren (proses paralel / request bersamaan) untuk `BookAppointmentAction`.
    **Ditulis merah dulu**: harus GAGAL saat `->lockForUpdate()` dicabut, baru layak disebut penjaga.
@@ -734,17 +780,16 @@
    (`tas_testing_test_{TEST_TOKEN}` lewat `ParallelTesting::setUpTestDatabase`), cek migrasi jalan di
    MySQL (FK lebih ketat dari SQLite — lihat komentar di `create_users_table.php`).
 
-**D2. Redis (cache/session/queue) + Horizon di container**
+**D2. Redis (cache/session/queue) + Horizon di container** ← *mulai dari sini*
    `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` → `redis`, klien **`phpredis`** (pecl, di dalam
    image — **bukan** package Composer baru). Horizon pertama kali benar-benar bisa jalan
    (`ext-pcntl` tak ada di PHP Windows). **Wajib diverifikasi manual, bukan cuma test hijau:**
    semantik `ShouldBeUnique` + `WithoutOverlapping` **berbeda** antara driver `database` (lama) dan
    Redis — jalankan skenario double-dispatch dan pastikan job kedua benar-benar ditolak.
 
-**D3. CI service containers**
-   `.github/workflows/ci.yml` job `backend` + blok `services:` (`mysql:8`, `redis:7`, dengan
-   healthcheck). Mengunci hasil D1+D2 supaya tak diam-diam mundur saat push. Catatan ADR-0005
-   ("tak perlu service container DB") berhenti berlaku di sini — sudah ditandai di ADR-0005.
+**D3. CI service containers** — **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
+   (kalau ditunda, CI pasti merah begitu `composer test` menuntut MySQL). Sisa D3 tinggal
+   **menambahkan service `redis:7`** ke `.github/workflows/ci.yml` bersamaan dengan D2.
 
 **D4. Containerisasi app penuh + docs + tutup selisih §Stack**
    App + `Dockerfile` + `docker-compose.yml` lengkap. Di sini keputusan **pindah repo ke filesystem
@@ -802,6 +847,18 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-12` (D1): **MySQL di Docker + test konkurensi sungguhan + CI service container.**
+  Kode/infra: `docker-compose.yml` (**baru**, MySQL 8.4 saja), `docker/mysql/init/01-databases.sql`
+  (**baru**), `phpunit.xml` (DB → MySQL, +testsuite `Concurrency`), `tests/Pest.php`
+  (+`DatabaseTruncation` untuk Concurrency), `.github/workflows/ci.yml` (+service `mysql:8.4`,
+  +ekstensi `pdo_mysql`, +env DB pada step Pest). Test: `tests/Concurrency/ConcurrentBookingTest.php`
+  (**baru**, 2 test) + `tests/Concurrency/bin/book-once.php` (**baru**, anak proses — bukan test).
+  260→**262 Pest/671 assert**. **Tak ada kode aplikasi (`app/`) yang berubah** — murni infrastruktur
+  uji. Docs: `docs/adr/0007-*.md` §Catatan eksekusi, `CLAUDE.md` §Hardening/Race, `ARCHITECTURE §7`,
+  `CODE-WALKTHROUGH §J.1`, `SETUP-GUIDE §16` (**baru**) + banner + daftar isi, `HANDOVER` §Status/
+  §Temuan (→FIXED)/§Langkah berikutnya (D1 selesai, D3 menyusut)/changelog ini. Seeder: **tak ada**.
+  Alasan: sqlite tak menerbitkan `SELECT … FOR UPDATE`, jadi gerbang anti-race mustahil jujur di
+  atasnya — lihat §Temuan 2026-09-12.
 - `2026-09-12`: **Keputusan migrasi Docker/Redis/MySQL (ADR-0007) + penanda batas pra-Docker +
   koreksi klaim "race-handling teruji".** **Tak ada kode aplikasi yang berubah** — dokumen &
   keputusan saja. Docs: `docs/adr/0007-docker-redis-mysql-migration.md` (**baru** — 3 keputusan

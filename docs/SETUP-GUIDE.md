@@ -18,11 +18,14 @@
 > queue/cache/session driver `database`. Per **2026-09-12** stack ini masih **benar dan berlaku** —
 > ia belum diganti apa pun.
 >
-> Yang sudah diputuskan tapi **belum dieksekusi**: migrasi ke **Docker penuh + Redis + MySQL**,
-> lihat **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**. Saat slice ADR-0007 dikerjakan,
-> bagian-bagian berikut akan berubah: §0 (prasyarat), §1 (ekstensi SQLite), §2 (`.env`), §7
-> (migrasi/seeder), §9 (gerbang kualitas → dijalankan di dalam container), §14 (CI + service
-> containers).
+> Yang sudah diputuskan: migrasi ke **Docker penuh + Redis + MySQL**,
+> lihat **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**. Saat slice berikutnya dikerjakan,
+> bagian ini akan berubah: §1 (ekstensi SQLite), §2 (`.env`), §7 (migrasi/seeder), §9 (gerbang
+> kualitas → dijalankan di dalam container).
+>
+> **⚠️ SATU HAL SUDAH BERUBAH — slice D1 selesai 2026-09-12.** `composer test` sekarang butuh
+> **MySQL di Docker**, bukan lagi sqlite `:memory:`. Sebelum menjalankan test: `docker compose up -d`.
+> Langkah §0–§13 lainnya masih apa adanya (app tetap native). Rinciannya di **§16**.
 >
 > **Batas pra-Docker ditandai tag git `pre-docker`.** Untuk membaca/menjalankan proyek persis
 > seperti dokumen ini: `git checkout pre-docker`.
@@ -45,6 +48,8 @@
 12. [Checklist verifikasi akhir](#12-checklist-verifikasi-akhir)
 13. [Lampiran: peta file yang dihasilkan](#13-lampiran-peta-file-yang-dihasilkan)
 14. [CI (GitHub Actions)](#14-ci-github-actions) · [14a untuk apa](#14a-untuk-apa-ci-ini-ada) · [14b apa yang dijalankan](#14b-apa-yang-dijalankan) · [14c cara memakai](#14c-cara-memakainya-sehari-hari)
+15. [E2E (Playwright) — lokal-only](#15-e2e-playwright--lokal-only)
+16. [Docker: MySQL untuk test (slice D1)](#16-docker-mysql-untuk-test-slice-d1)
 
 ---
 
@@ -872,3 +877,81 @@ lambat sampai lewat timeout (kontensi CPU/IO, bukan bug logic).
   mekanisme sekaligus — flag `--env` (bikin `ServeCommand` mengawasi file itu utk auto-reload)
   **dan** env var `APP_ENV=e2e` yang di-set `playwright.config.ts` (dipakai proses PHP yang
   sungguhan di-spawn utk memilih file dotenv). Keduanya perlu ada; salah satu saja tidak cukup.
+
+---
+
+## 16. Docker: MySQL untuk test (slice D1)
+
+> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md) slice D1**.
+> Redis, Horizon, dan containerisasi app menyusul di slice berikutnya — belum ada di sini.
+
+### 16a. Kenapa test pindah dari SQLite ke MySQL
+
+Bukan kerapian. **SQLite tidak menerbitkan `SELECT … FOR UPDATE` sama sekali.** Artinya seluruh
+test yang seolah menguji anti-race selama ini berjalan di atas mesin yang tak punya row lock —
+dan memang terbukti: mencabut `->lockForUpdate()` dari `SlotRepository` tidak membuat satu test pun
+merah. Race condition adalah alasan proyek ini ada (`CLAUDE.md` §Hardening), jadi gerbangnya harus
+berjalan di mesin yang perilaku lock-nya sama dengan produksi.
+
+### 16b. Menyalakan
+
+```bash
+docker compose up -d        # sekali; container tetap hidup setelah reboot (restart: unless-stopped)
+docker compose ps           # STATUS harus "healthy" sebelum test dijalankan
+composer test               # sekarang menembak MySQL, bukan sqlite :memory:
+```
+
+Matikan dengan `docker compose down` (data aman di volume). `docker compose down -v` **menghapus
+data** dan memaksa skrip init jalan lagi — perlu kalau `docker/mysql/init/` diubah.
+
+### 16c. Port 3307, bukan 3306
+
+Mesin dev ini menjalankan laragon yang sudah memakai **3306**. Container karena itu dipetakan ke
+**3307** di `docker-compose.yml`, dan `phpunit.xml` memuat 3307 sebagai default.
+
+CI memakai 3306 (tak ada laragon di runner) lewat blok `env:` pada step Pest. Ini bekerja tanpa
+berkas konfigurasi kedua karena **PHPUnit tidak menimpa env var yang sudah ada** di environment
+(selama `<env>`-nya tanpa `force="true"`) — jadi siapa pun yang port-nya berbeda cukup meng-export
+`DB_PORT` sendiri.
+
+### 16d. Database yang terbentuk
+
+| Database | Isi | Dibuat oleh |
+|----------|-----|-------------|
+| `tas` | data dev (dipakai app nanti di D4) | `MYSQL_DATABASE` di compose |
+| `tas_testing` | DB test saat dijalankan **tanpa** `--parallel` | `docker/mysql/init/01-databases.sql` |
+| `tas_testing_test_1..12` | satu DB **per proses** Pest `--parallel` | Laravel, otomatis saat runtime |
+
+DB test sengaja **terpisah** dari DB dev: `RefreshDatabase` menjalankan `migrate:fresh` yang
+menghapus semua tabel. Kalau test menumpang DB dev, sekali `composer test` data demo hilang.
+
+Pembuatan DB per-proses butuh hak `CREATE DATABASE` — itulah sebabnya test terhubung sebagai
+`root`, bukan user aplikasi.
+
+### 16e. Test konkurensi (`tests/Concurrency/`)
+
+Testsuite **ketiga**, terpisah dari `Unit` dan `Feature` karena memakai trait DB yang berbeda:
+`DatabaseTruncation`, bukan `RefreshDatabase`. Alasannya mengikat: RefreshDatabase membungkus tiap
+test dalam transaksi yang di-rollback, sehingga data yang dibuat test **tak pernah terlihat** oleh
+proses PHP lain — dan test ini justru menyalakan 4 proses PHP sungguhan lewat `symfony/process`
+untuk memperebutkan satu slot terakhir.
+
+Isinya dua test, dan **keduanya wajib ada**:
+
+1. **Realistis** — 4 proses menyerbu bersamaan, tepat satu menang.
+2. **Deterministik** — memastikan `select … for update` benar-benar diterbitkan.
+
+Kenapa tidak cukup yang realistis saja: saat lock dicabut, test #1 **tetap hijau**, karena
+`increment('booked_count')` tetap mengunci baris di UPDATE-nya dan `DB::transaction(attempts: 3)`
+mengulang closure yang kalah. Sistem selamat lewat jalur yang tak dirancang untuk itu. Test #2-lah
+gerbang yang sesungguhnya. **Jangan hapus #2** dengan alasan #1 lebih realistis.
+
+### 16f. Kalau test gagal konek
+
+| Gejala | Sebab paling mungkin | Tindakan |
+|--------|----------------------|----------|
+| `SQLSTATE[HY000] [2002]` connection refused | container belum jalan / belum `healthy` | `docker compose up -d` lalu tunggu `docker compose ps` sehat |
+| `port is already allocated` saat `up` | ada MySQL lain di 3307 | ubah `DB_PORT_HOST` di `.env` atau matikan yang bentrok |
+| `Access denied for user 'root'` | password tak cocok dengan `docker-compose.yml` | samakan `DB_PASSWORD` (default `secret`) |
+| `Unknown database 'tas_testing'` | volume dibuat sebelum skrip init ada | `docker compose down -v && docker compose up -d` (**hapus data**) |
+| Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya — ia mencetak keluaran tiap anak |

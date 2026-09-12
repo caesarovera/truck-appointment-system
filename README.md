@@ -15,13 +15,18 @@ Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan
 Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horizon masih
 *target* produksi — belum dipakai**, lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
 
-> ⏳ **Keadaan ini = "pra-Docker" (tag git `pre-docker`).** Migrasi ke **Docker penuh + Redis +
-> MySQL** sudah diputuskan & disetujui, **belum dieksekusi** — alasan, urutan slice, dan biaya
-> yang diterima sadar ada di [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
+> ⏳ **Migrasi ke Docker sedang berjalan** — [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
+> **Slice D1 SELESAI (2026-09-12):** test kini berjalan di **MySQL dalam Docker**, bukan sqlite,
+> karena sqlite tak menerbitkan `SELECT … FOR UPDATE` sehingga gerbang anti-race mustahil jujur
+> di atasnya. **Sebelum `composer test`: `docker compose up -d`.**
+> Sisanya (Redis, Horizon, containerisasi app) belum — baris Stack di atas masih berlaku untuk
+> runtime app. Checkpoint terakhir era native ada di tag git `pre-docker`.
+
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 
-Status: backend MVP API lengkap & ber-test (**260 Pest**); SPA mencakup UI **4 persona**
+Status: backend MVP API lengkap & ber-test (**262 Pest**, termasuk test konkurensi booking
+lintas-proses); SPA mencakup UI **4 persona**
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
 company/user/**role & izin**) + **CRUD armada truk transporter** + **riwayat gate-in/out**
 + **QR gate-in (token ter-sign)** + **realtime kuota/antrian live (Reverb + Echo)**
@@ -68,11 +73,12 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 ## Mulai cepat
 
 ```bash
-# Prasyarat: PHP 8.3+, Composer 2.8+, driver pdo_sqlite aktif (lihat SETUP-GUIDE §1)
+# Prasyarat: PHP 8.3+, Composer 2.8+, Docker, driver pdo_sqlite + pdo_mysql aktif (SETUP-GUIDE §1)
 cp .env.example .env
 php artisan key:generate
-php artisan migrate:fresh --seed     # bikin skema + data demo
+php artisan migrate:fresh --seed     # bikin skema + data demo (app masih SQLite)
 
+docker compose up -d # WAJIB sebelum test: MySQL untuk Pest (SETUP-GUIDE §16)
 composer test        # pest
 composer analyse     # phpstan level 8
 composer fix         # pint

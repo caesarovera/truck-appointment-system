@@ -1,0 +1,51 @@
+# docker-compose.yml — truck-appointment-system
+#
+# SLICE D1 (ADR-0007): **MySQL saja.** Redis menyusul di D2, containerisasi app di D4.
+# Sengaja TIDAK menambah service yang belum dibutuhkan — lihat CLAUDE.md §Peran Agent
+# (no overengineering): tiap service masuk saat slice-nya dikerjakan, bukan sebelumnya.
+#
+# App (Laravel) masih jalan NATIVE di Windows pada slice ini dan menembak MySQL di sini
+# lewat port host. Itu disengaja: D1 memisahkan risiko "MySQL vs SQLite" dari risiko
+# "app di dalam container", supaya kalau ada yang merah, penyebabnya tak ambigu.
+#
+# Jalankan:  docker compose up -d
+# Cek sehat: docker compose ps          (kolom STATUS harus "healthy")
+# Matikan:   docker compose down        (data TETAP — ada di volume mysql-data)
+# Reset total (HAPUS DATA): docker compose down -v
+
+name: tas
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: tas-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
+      # DB dev. DB test (`tas_testing`) dibuat oleh skrip init, lihat docker/mysql/init/.
+      MYSQL_DATABASE: ${DB_DATABASE:-tas}
+    ports:
+      # KIRI = port di Windows, KANAN = port di dalam container.
+      # 3307, BUKAN 3306: laragon sudah memakai 3306 di mesin dev ini. Kalau dipaksa
+      # 3306, container gagal bind dan errornya ("port is already allocated") sering
+      # disalahartikan sebagai MySQL-nya yang rusak.
+      - '${DB_PORT_HOST:-3307}:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Skrip init HANYA jalan saat volume masih kosong (container pertama kali dibuat).
+      # Kalau menambah/mengubah skrip di sini, wajib `docker compose down -v` dulu.
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Dipakai supaya `docker compose up --wait` dan CI tahu kapan MySQL SIAP MELAYANI,
+      # bukan sekadar "prosesnya hidup". MySQL butuh belasan detik untuk inisialisasi
+      # pertama; tanpa healthcheck, migrasi yang jalan terlalu cepat akan gagal konek.
+      test:
+        ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${DB_ROOT_PASSWORD:-secret}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  mysql-data:
+    name: tas-mysql-data
