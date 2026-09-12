@@ -27,8 +27,18 @@
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
+        <!-- force="true" pada baris ISOLASI di bawah (D3').
+             Tanpa itu, env var yang sudah ada di environment MENANG atas berkas ini —
+             dan sejak service `app` di docker-compose.yml menyetel CACHE_STORE/
+             QUEUE_CONNECTION/SESSION_DRIVER=redis, seluruh suite yang dijalankan DI DALAM
+             container diam-diam berhenti memakai `sync`/`array`. Akibatnya job ter-antre
+             alih-alih dieksekusi inline, dan test yang mengandalkan itu berubah makna
+             tanpa ada yang merah. Aturannya: environment boleh menentukan DI MANA
+             (host/port DB), TIDAK boleh menentukan APAKAH test terisolasi.
+             DB_* di bawah sengaja TANPA force — justru itu yang wajib bisa berbeda
+             antara Windows (127.0.0.1:3307) dan container (mysql:3306). -->
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
         <!-- SLICE D1 (ADR-0007): test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
              Alasannya BUKAN kerapian: sqlite tak menerbitkan `SELECT ... FOR UPDATE`, jadi
              test konkurensi (jantung proyek ini) mustahil jujur di atasnya. Lihat
@@ -42,10 +52,16 @@
         <env name="DB_DATABASE" value="tas_testing"/>
         <env name="DB_USERNAME" value="root"/>
         <env name="DB_PASSWORD" value="secret"/>
-        <env name="MAIL_MAILER" value="array"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <!-- DB Redis khusus test. Test yang memang menguji Redis (RedisUniqueJobTest)
+             meng-FLUSH database ini; tanpa pemisahan, ia akan menghapus cache & antrian
+             DEV yang berbagi container Redis yang sama. Pola sama dengan `tas_testing`
+             yang dipisah dari `tas`. -->
+        <env name="REDIS_DB" value="15" force="true"/>
+        <env name="REDIS_CACHE_DB" value="15" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
     </php>
 </phpunit>

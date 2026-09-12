@@ -17,9 +17,10 @@ Queue/cache/session dev memakai driver `database` (DB SQLite); **Redis 7 + Horiz
 
 > ⏳ **Migrasi ke Docker sedang berjalan** — [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
 > **Sudah jadi kenyataan:** **MySQL** untuk test (sqlite tak menerbitkan `SELECT … FOR UPDATE`,
-> sehingga gerbang anti-race mustahil jujur di atasnya) dan **app Laravel di container**.
-> **Belum:** Redis untuk queue/cache/session, Horizon, Reverb — baris Stack di atas masih
-> menggambarkan keadaan sebenarnya untuk ketiganya.
+> sehingga gerbang anti-race mustahil jujur di atasnya), **app Laravel di container**, serta
+> **Redis + Horizon** untuk queue/cache/session. Horizon akhirnya benar-benar jalan — `ext-pcntl`
+> yang ia tuntut tak pernah ada di PHP Windows.
+> **Belum:** Reverb di container (opsional, sudah jalan native).
 > **Sebelum menjalankan apa pun: `docker compose up -d`.** Jalur native Windows **tetap
 > didukung** — lihat [`docs/SETUP-GUIDE.md §16-§17`](docs/SETUP-GUIDE.md).
 > Checkpoint terakhir era native ada di tag git `pre-docker`.

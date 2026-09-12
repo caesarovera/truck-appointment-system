@@ -2,9 +2,10 @@
 #
 # ADR-0007. Service masuk per slice, bukan sekaligus — lihat CLAUDE.md §Peran Agent
 # (no overengineering).
-#   D1  : mysql  ✅
-#   D2' : app    ✅  (containerisasi app DIMAJUKAN dari D4 — lihat catatan di bawah)
-#   next: redis + horizon, lalu reverb
+#   D1  : mysql            ✅
+#   D2' : app              ✅  (containerisasi app DIMAJUKAN dari D4 — lihat catatan di bawah)
+#   D3' : redis + horizon  ✅
+#   next: reverb (opsional)
 #
 # KENAPA app dimajukan mendahului Redis: D2 versi lama menaruh Redis lebih dulu, padahal
 # app masih native Windows saat itu — dan PHP Windows native tak punya klien Redis. Satu-
@@ -51,6 +52,28 @@ services:
       retries: 20
       start_period: 30s
 
+  redis:
+    image: redis:7-alpine
+    container_name: tas-redis
+    restart: unless-stopped
+    # appendonly: queue Redis menyimpan JOB. Tanpa persistensi, `docker compose restart`
+    # membuang seluruh antrian yang belum diproses — termasuk reminder H-2 jam yang sudah
+    # dijadwalkan. Untuk dev ini berlebihan, tapi murah dan menghindari kebingungan
+    # "kok job-nya hilang".
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      # 6379 di mesin dev ini bebas (sudah dicek). Tetap lewat variabel supaya mudah
+      # digeser kalau kelak bentrok, pola sama dengan MySQL.
+      - '${REDIS_PORT_HOST:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
   app:
     build:
       context: .
@@ -75,12 +98,57 @@ services:
       # Env var sungguhan menang atas .env: Laravel memuat dotenv secara immutable,
       # jadi baris di sini tak perlu mengubah berkas .env milik dev.
       APP_ENV: local
+      # Redis (slice D3'). Di dalam jaringan compose: nama service + port internal.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CLIENT: phpredis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
     ports:
       - '${APP_PORT:-8000}:8000'
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  horizon:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: tas-horizon
+    restart: unless-stopped
+    # INILAH yang tak pernah bisa jalan di mesin dev sebelum containerisasi: Horizon
+    # menuntut ext-pcntl, dan PHP Windows native tak punya. Image Linux punya.
+    command: ['php', 'artisan', 'horizon']
+    volumes:
+      - .:/var/www/html
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-tas}
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
+      APP_ENV: local
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CLIENT: phpredis
+      # WAJIB sama persis dengan service `app`. Kalau worker memakai store/connection
+      # berbeda dari yang mendorong job, job tak akan pernah terambil — dan gejalanya
+      # membingungkan: tak ada error, antrian cuma diam.
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   mysql-data:
     name: tas-mysql-data
+  redis-data:
+    name: tas-redis-data

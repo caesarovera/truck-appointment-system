@@ -54,6 +54,7 @@
 15. [E2E (Playwright) — lokal-only](#15-e2e-playwright--lokal-only)
 16. [Docker: MySQL untuk test (slice D1)](#16-docker-mysql-untuk-test-slice-d1)
 17. [Docker: app di container (slice D2′)](#17-docker-app-di-container-slice-d2)
+18. [Docker: Redis + Horizon (slice D3′)](#18-docker-redis--horizon-slice-d3)
 
 ---
 
@@ -1046,3 +1047,83 @@ sungguhan menang atas `.env` (Laravel memuat dotenv secara *immutable*). Jadi ta
   `docker/mysql/init/` menuntut `docker compose down -v` (**hapus data**).
 - **`storage/logs/laravel.log` dibagi dengan host** lewat bind mount, jadi log dari kedua jalur
   bercampur di satu berkas. Bukan bug, tapi bisa membingungkan saat menelusuri error.
+
+---
+
+## 18. Docker: Redis + Horizon (slice D3′)
+
+> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**.
+
+### 18a. Apa yang berubah
+
+| | Sebelum | Sesudah (di container) |
+|---|---|---|
+| Cache | driver `database` | **Redis** |
+| Session | driver `database` | **Redis** |
+| Queue | driver `database` | **Redis** |
+| Worker | `queue:listen` manual | **Horizon** (`docker compose up -d`) |
+
+**Horizon akhirnya benar-benar jalan** — pertama kali sepanjang proyek ini. Ia menuntut
+`ext-pcntl`, yang tak pernah ada di PHP Windows native. Cek:
+
+```bash
+docker compose exec app php artisan horizon:status     # -> Horizon is running
+```
+
+Dashboard-nya di `http://localhost:8000/horizon`.
+
+**Jalur native Windows TETAP driver `database`** — PHP native tak punya ekstensi redis. Ini
+disengaja: keduanya tetap hidup sampai jalur native dipensiunkan.
+
+### 18b. Isolasi test: satu jebakan yang sempat menggigit
+
+Menyetel `CACHE_STORE`/`QUEUE_CONNECTION`/`SESSION_DRIVER` di `environment:` service `app`
+ternyata **menimpa isolasi `phpunit.xml`**: env var yang sudah ada di environment menang atas
+`<env>` yang tanpa `force="true"`. Akibatnya seluruh suite yang dijalankan **di dalam container**
+diam-diam berhenti memakai `sync`/`array` — job ter-antre alih-alih dieksekusi inline, dan test
+yang mengandalkan itu berubah makna **tanpa satu pun berwarna merah**.
+
+Ditutup dengan `force="true"` pada baris **isolasi** saja. Aturan yang berlaku sekarang:
+
+> Environment boleh menentukan **DI MANA** (host/port DB). Environment **tidak boleh** menentukan
+> **APAKAH** test terisolasi.
+
+`DB_*` sengaja **tanpa** `force` — justru itu yang wajib berbeda antara Windows (`127.0.0.1:3307`)
+dan container (`mysql:3306`). Test juga memakai **DB Redis terpisah** (`REDIS_DB=15`), sebab
+`RedisUniqueJobTest` meng-*flush* database itu; tanpa pemisahan ia akan menghapus cache & antrian
+dev yang berbagi container Redis yang sama.
+
+### 18c. Gerbang baru yang sebelumnya mustahil
+
+`tests/Feature/Hardening/RedisUniqueJobTest.php` menguji `ShouldBeUnique` lewat **perilaku**, bukan
+lewat string. Sebelum Redis, `QUEUE_CONNECTION=sync` melepas lock unique seketika, sehingga klaim
+`uniqueId()` = `{appointment}:{window}` hanya bisa dijaga dengan meng-assert string-nya
+(`CODE-WALKTHROUGH §O.3` jujur mencatat keterbatasan itu).
+
+Sekarang yang diuji adalah akibatnya: duplikat ditahan selama job masih pending, dan reminder hasil
+reschedule tetap lolos. **Mutasi dijalankan** — `uniqueId()` dikembalikan ke appointment id saja →
+2 dari 3 test **merah**.
+
+Test ini **dilewati** kalau Redis tak terjangkau (normal di native Windows). Karena itu service
+`redis` **wajib** ada di CI: gerbang yang dilewati di CI sama saja dengan tak ada.
+
+### 18d. Jebakan `PendingDispatch`
+
+`dispatch()` mengembalikan `PendingDispatch` yang baru benar-benar mendorong job saat objeknya
+**dihancurkan**. Menyimpannya ke variabel di dalam loop menunda push sampai variabel itu ditimpa:
+
+```php
+foreach ([1,2,3] as $i) { $r = dispatch($job); }   // SALAH: push tertunda 1 iterasi
+foreach ([1,2,3] as $i) { dispatch($job); }        // benar: langsung destruct -> push
+```
+
+Gejalanya menyesatkan: ukuran antrian terbaca meleset satu langkah, dan mudah disalahartikan
+sebagai lock unique yang tak bekerja.
+
+### 18e. Jebakan lain
+
+- **Worker dan pendorong job wajib satu store/connection.** Kalau `horizon` memakai
+  `QUEUE_CONNECTION` berbeda dari `app`, job tak pernah terambil — tanpa error, antrian cuma diam.
+  Keduanya disetel identik di `docker-compose.yml`.
+- **`redis:7-alpine` pakai `appendonly yes`.** Queue Redis menyimpan **job**; tanpa persistensi,
+  `docker compose restart` membuang seluruh antrian yang belum diproses.

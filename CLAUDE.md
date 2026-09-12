@@ -28,14 +28,15 @@ Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan 
 
 * Backend: Laravel 12, PHP 8.3+ (`declare(strict_types=1)` wajib)
 * Auth: Sanctum (token + scopes) — scope per role, lihat `docs/BUSINESS-FLOW.md §1`
-* Queue/Cache/Session — **target produksi:** Redis 7 + Horizon. **Dev sekarang:** driver `database` (DB `sqlite`, `BROADCAST_CONNECTION=log`). Bedanya bukan sekadar catatan — lihat konsekuensinya di §Hardening → Cache.
+* Queue/Cache/Session — **di container: Redis 7 + Horizon (sudah dipakai, bukan lagi target).** **Di jalur native Windows: driver `database`** (PHP native tak punya ekstensi redis). `BROADCAST_CONNECTION=log` di dev. Bedanya bukan sekadar catatan — lihat konsekuensinya di §Hardening → Cache.
 * Realtime: Reverb (WebSocket) + Laravel Echo — channel `slot.{gateId}` (kuota live) & `gate.queue.{terminalId}`
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
 * Infra dev: **Docker** (`docker-compose.yml` — service `mysql` + `app`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi sedang berjalan, lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**:
-  * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`).
-  * ⏳ **Masih target, BELUM dipakai:** Redis untuk queue/cache/session, Horizon, Reverb di container. Baris Queue/Cache/Session di atas masih menggambarkan keadaan sebenarnya (driver `database`).
+  * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`) · **Redis 7 untuk queue/cache/session** · **Horizon jalan** (`docker compose exec app php artisan horizon:status`). Ini membuat baris Queue/Cache/Session & Horizon di §Stack di atas **akhirnya benar** di dalam container.
+  * ⚠️ **Jalur native Windows tetap driver `database`** — PHP native tak punya ekstensi redis. Jadi baris §Stack itu benar untuk container, belum untuk native.
+  * ⏳ **Masih target:** Reverb di container (opsional — sudah jalan native).
   * **Dua jalur sama-sama hidup:** `composer test` di Windows (MySQL lewat port host 3307) **dan** `docker compose exec app composer test` (MySQL lewat jaringan compose). Container ~1,7× lebih lambat karena bind mount NTFS — diukur, diterima sadar, lihat ADR-0007.
   * Checkpoint terakhir era native: tag git **`pre-docker`**.
 * CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
@@ -75,12 +76,14 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 * Counter `booked_count` per slot window → naik/turun di dalam transaksi yang sama dengan create/cancel appointment.
 
 ### Cache
-* Invalidasi selektif saat booking/cancel: **explicit-key `Cache::forget`** (lihat `SlotRepository`), **BUKAN `Cache::tags`** — store `database` yang dipakai dev tak mendukung tagging. Boleh refaktor ke `Cache::tags(['slot', "gate:{$gateId}"])` **setelah** benar-benar pindah ke Redis (lihat §Stack). Jangan `Cache::flush()`.
+* Invalidasi selektif saat booking/cancel: **explicit-key `Cache::forget`** (lihat `SlotRepository`). Jangan `Cache::flush()`.
+* **Status `Cache::tags` (diperbarui D3′):** Redis sudah dipakai di container, jadi tagging **kini secara teknis mungkin** — tapi refaktornya **sengaja BELUM dikerjakan**, dipisah dari migrasi infra supaya perubahan perilaku cache tak bercampur dalam commit yang sulit di-*revert*. Selama jalur native Windows (driver `database`, tak mendukung tagging) masih didukung, `Cache::forget` eksplisit **tetap satu-satunya yang benar di kedua jalur**. Jangan pakai `Cache::tags` sebelum keputusan itu diambil terpisah.
 * Endpoint publik ketersediaan slot (`GET /api/v1/slots/availability`) di-poll banyak transporter → `Cache::flexible($key, [10, 30], $cb)` (anti-stampede).
 
 ### Queue
 * Job: `implements ShouldQueue, ShouldBeUnique`. Set `$tries`, `$backoff`, `uniqueId()`, `failed()`.
-* `AppointmentReminderJob` (H-2 jam) → `uniqueId()` = appointment id.
+* ✅ **`ShouldBeUnique` dijaga `tests/Feature/Hardening/RedisUniqueJobTest.php`** (D3′) — menguji **perilaku** di atas Redis nyata: duplikat ditahan selama job pending, reminder hasil reschedule tetap lolos. Sebelumnya mustahil karena `QUEUE_CONNECTION=sync` melepas lock seketika, jadi yang dijaga cuma string `uniqueId()`. Test ini **skip** kalau Redis tak terjangkau (normal di native Windows) → service `redis` **wajib** ada di CI.
+* `AppointmentReminderJob` (H-2 jam) → `uniqueId()` = **`{appointmentId}:{slotWindowId}`**, BUKAN appointment id saja. Window ikut karena lock `ShouldBeUnique` bertahan selama job masih pending: dengan appointment id saja, reminder baru hasil reschedule dibuang diam-diam dan sopir tak pernah diingatkan (temuan ronde 4). Dijaga `RedisUniqueJobTest`.
 * `NoShowSweepJob` (cron tiap 5 menit) → `WithoutOverlapping`, tandai appointment lewat grace period jadi `NO_SHOW` + balikin kuota.
 * `ProcessGateEventJob` → `WithoutOverlapping` per appointment.
 

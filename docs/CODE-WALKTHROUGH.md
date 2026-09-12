@@ -1225,11 +1225,17 @@ kuota) tapi status akhir `NO_SHOW` + event `AppointmentNoShow` (impl
 Schedule::job(new NoShowSweepJob)->everyFiveMinutes();
 ```
 
-### O.2 AppointmentReminderJob — unik per appointment
+### O.2 AppointmentReminderJob — unik per appointment **DAN window**
+> ⚠️ Potongan di bawah memakai `uniqueId()` versi **final**. Draf pertama slice ini memakai
+> appointment id saja dan itu **bug** — alasannya dibedah di §O.3, dan kini dijaga
+> `tests/Feature/Hardening/RedisUniqueJobTest.php`.
+
 ```php
 final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
 {
-    public function uniqueId(): string { return (string) $this->appointmentId; }
+    // Window IKUT: lock ShouldBeUnique bertahan selama job masih pending, jadi tanpa
+    // window, reminder hasil reschedule dibuang diam-diam. Lihat §O.3.
+    public function uniqueId(): string { return $this->appointmentId.':'.$this->slotWindowId; }
 
     public function handle(): void
     {
@@ -1285,9 +1291,24 @@ yang menetralkannya. Perhatikan penulisan dokumen di `BUSINESS-FLOW §3.3`: "dib
 imprecise dan sudah dikoreksi jadi "dinetralkan" — dokumen harus menggambarkan mekanisme yang
 benar-benar ada, kalau tidak orang berikutnya akan mencari kode pembatalan yang tak pernah ada.
 
-**Catatan test:** `QUEUE_CONNECTION=sync` di `phpunit.xml` berarti lock unique langsung lepas,
-jadi jebakan di atas **tak bisa** ditangkap test perilaku — dikunci lewat assertion langsung
-atas `uniqueId()`. +5 test → **205 Pest**.
+**Catatan test (diperbarui 2026-09-12, slice D3′).** Dulu: `QUEUE_CONNECTION=sync` di
+`phpunit.xml` melepas lock unique seketika, jadi jebakan di atas **tak bisa** ditangkap test
+perilaku — yang dijaga hanyalah **string** `uniqueId()` lewat assertion langsung. +5 test →
+**205 Pest**.
+
+**Sekarang sudah bisa, dan sudah dijaga.** Setelah Redis nyata tersedia
+([ADR-0007](adr/0007-docker-redis-mysql-migration.md) slice D3′),
+`tests/Feature/Hardening/RedisUniqueJobTest.php` menguji **akibatnya**, bukan representasinya:
+duplikat ditahan selama job masih pending di antrian, dan reminder hasil reschedule (window
+berbeda) tetap lolos. Gerbangnya **dibuktikan menggigit lewat mutasi** — `uniqueId()` dikembalikan
+ke appointment id saja, 2 dari 3 test langsung merah.
+
+Test itu **dilewati** kalau Redis tak terjangkau (keadaan normal di PHP native Windows), jadi
+service `redis` wajib ada di CI — gerbang yang dilewati di CI sama saja dengan tak ada.
+
+> Ini kelas perbaikan yang sama dengan temuan D1: aturannya sudah benar sejak lama, tapi yang
+> menjaganya menguji **bentuk**, bukan **akibat**. Kalau menemukan catatan "tak bisa dites karena
+> lingkungan", perlakukan sebagai utang yang jatuh tempo begitu lingkungannya berubah.
 
 ---
 

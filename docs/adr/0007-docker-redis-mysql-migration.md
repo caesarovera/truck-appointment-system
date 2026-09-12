@@ -170,6 +170,36 @@ memburuk atau mulai mengganggu ritme kerja.
 (MySQL lewat port 3307), dan `docker compose exec app composer test` juga jalan (MySQL lewat
 jaringan compose). Tak ada yang dipaksa pindah di tengah slice.
 
+**[2026-09-12] Slice D3′ SELESAI: Redis + Horizon.** Service `redis` (7-alpine, `appendonly`)
+dan `horizon` masuk compose; `app` + `horizon` memakai `CACHE_STORE`/`SESSION_DRIVER`/
+`QUEUE_CONNECTION` = `redis`. **Horizon akhirnya benar-benar berjalan** (`horizon:status` →
+*Horizon is running*) — pertama kali sepanjang proyek ini, karena `ext-pcntl` yang ia tuntut tak
+pernah ada di PHP Windows native. 262 → **265 Pest** di container; native Windows **262 lulus + 3
+dilewati**. Tiga hal yang perlu diingat:
+
+1. **Bug yang saya perkenalkan sendiri di slice ini, dan cara menutupnya.** Menyetel
+   `CACHE_STORE`/`QUEUE_CONNECTION`/`SESSION_DRIVER` di `environment:` service `app` diam-diam
+   **menimpa isolasi `phpunit.xml`** — env var yang sudah ada di environment menang atas `<env>`
+   tanpa `force="true"`. Akibatnya seluruh suite yang dijalankan **di dalam container** berhenti
+   memakai `sync`/`array`: job ter-antre alih-alih dieksekusi inline, dan test yang mengandalkan
+   itu berubah makna **tanpa ada yang merah**. Ditutup dengan `force="true"` pada baris isolasi
+   saja. Aturannya sekarang eksplisit di `phpunit.xml`: **environment boleh menentukan DI MANA
+   (host/port DB), tidak boleh menentukan APAKAH test terisolasi.** `DB_*` sengaja tetap tanpa
+   `force` — justru itu yang wajib berbeda antara Windows dan container.
+2. **Gerbang baru yang akhirnya mungkin.** `CODE-WALKTHROUGH §O.3` mencatat jujur bahwa klaim
+   `uniqueId()` = `{appointment}:{window}` "dikunci lewat assertion langsung atas `uniqueId()`"
+   karena `QUEUE_CONNECTION=sync` melepas lock unique seketika — artinya yang dijaga adalah
+   **string**-nya, bukan akibatnya. Dengan Redis nyata, `tests/Feature/Hardening/RedisUniqueJobTest.php`
+   menguji **perilaku**: duplikat ditahan selama job masih pending, dan reminder hasil reschedule
+   tetap lolos. **Mutasi dijalankan** (`uniqueId()` dikembalikan ke appointment id saja) → 2 dari 3
+   test MERAH. Test ini **di-skip** kalau Redis tak terjangkau, supaya jalur native Windows tetap
+   hidup; karena itu service `redis` **wajib** ada di CI — gerbang yang dilewati di CI sama saja
+   dengan tak ada.
+3. **Jebakan `PendingDispatch`.** `dispatch()` mengembalikan `PendingDispatch` yang baru benar-benar
+   mendorong job saat objeknya **dihancurkan**. Menyimpannya ke variabel di dalam loop menunda push
+   sampai variabel itu ditimpa, dan pengukuran ukuran antrian meleset satu langkah — sempat membuat
+   saya salah membaca hasil verifikasi manual.
+
 ## Kapan ditinjau ulang
 
 - **Refaktor cache ke `Cache::tags`**: baru boleh **setelah** slice #2 hijau. Sengaja dipisah dari

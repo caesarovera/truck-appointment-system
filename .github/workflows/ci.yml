@@ -47,6 +47,19 @@ jobs:
           --health-retries=20
           --health-start-period=30s
 
+      # Slice D3'. WAJIB ada, bukan pelengkap: tanpa Redis, tests/Feature/Hardening/
+      # RedisUniqueJobTest DILEWATI diam-diam (by design, supaya PHP Windows native tetap
+      # bisa menjalankan suite) — dan gerbang yang dilewati di CI sama saja dengan tak ada.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +79,9 @@ jobs:
           # pdo_mysql: WAJIB sejak D1 — test berjalan di MySQL (lihat services: di atas).
           # pdo_sqlite/sqlite3 dipertahankan: .env.example masih DB_CONNECTION=sqlite dan
           # dipakai perintah artisan di luar test.
-          extensions: pcntl, posix, pdo_mysql, pdo_sqlite, sqlite3, mbstring, gd
+          # redis: dibutuhkan RedisUniqueJobTest (slice D3'). Tanpa ekstensi ini test
+          # tersebut otomatis skip, dan gerbangnya tak berlaku di CI.
+          extensions: pcntl, posix, pdo_mysql, pdo_sqlite, sqlite3, mbstring, gd, redis
           coverage: none
 
       - name: Cache dependensi Composer
@@ -108,6 +123,9 @@ jobs:
           DB_DATABASE: tas_testing
           DB_USERNAME: root
           DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          REDIS_CLIENT: phpredis
         run: composer test
 
   frontend:

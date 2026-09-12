@@ -13,6 +13,46 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-12` (D3′) · **[SELESAI] Redis + Horizon — dan Horizon AKHIRNYA benar-benar jalan.**
+  **265 Pest di container** (262 + 3 baru), native Windows **262 lulus + 3 dilewati**, PHPStan lvl 8
+  & Pint bersih. **Tak ada kode aplikasi yang berubah.**
+  **Dibangun:** service `redis` (7-alpine, `appendonly yes` — antrian menyimpan JOB, tanpa
+  persistensi `restart` membuangnya) + service `horizon` di compose; `app` & `horizon` memakai
+  `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION`=`redis` (**identik** — kalau worker beda
+  connection dari pendorong job, job tak pernah terambil dan gejalanya cuma "antrian diam" tanpa
+  error); service `redis:7-alpine` + ekstensi `redis` di `.github/workflows/ci.yml`;
+  `tests/Feature/Hardening/RedisUniqueJobTest.php` (baru, 3 test).
+  **`horizon:status` → "Horizon is running"** — pertama kali sepanjang proyek ini, karena
+  `ext-pcntl` yang ia tuntut tak pernah ada di PHP Windows native.
+  **BUG YANG SAYA PERKENALKAN SENDIRI DI SLICE INI, lalu ditutup:** menyetel
+  `CACHE_STORE`/`QUEUE_CONNECTION`/`SESSION_DRIVER` di `environment:` service `app` **menimpa
+  isolasi `phpunit.xml`** — env var yang sudah ada di environment menang atas `<env>` tanpa
+  `force="true"`. Akibatnya seluruh suite **di dalam container** diam-diam berhenti memakai
+  `sync`/`array`: job ter-antre alih-alih dieksekusi inline, dan test yang mengandalkan itu
+  berubah makna **tanpa satu pun berwarna merah**. Ditutup dengan `force="true"` pada baris
+  **isolasi saja**; `DB_*` sengaja tetap tanpa `force` karena justru itu yang wajib berbeda antara
+  Windows dan container. Aturannya kini tertulis di `phpunit.xml`: **environment boleh menentukan
+  DI MANA, tidak boleh menentukan APAKAH test terisolasi.** Test juga dapat DB Redis sendiri
+  (`REDIS_DB=15`) karena `RedisUniqueJobTest` mem-flush-nya — tanpa itu cache & antrian DEV ikut
+  terhapus (Redis-nya satu container).
+  **Gerbang yang sebelumnya MUSTAHIL, kini ada:** `CODE-WALKTHROUGH §O.3` jujur mencatat bahwa
+  klaim `uniqueId()` = `{appointment}:{window}` cuma "dikunci lewat assertion langsung atas
+  `uniqueId()`" karena `sync` melepas lock seketika — artinya yang dijaga **string**-nya, bukan
+  akibatnya. Dengan Redis nyata, test baru menguji perilaku: duplikat ditahan selama job pending,
+  reminder hasil reschedule tetap lolos. **Mutasi dijalankan** (`uniqueId()` dikembalikan ke
+  appointment id saja) → **2 dari 3 test MERAH**; dikembalikan → 3/3 hijau. Test ini **skip**
+  kalau Redis tak terjangkau (normal di native Windows) — karena itu service `redis` **wajib** di
+  CI, sebab gerbang yang dilewati di CI sama saja dengan tak ada.
+  **Jebakan `PendingDispatch`:** `dispatch()` baru mendorong job saat objeknya **dihancurkan**;
+  menyimpannya ke variabel di dalam loop menunda push satu iterasi dan sempat membuat saya salah
+  membaca hasil verifikasi manual.
+  **Drift dokumen lama ikut ditambal** (ditemukan karena bertentangan dengan test baru):
+  `CLAUDE.md` §Queue masih menulis `uniqueId()` = appointment id (**salah sejak ronde 4**),
+  §Stack & §Cache masih menyebut sqlite/`database` sebagai satu-satunya kenyataan, dan
+  `CODE-WALKTHROUGH §O.2` memajang `uniqueId()` versi bug seolah kode sekarang.
+  Docs: ADR-0007 §Catatan eksekusi, `CLAUDE.md` (§Stack/§Cache/§Queue), `SETUP-GUIDE §18` (baru),
+  `CODE-WALKTHROUGH §O.2`+`§O.3`, `README`, entri ini.
+
 - `2026-09-12` (D2′) · **[SELESAI] Containerisasi app — DIMAJUKAN mendahului Redis.**
   **Kenapa urutan diubah:** D2 (Redis) mulai dikerjakan lalu ketahuan rencananya cacat — Redis
   untuk cache/session/queue mengandaikan app bisa bicara ke Redis, padahal app **dan seluruh test
@@ -799,12 +839,15 @@
     paksa `expectsJson()` untuk seluruh grup API di `bootstrap/app.php`.
 
 ## Sedang dikerjakan
-- (kosong) — **D1 + D2′ selesai & hijau**: 262 Pest/671 assert (di container **dan** native),
-  PHPStan lvl 8, Pint bersih. Berikutnya **D3′** (Redis cache/session/queue + Horizon di container
-  — kini tanpa hambatan karena klien `redis` sudah ada di image), lalu D4′ (service `redis:7` di CI).
-- **Belum diverifikasi:** CI untuk D1 (service container MySQL) — commit `4ea097b` sudah di-push
-  2026-09-12 tapi hasil run-nya **belum pernah dibaca**: repo privat, `gh` tak terpasang, tak ada
-  token di sesi itu. Cek manual di tab Actions. Jangan tulis "CI hijau" sebelum benar-benar dilihat.
+- (kosong) — **D1 + D2′ + D3′ selesai & hijau**: **265 Pest** di container, **262 + 3 skip** di
+  native Windows, PHPStan lvl 8, Pint bersih. D4′ (service `redis` di CI) **sudah ikut dikerjakan
+  di D3′** dengan alasan sama seperti MySQL di D1: gerbang baru yang tak dipasang di CI tak berlaku
+  saat push. Sisa: **D5′** (penutup §Stack/docs) & **D6′** (Reverb, opsional).
+- **CI TERVERIFIKASI HIJAU** untuk `4ea097b` (D1) & `3e1f0c2` (D2′) — dikonfirmasi user
+  2026-09-12 dengan melihat langsung tab Actions (repo privat + `gh` tak terpasang di sesi ini,
+  jadi agent tak bisa membacanya sendiri). Yang penting dari run D1: **service container MySQL +
+  pembuatan DB per-proses paralel benar-benar bekerja di runner bersih** — sebelumnya itu cuma
+  ditulis berdasarkan dokumentasi, belum pernah dieksekusi.
 
 ## Langkah berikutnya (urut)
 **Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
@@ -827,18 +870,18 @@
 
 **D2′. Containerisasi app** — ✅ **SELESAI 2026-09-12** (dimajukan dari D4, lihat §Status)
 
-**D3′. Redis (cache/session/queue) + Horizon di container** ← *mulai dari sini*
+**D3′. Redis (cache/session/queue) + Horizon di container** — ✅ **SELESAI 2026-09-12** (termasuk service `redis` di CI, lihat §Status)
    `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` → `redis`, klien **`phpredis`** (pecl, di dalam
    image — **bukan** package Composer baru). Horizon pertama kali benar-benar bisa jalan
    (`ext-pcntl` tak ada di PHP Windows). **Wajib diverifikasi manual, bukan cuma test hijau:**
    semantik `ShouldBeUnique` + `WithoutOverlapping` **berbeda** antara driver `database` (lama) dan
    Redis — jalankan skenario double-dispatch dan pastikan job kedua benar-benar ditolak.
 
-**D4′. CI service containers** — **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
+**D4′. CI service containers** — ✅ **SELESAI** (MySQL di D1, Redis di D3′). Semula **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
    (kalau ditunda, CI pasti merah begitu `composer test` menuntut MySQL). Sisa D3 tinggal
    **menambahkan service `redis:7`** ke `.github/workflows/ci.yml` bersamaan dengan D2.
 
-**D5′. Sisa penutup §Stack + docs** (yang belum tertutup D2′)
+**D5′. Sisa penutup §Stack + docs** ← *berikutnya* (sebagian besar sudah tertutup D2′/D3′)
    App + `Dockerfile` + `docker-compose.yml` lengkap. Di sini keputusan **pindah repo ke filesystem
    WSL2** diambil sadar (bind mount NTFS → container Linux lambat untuk autoload PHP; kalau `vendor/`
    dipindah ke named volume, IDE & PHPStan di host kehilangan sumbernya → semua gerbang harus jalan
@@ -894,6 +937,17 @@
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-12` (D3′): **Redis + Horizon + gerbang ShouldBeUnique berbasis perilaku.** Kode/infra:
+  `docker-compose.yml` (+service `redis` & `horizon`, env redis di `app`), `phpunit.xml`
+  (**`force="true"` pada baris isolasi** + `REDIS_DB`/`REDIS_CACHE_DB`=15),
+  `.github/workflows/ci.yml` (+service `redis:7-alpine`, +ekstensi `redis`, +env REDIS_*).
+  Test: `tests/Feature/Hardening/RedisUniqueJobTest.php` (**baru**, 3 test, skip tanpa Redis).
+  262→**265 Pest** (container). **Tak ada kode aplikasi yang berubah.** Docs: ADR-0007,
+  `CLAUDE.md` §Stack/§Cache/§Queue (**3 baris kontrak yang sudah tak akurat ditambal**, termasuk
+  `uniqueId()` yang salah sejak ronde 4), `SETUP-GUIDE §18` (**baru**) + daftar isi,
+  `CODE-WALKTHROUGH §O.2`/`§O.3`, `README`, `HANDOVER` §Status/§Sedang dikerjakan/§Langkah
+  berikutnya/changelog ini. Seeder: **tak ada**. Alasan: `sync` melepas lock unique seketika,
+  jadi klaim `uniqueId()` hanya bisa dijaga sebagai string sampai Redis nyata tersedia.
 - `2026-09-12` (D2′): **Containerisasi app, dimajukan mendahului Redis.** Kode/infra:
   `docker/php/Dockerfile` (**baru**), `.dockerignore` (**baru**), `docker-compose.yml` (+service
   `app`). **Tak ada kode aplikasi (`app/`, `tests/`) yang berubah.** Docs: ADR-0007 (+catatan
