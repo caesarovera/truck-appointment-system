@@ -35,8 +35,15 @@
              alih-alih dieksekusi inline, dan test yang mengandalkan itu berubah makna
              tanpa ada yang merah. Aturannya: environment boleh menentukan DI MANA
              (host/port DB), TIDAK boleh menentukan APAKAH test terisolasi.
-             DB_* di bawah sengaja TANPA force — justru itu yang wajib bisa berbeda
-             antara Windows (127.0.0.1:3307) dan container (mysql:3306). -->
+             KOREKSI D6': force SENDIRIAN TIDAK CUKUP, dan klaim D3′ bahwa ia menutup
+             masalah ini keliru. force hanya menulis $_ENV + putenv(); env() Laravel membaca
+             $_SERVER lebih dulu, tempat nilai container masih tertanam. Yang menuntaskannya:
+             tests/TestCase.php::createApplication() menyalin $_ENV ke $_SERVER. Kedua
+             bagian wajib ada.
+             DB_HOST/DB_PORT di bawah sengaja TANPA force — justru itu yang wajib bisa
+             berbeda antara Windows (127.0.0.1:3307) dan container (mysql:3306).
+             DB_DATABASE BUKAN "di mana", tapi "apakah": ia memisahkan DB test dari DB dev.
+             Lihat komentar di baris DB_DATABASE. -->
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <!-- SLICE D1 (ADR-0007): test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
@@ -45,11 +52,21 @@
              HANDOVER.md §Temuan 2026-09-12.
              Nilai di bawah = default yang cocok dengan docker-compose.yml. PHPUnit TIDAK
              menimpa env var yang sudah ada di environment (tanpa force="true"), jadi CI atau
-             mesin dengan port lain cukup meng-export DB_* sendiri tanpa mengubah file ini. -->
+             mesin dengan port lain cukup meng-export DB_HOST/DB_PORT sendiri tanpa mengubah
+             file ini. Pengecualian: DB_DATABASE di-force (lihat komentarnya). -->
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="3307"/>
-        <env name="DB_DATABASE" value="tas_testing"/>
+        <!-- force="true" (D6'): service PHP di docker-compose.yml menyetel DB_DATABASE=tas
+             (DB DEV) — dan tanpa force nilai itu menang. Akibatnya sejak D2', `pest` di dalam
+             container menembak `tas`: RefreshDatabase me-migrate:fresh DB dev, dan run paralel
+             menumbuhkan tas_test_N alih-alih tas_testing_test_N. Test tetap HIJAU sementara
+             data dev terhapus; terbukti dengan menjalankan satu file test non-paralel di
+             container (users 7 → 0). Garis D3' di atas ditarik di tempat yang salah untuk baris
+             ini. Nilainya sama di semua jalur (native, container, CI), jadi force tak
+             mengambil fleksibilitas apa pun. Seperti baris isolasi lain, force ini baru
+             berefek bersama tests/TestCase.php (lihat koreksi di atas). -->
+        <env name="DB_DATABASE" value="tas_testing" force="true"/>
         <env name="DB_USERNAME" value="root"/>
         <env name="DB_PASSWORD" value="secret"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
