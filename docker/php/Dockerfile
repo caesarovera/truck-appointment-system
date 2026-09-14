@@ -45,5 +45,16 @@ WORKDIR /var/www/html
 RUN useradd -u 1000 -m -s /bin/bash app && chown -R app:app /var/www/html
 USER app
 
-# Perintah default. Di-override per service di docker-compose.yml.
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Perintah default (dipakai service `app`; service lain meng-override `command:`).
+#
+# --no-reload WAJIB. Tanpa flag ini, selama berkas .env ada, ServeCommand menjalankan
+# server web sebagai proses anak dan MEMBUANG setiap env var di luar whitelist-nya
+# (ServeCommand::$passthroughVariables) supaya .env bisa di-reload saat berubah. Image ini
+# tanpa php.ini → variables_order=EGPCS → semua env var service compose (DB_HOST=mysql,
+# CACHE_STORE=redis, BROADCAST_CONNECTION=reverb, ...) ikut terbuang, dan server web
+# kembali membaca .env milik jalur native: SQLite, driver `database`, broadcaster `log`.
+# Sejak D2' app web di container diam-diam melayani dari database/database.sqlite (bind
+# mount) sementara CLI (artisan, horizon, test) memakai MySQL/Redis — terbukti D6' dari
+# token login lewat :8000 yang masuk SQLite, bukan MySQL `tas`.
+# Harganya: mengubah .env butuh `docker compose restart app` (tak ada auto-reload).
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000", "--no-reload"]
