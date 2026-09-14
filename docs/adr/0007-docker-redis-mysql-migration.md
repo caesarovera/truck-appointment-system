@@ -200,6 +200,42 @@ dilewati**. Tiga hal yang perlu diingat:
    sampai variabel itu ditimpa, dan pengukuran ukuran antrian meleset satu langkah — sempat membuat
    saya salah membaca hasil verifikasi manual.
 
+**[2026-09-14] Slice D6′ SELESAI: scheduler + Reverb di container — dan dua koreksi atas D2′/D3′.**
+
+*Penomoran.* Tabel *Decision* di atas memakai urutan asli (#5 = Reverb). Setelah urutan diubah,
+`HANDOVER` memakai **D5′ = dokumen, D6′ = Reverb**; catatan ini mengikuti `HANDOVER`. D6′
+dikerjakan **sebelum** D5′ atas keputusan pemilik proyek, supaya dokumen ditulis sekali atas
+keadaan yang sudah terbukti.
+
+*Keputusan pemilik proyek (2026-09-14).* **Docker jadi jalur jalan utama; native cukup untuk
+`composer test`.** `composer dev` — yang nasibnya ditunda "ke slice #4" di *Consequences* dan tak
+pernah diputuskan — **dibiarkan, dengan peringatan native-only** (tanpa perubahan kode).
+
+*Yang dibangun.* Service `scheduler` (`schedule:work`) dan `reverb` (`reverb:start`, port 8080);
+env semua service PHP disatukan lewat YAML anchor. Alasan "Reverb opsional karena sudah jalan
+native" (tabel *Decision* #5 & *Kapan ditinjau ulang*) ternyata **hanya benar untuk jalur native**:
+di container, `REVERB_HOST=localhost` dari `.env` menunjuk container itu sendiri — dibuktikan
+dengan mutasi (cURL 7). Scheduler bahkan tak pernah dijalankan siapa pun, di jalur mana pun.
+
+*Dua koreksi — ditemukan dengan memeriksa di mana data benar-benar mendarat, bukan apakah
+responsnya 200 atau test-nya hijau:*
+
+1. **Koreksi atas catatan D3′ #1 di atas: `force="true"` sendirian TIDAK menutup isolasi.**
+   PHPUnit hanya menulis `$_ENV` + `putenv()`; `env()` Laravel membaca `$_SERVER` lebih dulu, tempat
+   env var service compose tertanam. Ditambah `DB_DATABASE` yang sengaja tanpa force, suite di
+   container memakai **DB dev `tas`** + Redis + Reverb sungguhan sambil tetap hijau — dan
+   `RefreshDatabase` non-paralel mengosongkan DB dev (terbukti: users 7 → 0). Ditutup dengan force
+   `DB_DATABASE` + `tests/TestCase.php` menyalin `$_ENV` ke `$_SERVER`. Fix pertama (force saja)
+   diuji ulang dan **tidak menggigit** — alasan kenapa uji merah wajib diulang *setelah* fix.
+2. **Koreksi atas catatan D2′: app web di container tak pernah memakai MySQL/Redis.** `artisan serve`
+   tanpa `--no-reload` membuang env var di luar whitelist dari proses server web (demi auto-reload
+   `.env`); image tanpa `php.ini` membuat seluruh env compose ikut terbuang, sehingga server web
+   membaca `.env` jalur native (SQLite). Hanya CLI yang benar-benar di container stack. Ditutup
+   dengan `--no-reload` di `Dockerfile`.
+
+*Temuan terbuka.* OPcache mati untuk SAPI CLI → tiap request ~3 detik di jalur yang kini utama.
+Detail & kandidat fix: `HANDOVER` §Temuan D6′.
+
 ## Kapan ditinjau ulang
 
 - **Refaktor cache ke `Cache::tags`**: baru boleh **setelah** slice #2 hijau. Sengaja dipisah dari

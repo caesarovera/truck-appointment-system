@@ -33,11 +33,11 @@ Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan 
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
-* Infra dev: **Docker** (`docker-compose.yml` — service `mysql` + `app`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi sedang berjalan, lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**:
-  * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`) · **Redis 7 untuk queue/cache/session** · **Horizon jalan** (`docker compose exec app php artisan horizon:status`). Ini membuat baris Queue/Cache/Session & Horizon di §Stack di atas **akhirnya benar** di dalam container.
-  * ⚠️ **Jalur native Windows tetap driver `database`** — PHP native tak punya ekstensi redis. Jadi baris §Stack itu benar untuk container, belum untuk native.
-  * ⏳ **Masih target:** Reverb di container (opsional — sudah jalan native).
-  * **Dua jalur sama-sama hidup:** `composer test` di Windows (MySQL lewat port host 3307) **dan** `docker compose exec app composer test` (MySQL lewat jaringan compose). Container ~1,7× lebih lambat karena bind mount NTFS — diukur, diterima sadar, lihat ADR-0007.
+* Infra dev: **Docker = jalur jalan utama** (`docker-compose.yml` — `mysql` · `redis` · `app` · `horizon` · `scheduler` · `reverb`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi selesai kecuali dokumen (D5′), lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**:
+  * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`) · **Redis 7 untuk queue/cache/session** · **Horizon jalan** (`docker compose exec app php artisan horizon:status`) · **scheduler** (`schedule:work` — `NoShowSweepJob` benar-benar jalan) · **Reverb** (port 8080; PHP publish ke `reverb:8080`, browser ke `localhost:8080`).
+  * 🔒 **Dua pengaman yang JANGAN dicabut** (keduanya pernah absen dan suite tetap hijau — D6′): (1) `--no-reload` di `CMD` `docker/php/Dockerfile` — tanpanya server web container membuang env compose dan diam-diam membaca `.env`/SQLite; (2) `tests/TestCase.php` menyalin `$_ENV`→`$_SERVER` + `force="true"` di `phpunit.xml` — tanpa **keduanya**, test di container menembak DB dev `tas` + Redis sungguhan.
+  * ⚠️ **Jalur native Windows = untuk `composer test` saja** (driver `database`, tanpa ekstensi redis). `composer dev` / `artisan serve` / `reverb:start` native **jangan** dinyalakan bersamaan container (port 8000/8080 bentrok; `serve` pindah diam-diam ke 8001 dengan DB SQLite).
+  * **Dua jalur test sama-sama sah:** `composer test` di Windows (MySQL lewat port host 3307) **dan** `docker compose exec app composer test` (MySQL lewat jaringan compose). Container ~1,7× lebih lambat karena bind mount NTFS — diukur, diterima sadar, lihat ADR-0007.
   * Checkpoint terakhir era native: tag git **`pre-docker`**.
 * CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
@@ -98,10 +98,9 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 composer test            # pest --parallel
 composer analyse         # phpstan level 8
 composer fix             # pint
-composer dev             # serve + queue:listen + pail + vite (dev harian)
-php artisan migrate:fresh --seed   # reset + demo data (lihat docs/DUMMY-DATA.md)
-php artisan reverb:start # websocket (dev, jalan native — TIDAK butuh Docker)
-php artisan horizon      # dashboard queue — butuh ext-pcntl, TIDAK jalan di dev Windows
+docker compose up -d     # SELURUH stack dev: mysql redis app(:8000) horizon scheduler reverb(:8080)
+docker compose exec app php artisan migrate:fresh --seed   # reset + demo data di MySQL `tas` (docs/DUMMY-DATA.md)
+composer dev             # NATIVE ONLY (SQLite) — jangan bersamaan container, lihat §Stack
 npm run dev | test:js | type-check | build   # `type-check` & `build` ikut gerbang CI
 ```
 

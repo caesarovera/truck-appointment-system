@@ -13,6 +13,51 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-14` (D6′ + 2 fix) · **[SELESAI] Scheduler + Reverb di container — dan dua klaim D2′/D3′
+  ternyata SALAH; keduanya ditutup dengan bukti merah→hijau.** Keputusan user sesi ini: **Docker
+  jadi jalur jalan utama, native cukup untuk `composer test`**; `composer dev` dibiarkan (native
+  only — peringatannya ditulis di D5′); pemisahan penuh dokumen pra/pasca-Docker **tidak**
+  dikerjakan (effort besar) — D5′ menulis ulang banner & tetap menunjuk tag `pre-docker`.
+  **Tiga commit kode:**
+  (1) `d186c4a` **fix(test) — isolasi test di container tak pernah berlaku.** `pest` di container
+  memakai `DB_DATABASE=tas` (**DB dev**), cache/queue `redis`, broadcast `reverb` — sambil hijau.
+  Dua sebab bertumpuk: `DB_DATABASE` sengaja tanpa `force` (garis D3′ ditarik di tempat salah), dan
+  **`force="true"` sendirian tak pernah berefek** — PHPUnit menulis `$_ENV`+`putenv`, sedangkan
+  `env()` Laravel membaca `$_SERVER` lebih dulu, tempat env compose tertanam. **Bukti merah:** satu
+  file test non-paralel di container → 3 passed, `tas` users **7 → 0**; probe: `env('DB_DATABASE')`
+  = `tas` walau `$_ENV` = `tas_testing`. **Fix:** force `DB_DATABASE` + `tests/TestCase.php::
+  createApplication()` menyalin `$_ENV`→`$_SERVER`. **Hijau:** file yang sama → `tas` utuh; suite
+  penuh → `tas` utuh. Jejak bug: schema `tas_test_1..12` (dihapus). **DB dev `tas` ternyata kosong
+  total saat sesi dimulai — korban bug ini** — lalu di-seed ulang.
+  (2) `38258e7` **fix(docker) — app web di `:8000` sejak D2′ melayani dari SQLite, bukan MySQL.**
+  `artisan serve` tanpa `--no-reload` (selama `.env` ada) membuang env var di luar whitelist dari
+  proses server web; image tanpa `php.ini` (`variables_order=EGPCS`) → semua env compose terbuang →
+  server web membaca `.env` native (sqlite, `database`, `log`). **Hanya CLI** (artisan, Horizon,
+  test) yang benar-benar di MySQL/Redis. Akibat: job dari request web masuk tabel `jobs` SQLite yang
+  tak pernah dibaca Horizon; `/broadcasting/auth` 200 kosong. **Bukti merah:** token login lewat
+  `:8000` masuk SQLite, MySQL 0. **Fix:** `--no-reload` di `Dockerfile`. **Hijau:** token masuk
+  MySQL, SQLite 0; auth balas JSON bertanda tangan.
+  (3) `234db36` **feat(D6′)** — service `scheduler` (`schedule:work`) + `reverb` (8080), env semua
+  service PHP disatukan lewat YAML anchor. **Gap scheduler:** tak ada yang pernah menjalankan
+  `routes/console.php` — tidak di container, tidak di `composer dev`; `NoShowSweepJob` & prune token
+  cuma terdaftar. **Realtime di jalur container sebelumnya putus** (`REVERB_HOST=localhost` dari
+  `.env` = container itu sendiri) — kini **terbukti**, bukan dugaan: mutasi nilai lama → cURL 7.
+  **Verifikasi live:** config compose sebelum/sesudah tak kehilangan apa pun; `NoShowSweepJob`
+  didorong scheduler & dieksekusi Horizon; klien WebSocket di Windows (`localhost:8080`) menerima
+  broadcast dari container; mutasi reverb mati → gagal; **domain end-to-end:** login → auth channel
+  privat `slot.2` → booking 201 → event `remaining 4` → cancel → event `remaining 5`.
+  Gerbang: container **265 passed (674 assert)**, native **262 + 3 skip (671)**, Pint bersih
+  (PHPStan tak mencakup berkas yang berubah).
+  **Pola yang berulang — kali ini menimpa saya sendiri:** fix pertama untuk (1) cuma
+  `force="true"`, dan **tidak menggigit** (`tas` tetap terhapus). Ketahuan karena uji merah
+  **diulang setelah fix**, bukan diasumsikan; tanpa itu fix yang salah sudah ter-commit dengan pesan
+  yang meyakinkan — persis kesalahan D3′ yang sedang dikoreksi.
+  **Temuan terbuka baru:** §Temuan D6′ (OPcache CLI mati → tiap request ~3 dtk).
+  **Data dev `tas` sesudah sesi:** hasil seed 2026-09-14 + 1 appointment `CANCELLED`
+  (`D6VU0000001`, dari verifikasi domain).
+  Docs: entri ini, §Temuan D6′, §MULAI SESI, §Langkah berikutnya, ADR-0007 §Catatan eksekusi,
+  `CLAUDE.md` §Stack/§Perintah. README/SETUP-GUIDE/ONBOARDING **sengaja** menunggu D5′.
+
 - `2026-09-12` (D3′) · **[SELESAI] Redis + Horizon — dan Horizon AKHIRNYA benar-benar jalan.**
   **265 Pest di container** (262 + 3 baru), native Windows **262 lulus + 3 dilewati**, PHPStan lvl 8
   & Pint bersih. **Tak ada kode aplikasi yang berubah.**
@@ -29,7 +74,9 @@
   isolasi `phpunit.xml`** — env var yang sudah ada di environment menang atas `<env>` tanpa
   `force="true"`. Akibatnya seluruh suite **di dalam container** diam-diam berhenti memakai
   `sync`/`array`: job ter-antre alih-alih dieksekusi inline, dan test yang mengandalkan itu
-  berubah makna **tanpa satu pun berwarna merah**. Ditutup dengan `force="true"` pada baris
+  berubah makna **tanpa satu pun berwarna merah**. **[DIKOREKSI 2026-09-14: klaim "ditutup" di
+  bawah KELIRU — `force` sendirian tak berefek karena `env()` membaca `$_SERVER`; ditutup sungguhan
+  di `d186c4a`, lihat entri D6′.]** Ditutup dengan `force="true"` pada baris
   **isolasi saja**; `DB_*` sengaja tetap tanpa `force` karena justru itu yang wajib berbeda antara
   Windows dan container. Aturannya kini tertulis di `phpunit.xml`: **environment boleh menentukan
   DI MANA, tidak boleh menentukan APAKAH test terisolasi.** Test juga dapat DB Redis sendiri
@@ -66,7 +113,10 @@
   `zip`/`redis`, Composer dari image resmi, user non-root UID 1000), `.dockerignore` (baru),
   service `app` di `docker-compose.yml` (bind mount, env DB via compose, `depends_on` mysql
   healthy). **Terverifikasi:** 262 Pest hijau **di dalam container**, `http://localhost:8000`
-  balas 200, `migrate:fresh --seed` jalan di DB `tas`.
+  balas 200, `migrate:fresh --seed` jalan di DB `tas`. **[DIKOREKSI 2026-09-14: ketiganya benar
+  sendiri-sendiri tapi tak saling membuktikan — server web di :8000 membaca SQLite (`artisan serve`
+  membuang env compose), dan "262 Pest di container" menembak DB dev. Ditutup `38258e7` &
+  `d186c4a`, lihat entri D6′.]**
   **Keputusan bind mount, diambil dengan ANGKA bukan kekhawatiran** (ini yang sengaja ditunda ke
   slice ini): `composer test` native **47 dtk** vs di container lewat bind mount NTFS **80 dtk** →
   ~**1,7× lebih lambat**. Diputuskan **TETAP bind mount, repo TIDAK dipindah ke WSL2** — nyata tapi
@@ -838,30 +888,63 @@
     perbaiki di luar scope). Perbaikan sebaris kalau nanti disetujui: beri nama route login, atau
     paksa `expectsJson()` untuk seluruh grup API di `bootstrap/app.php`.
 
+## Temuan D6′ 2026-09-14 — jalur container ternyata tak semuanya memakai container
+
+Ditemukan saat **verifikasi live** D6′, bukan saat membaca kode. Tiga pertama FIXED sesi yang sama
+(detail & bukti merah→hijau di entri §Status `2026-09-14`):
+
+- **[FIXED `d186c4a`] Test di container menembak DB dev `tas`** + `force="true"` tak pernah berefek
+  (`env()` membaca `$_SERVER`). Kelas bug ronde 5 lagi: **tak ada gerbang** — suite tetap hijau.
+- **[FIXED `38258e7`] App web di `:8000` membaca SQLite/`.env`** — `artisan serve` membuang env
+  compose. Klaim D2′/D3′ "app memakai MySQL/Redis" hanya benar untuk CLI.
+- **[FIXED `234db36`] Scheduler tak pernah dijalankan siapa pun** + **realtime putus di jalur
+  container** (`REVERB_HOST=localhost`).
+- **[TERBUKA — P2] OPcache mati untuk SAPI CLI → tiap request ~3 detik.** `artisan serve` = SAPI CLI,
+  image tanpa `php.ini` → `opcache.enable_cli=0` → setiap request mengompilasi ulang framework lewat
+  bind mount NTFS. Diukur: `GET /up` 3,28 / 2,96 / 2,60 dtk; login ~8 dtk, booking ~10 dtk.
+  **Naik jadi P2 karena Docker kini jalur utama** — SPA akan terasa rusak, bukan sekadar lambat.
+  Kandidat fix (belum dicoba, **wajib diukur ulang**): `conf.d` di `Dockerfile` dengan
+  `opcache.enable_cli=1` + `opcache.validate_timestamps=1` + `opcache.revalidate_freq=0` (dev: edit
+  kode tetap langsung terlihat). Sengaja tak dikerjakan di D6′ — di luar scope yang disepakati.
+- **[CATATAN] Metode yang menemukan semuanya:** memeriksa **di mana data benar-benar mendarat**
+  (token login di MySQL atau SQLite? schema test bernama apa?), bukan "apakah responsnya 200" atau
+  "apakah test hijau". Kedua pertanyaan terakhir itulah yang dijawab D2′/D3′ — dan keduanya lolos
+  sementara sistemnya salah.
+
 ## Sedang dikerjakan
-- (kosong) — **sesi ditutup 2026-09-12 dalam keadaan bersih.** D1 + D2′ + D3′ + D4′ selesai,
-  semua di-commit & di-push, working tree bersih. **265 Pest** di container, **262 + 3 skip** di
-  native Windows, PHPStan lvl 8, Pint bersih.
+- (kosong) — **sesi 2026-09-14 selesai: D6′ + 2 fix + docs minimal.** 4 commit (3 kode + 1 docs),
+  **belum di-push** saat entri ini ditulis — CI untuk `tests/TestCase.php` baru belum terbukti.
+  **265 Pest** di container, **262 + 3 skip** native, Pint bersih.
 
 ### ▶️ MULAI SESI BERIKUTNYA DARI SINI
 
 **1. Nyalakan infra dulu** — tanpa ini `composer test` gagal konek, bukan bug:
 ```bash
-docker compose up -d          # mysql + redis + app + horizon
+docker compose up -d          # mysql + redis + app + horizon + scheduler + reverb
 docker compose ps             # mysql & redis harus "healthy"
 ```
-Dua jalur sama-sama sah: `docker compose exec app composer test` (265 test) atau
-`composer test` di Windows (262 + 3 skip). Rinci: `SETUP-GUIDE §16–§18`.
+**Docker = jalur jalan utama** (keputusan user 2026-09-14): app `http://localhost:8000`,
+realtime `localhost:8080`, Horizon `/horizon`. **Jangan** nyalakan `composer dev`,
+`php artisan serve`, atau `php artisan reverb:start` native bersamaan (port 8000/8080 bentrok;
+`serve` diam-diam pindah ke 8001 dengan DB SQLite). Test: `docker compose exec app composer test`
+(265) atau `composer test` di Windows (262 + 3 skip) — keduanya kini benar-benar memakai
+`tas_testing`. DB dev `tas` kosong? `docker compose exec app php artisan migrate:fresh --seed`.
+Rinci (sebagian basi sampai D5′): `SETUP-GUIDE §16–§18`.
 
-**2. Yang perlu mata manusia (agent tak bisa):** CI untuk commit **`8319cf6` (D3′) BELUM
-diverifikasi** — repo privat, `gh` tak terpasang, tak ada token di sesi ini. Cek tab Actions.
-`4ea097b` (D1) & `3e1f0c2` (D2′) **sudah dikonfirmasi hijau** oleh user. Risiko khusus di run D3′:
-service container `redis` + ekstensi `redis` baru pertama kali dieksekusi di runner.
+**2. CI commit `8319cf6` (D3′) — CONFIRMED hijau oleh user 2026-09-14** (Pest passed; repo privat,
+`gh` tak terpasang di sesi manapun sejauh ini, jadi ini tetap lewat mata manusia, bukan dibaca
+agent). Sama seperti `4ea097b` (D1) & `3e1f0c2` (D2′) sebelumnya. Ini menutup risiko khusus run
+D3′ (service container `redis` + ekstensi `redis` baru pertama kali dieksekusi di runner) —
+service container Redis di GitHub Actions terbukti bekerja di runner bersih.
+
+**CI untuk 4 commit sesi 2026-09-14 (`d186c4a`…) BELUM diverifikasi.** Yang paling perlu dilihat:
+`tests/TestCase.php` baru jalan di runner (seharusnya no-op di sana — env CI sudah sama).
 
 **3. Pekerjaan tersisa, urut:**
-- **D5′** — penutup §Stack/docs. Sebagian besar sudah tertutup sambil jalan di D2′/D3′; sisanya
-  tinggal menyisir klaim yang masih menggambarkan jalur native sebagai satu-satunya.
-- **D6′** — Reverb ke container. **Opsional**, boleh dilewati: sudah jalan native & terverifikasi.
+- **[P2, TERBUKA] OPcache CLI** — tiap request ~3 dtk di jalur utama. Lihat §Temuan D6′. Kecil,
+  tapi mengubah `Dockerfile` → minta OK dulu, lalu ukur sebelum/sesudah.
+- **D5′** — dokumen untuk Docker sebagai jalur utama. Scope-nya kini jelas (analisa 2026-09-14),
+  lihat §Langkah berikutnya D5′.
 - **[P3, TERBUKA]** bug 500-vs-401 — lihat §Temuan D2′. Sengaja tak diperbaiki (di luar scope),
   menunggu keputusan user. Perbaikannya sebaris.
 - **Opsional, kini SAH secara teknis tapi sengaja belum:** refaktor `Cache::forget` →
@@ -910,17 +993,31 @@ aman dihapus.
    (kalau ditunda, CI pasti merah begitu `composer test` menuntut MySQL). Sisa D3 tinggal
    **menambahkan service `redis:7`** ke `.github/workflows/ci.yml` bersamaan dengan D2.
 
-**D5′. Sisa penutup §Stack + docs** ← *berikutnya* (sebagian besar sudah tertutup D2′/D3′)
-   App + `Dockerfile` + `docker-compose.yml` lengkap. Di sini keputusan **pindah repo ke filesystem
-   WSL2** diambil sadar (bind mount NTFS → container Linux lambat untuk autoload PHP; kalau `vendor/`
-   dipindah ke named volume, IDE & PHPStan di host kehilangan sumbernya → semua gerbang harus jalan
-   di dalam container). Nasib `composer dev` diputuskan di sini. Baru **setelah slice ini**:
-   `CLAUDE.md` §Stack naik status dari *target* → *keadaan*, banner pra-Docker di `SETUP-GUIDE`/
-   `ONBOARDING`/`README` dicabut, dan §Batas pra-Docker di file ini ditutup.
+**D6′. Scheduler + Reverb ke container** — ✅ **SELESAI 2026-09-14** (detail di §Status). Semula
+   "opsional, sudah jalan native" — alasan itu **keliru** untuk jalur container (realtime terbukti
+   putus di sana), dan scheduler ternyata tak pernah jalan di mana pun. Dikerjakan **sebelum** D5′
+   atas keputusan user, supaya dokumen ditulis sekali atas keadaan yang sudah terbukti.
 
-**D6′. Reverb ke container — terakhir, boleh dilewati**
-   Sudah jalan native & terverifikasi manual. Memindahkannya = risiko merusak yang bekerja demi
-   selisih belajar paling tipis. Kerjakan hanya bila ada kebutuhan nyata.
+**D5′. Dokumen untuk Docker sebagai jalur utama** ← *berikutnya*
+   Definisi lama (keputusan WSL2 & nasib `composer dev`) **sudah diputuskan**: WSL2 ditolak dengan
+   angka di D2′; `composer dev` **dibiarkan, diberi peringatan native-only** (user, 2026-09-14).
+   Banner pra-Docker **ditulis ulang, bukan dicabut** — tag `pre-docker` tetap ditunjuk.
+   Checklist hasil analisa 2026-09-14 (baris = temuan nyata, bukan tebakan):
+   - `README` *Mulai cepat* **rusak untuk clone baru**: `migrate:fresh --seed` native mengisi SQLite,
+     container `app` memakai MySQL `tas` kosong, `php artisan serve` diam-diam pindah ke 8001,
+     `composer install` tak disebut. Tulis ulang Docker-first.
+   - `CLAUDE.md`: §Urutan build #1 masih "Docker Compose **tidak** dipakai"; §Stack "migrasi sedang
+     berjalan"; §Perintah susun ulang Docker-first + `composer dev` native-only.
+   - `SETUP-GUIDE`: banner; prasyarat "Docker (opsional)"; **§8c & §14 salah** (sqlite `:memory:`,
+     "CI tanpa service container DB"); §16c (env tanpa force); §17b/§17e (klaim env container dipakai
+     server web — dulu salah); **§18 klaim `force` menutup isolasi — salah**; §4c/§11 Reverb native;
+     tambah scheduler + reverb container.
+   - `ONBOARDING`: banner; tabel "Kenapa test pakai SQLite `:memory:`" (:168); blok perintah harian.
+   - `CODE-WALKTHROUGH`: :556 (`phpunit.xml` `:memory:`), label "(test pakai SQLite)" di :263 & :1215.
+   - `DUMMY-DATA`: scheduler kini **benar-benar** menyapu data demo lampau jadi `NO_SHOW`; seed di
+     container.
+   - `HANDOVER` banner `BATAS PRA-DOCKER` masih "masih berlaku hari ini, belum dieksekusi".
+   - **Verifikasi D5′ = menjalankan *Mulai cepat* yang baru dari nol**, bukan membacanya.
 
 > **Opsional setelah D2 hijau (sengaja dipisah):** refaktor cache explicit-key `Cache::forget` →
 > `Cache::tags(['slot', "gate:{$gateId}"])`. Baru **boleh** setelah Redis nyata dipakai. Dipisah dari
@@ -966,6 +1063,15 @@ aman dihapus.
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-14` (D6′ + 2 fix): **Scheduler + Reverb di container; isolasi test & server web container
+  diperbaiki.** Kode/infra: `docker-compose.yml` (service `scheduler`/`reverb`, env PHP via anchor),
+  `docker/php/Dockerfile` (`serve --no-reload`), `phpunit.xml` (force `DB_DATABASE` + koreksi komentar
+  D3′), `tests/TestCase.php` (`$_ENV`→`$_SERVER`). Docs (minimal — sisanya D5′): `HANDOVER` §Status/
+  §Temuan D6′ (baru)/§Sedang dikerjakan/§MULAI SESI/§Langkah berikutnya (D6′ selesai, D5′ didefinisikan
+  ulang dengan checklist) + penanda `[DIKOREKSI]` pada klaim D2′ & D3′ yang terbukti salah;
+  `ADR-0007` §Catatan eksekusi; `CLAUDE.md` §Stack/§Perintah (baris yang kini salah saja). Seeder:
+  **tak ada**. Alasan: jurnal & ADR tak ditulis ulang — klaim lama diberi penanda koreksi supaya
+  pembaca sesi berikutnya tak mewarisi keyakinan yang sudah dibantah bukti.
 - `2026-09-12` (penutup sesi): **Sinkronisasi dokumen dengan keadaan pasca-D3′ + catatan mulai
   sesi berikutnya.** **Tak ada kode/infra yang berubah — dokumen saja.** Menambal 6 klaim yang
   jadi tidak akurat setelah migrasi: `README` §Stack ("Redis masih target — belum dipakai"),
