@@ -2,10 +2,10 @@
 #
 # ADR-0007. Service masuk per slice, bukan sekaligus — lihat CLAUDE.md §Peran Agent
 # (no overengineering).
-#   D1  : mysql            ✅
-#   D2' : app              ✅  (containerisasi app DIMAJUKAN dari D4 — lihat catatan di bawah)
-#   D3' : redis + horizon  ✅
-#   next: reverb (opsional)
+#   D1  : mysql              ✅
+#   D2' : app                ✅  (containerisasi app DIMAJUKAN dari D4 — lihat catatan di bawah)
+#   D3' : redis + horizon    ✅
+#   D6' : scheduler + reverb ✅
 #
 # KENAPA app dimajukan mendahului Redis: D2 versi lama menaruh Redis lebih dulu, padahal
 # app masih native Windows saat itu — dan PHP Windows native tak punya klien Redis. Satu-
@@ -14,12 +14,81 @@
 # redis` di dalam image cukup, tanpa menyentuh mesin dev sama sekali.
 #
 # Jalankan:  docker compose up -d
-# Cek sehat: docker compose ps          (kolom STATUS harus "healthy")
+# Cek sehat: docker compose ps          (mysql & redis: STATUS harus "healthy")
 # Masuk app: docker compose exec app bash
-# Matikan:   docker compose down        (data TETAP — ada di volume mysql-data)
+# Log:       docker compose logs -f app horizon scheduler reverb
+# Matikan:   docker compose down        (data TETAP — ada di volume mysql-data & redis-data)
 # Reset total (HAPUS DATA): docker compose down -v
+#
+# JANGAN nyalakan bersamaan dengan jalur native: `composer dev` / `php artisan serve`
+# (port 8000 → diam-diam pindah ke 8001, dengan DB SQLite yang berbeda) atau
+# `php artisan reverb:start` (port 8080 bentrok).
 
 name: tas
+
+# ---------------------------------------------------------------------------
+# Definisi bersama SEMUA service PHP (app, horizon, scheduler, reverb).
+#
+# KENAPA anchor, bukan salinan per service: env yang berbeda antar service PHP adalah bug
+# yang DIAM. Worker dengan QUEUE_CONNECTION beda dari pendorong job tak pernah mengambil
+# job-nya; publisher broadcast dengan REVERB_HOST beda tak pernah sampai ke Reverb. Tak ada
+# error di kedua kasus — antrian/realtime cuma diam. Dengan empat service, "jaga supaya
+# salinannya sama persis" bukan lagi pengaman yang realistis.
+#
+# Catatan YAML: `<<:` menggabung secara DANGKAL. Service yang menulis ulang `environment:`
+# atau `depends_on:` MENGGANTI seluruh map, bukan menambah — pakai `<<: *php-depends`
+# di dalamnya (lihat horizon).
+# ---------------------------------------------------------------------------
+x-php-env: &php-env
+  # Env var sungguhan menang atas .env: Laravel memuat dotenv secara immutable, jadi baris
+  # di sini tak perlu mengubah berkas .env milik dev (yang tetap berisi nilai jalur native).
+  APP_ENV: local
+  # Di dalam jaringan compose, MySQL dipanggil lewat NAMA SERVICE dan port INTERNAL 3306 —
+  # bukan 127.0.0.1:3307 yang cuma berlaku dari Windows.
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_DATABASE: ${DB_DATABASE:-tas}
+  DB_USERNAME: root
+  DB_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
+  # Redis (slice D3'). Nama service + port internal.
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_CLIENT: phpredis
+  CACHE_STORE: redis
+  SESSION_DRIVER: redis
+  QUEUE_CONNECTION: redis
+  # Broadcast (slice D6'). REVERB_HOST di sini = alamat Reverb DILIHAT DARI CONTAINER, dipakai
+  # PHP untuk PUBLISH event. Browser TIDAK memakai nilai ini — Echo membaca VITE_REVERB_* dari
+  # .env host (localhost:8080) yang diteruskan port mapping service `reverb`. Dua alamat untuk
+  # server yang sama, karena `localhost` di dalam container = container itu sendiri. Sebelum
+  # D6' nilai `localhost` dari .env ikut terbaca di sini, dan publish dari horizon tak pernah
+  # bisa sampai ke Reverb native di Windows.
+  # Test tak terpengaruh: phpunit.xml memaksa BROADCAST_CONNECTION=null (force="true").
+  BROADCAST_CONNECTION: reverb
+  REVERB_HOST: reverb
+  REVERB_PORT: 8080
+  REVERB_SCHEME: http
+
+x-php-depends: &php-depends
+  mysql:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  restart: unless-stopped
+  # Kode masuk lewat bind mount, BUKAN COPY ke image: edit di editor langsung terlihat tanpa
+  # rebuild. Konsekuensinya di Windows, bind mount menembus NTFS dan I/O PHP (autoload ribuan
+  # berkas kecil) jadi lebih lambat — diukur, bukan ditebak; angkanya ada di
+  # docs/SETUP-GUIDE.md §17.
+  volumes:
+    - .:/var/www/html
+  environment: *php-env
+  depends_on: *php-depends
 
 services:
   mysql:
@@ -75,77 +144,48 @@ services:
       start_period: 10s
 
   app:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    <<: *php
     container_name: tas-app
-    restart: unless-stopped
-    # Kode masuk lewat bind mount, BUKAN COPY ke image: edit di editor langsung
-    # terlihat tanpa rebuild. Konsekuensinya di Windows, bind mount menembus NTFS
-    # dan I/O PHP (autoload ribuan berkas kecil) jadi lebih lambat — diukur, bukan
-    # ditebak; angkanya ada di docs/SETUP-GUIDE.md §17.
-    volumes:
-      - .:/var/www/html
-    environment:
-      # Di dalam jaringan compose, MySQL dipanggil lewat NAMA SERVICE dan port
-      # INTERNAL 3306 — bukan 127.0.0.1:3307 yang cuma berlaku dari Windows.
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE:-tas}
-      DB_USERNAME: root
-      DB_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
-      # Env var sungguhan menang atas .env: Laravel memuat dotenv secara immutable,
-      # jadi baris di sini tak perlu mengubah berkas .env milik dev.
-      APP_ENV: local
-      # Redis (slice D3'). Di dalam jaringan compose: nama service + port internal.
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_CLIENT: phpredis
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
-      QUEUE_CONNECTION: redis
+    # Perintah default dari Dockerfile: `php artisan serve --host=0.0.0.0 --port=8000`.
     ports:
       - '${APP_PORT:-8000}:8000'
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   horizon:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    <<: *php
     container_name: tas-horizon
-    restart: unless-stopped
     # INILAH yang tak pernah bisa jalan di mesin dev sebelum containerisasi: Horizon
     # menuntut ext-pcntl, dan PHP Windows native tak punya. Image Linux punya.
     command: ['php', 'artisan', 'horizon']
-    volumes:
-      - .:/var/www/html
-    environment:
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE:-tas}
-      DB_USERNAME: root
-      DB_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
-      APP_ENV: local
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_CLIENT: phpredis
-      # WAJIB sama persis dengan service `app`. Kalau worker memakai store/connection
-      # berbeda dari yang mendorong job, job tak akan pernah terambil — dan gejalanya
-      # membingungkan: tak ada error, antrian cuma diam.
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
-      QUEUE_CONNECTION: redis
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      <<: *php-depends
+      # Horizon-lah yang mem-PUBLISH broadcast (ShouldBroadcast = job di antrian). Ini cuma
+      # urutan start, bukan jaminan siap; publish yang gagal masuk failed jobs, tidak hilang diam.
+      reverb:
+        condition: service_started
+
+  scheduler:
+    <<: *php
+    container_name: tas-scheduler
+    # Tanpa service ini TAK ADA yang menjalankan routes/console.php: NoShowSweepJob (tiap 5
+    # menit) dan sanctum:prune-expired (harian) cuma terdaftar, tak pernah jalan — tidak di
+    # container, tidak juga di `composer dev`. Test tetap hijau karena test memanggil job-nya
+    # langsung, jadi gap ini tak pernah merah di mana pun (ditemukan saat analisa D6').
+    # schedule:work = loop yang memanggil schedule:run tiap menit (pengganti cron di dev).
+    # Job yang dijadwalkan didorong ke Redis lalu DIEKSEKUSI oleh horizon, bukan di sini.
+    # SATU instance saja — dua scheduler = setiap sweep terkirim dua kali.
+    command: ['php', 'artisan', 'schedule:work']
+
+  reverb:
+    <<: *php
+    container_name: tas-reverb
+    # Server WebSocket. Sebelum D6' jalan native di Windows (dan masih BISA — Reverb tak butuh
+    # ext-pcntl); dipindah supaya publish dari horizon punya alamat yang pasti: `reverb:8080`.
+    command: ['php', 'artisan', 'reverb:start', '--host=0.0.0.0', '--port=8080']
+    ports:
+      # KANAN wajib 8080 (= REVERB_PORT di x-php-env). KIRI = port yang dibuka ke browser, dan
+      # HARUS sama dengan VITE_REVERB_PORT di .env host — Echo di browser membaca nilai itu saat
+      # Vite build/dev, bukan dari container.
+      - '${REVERB_PORT_HOST:-8080}:8080'
 
 volumes:
   mysql-data:
