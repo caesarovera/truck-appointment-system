@@ -260,8 +260,8 @@ arah sebaliknya (appointments → users) tetap pakai FK. Kompromi yang aman.
 
 ### Kenapa enum disimpan `string`, bukan `$table->enum()`
 `$table->enum()` membuat tipe ENUM khas MySQL yang ribet diubah & tak portabel ke
-SQLite. Kita pakai `string` + PHP Enum cast di model → portabel (test pakai SQLite,
-prod bisa MySQL) dan tetap type-safe di aplikasi.
+SQLite. Kita pakai `string` + PHP Enum cast di model → portabel (dev & test kini MySQL,
+e2e memakai SQLite) dan tetap type-safe di aplikasi.
 
 ---
 
@@ -421,7 +421,7 @@ class TruckFactory extends Factory
 - **State** (`inactive()`, `nearlyFull()`, `confirmed()`): variasi siap pakai.
 
 **Kenapa `definition()` TANPA docblock `@return`:** lihat penjelasan di
-`SETUP-GUIDE §6c` / Troubleshooting — docblock `array<string,mixed>` bentrok dengan
+`SETUP-GUIDE §11` (Troubleshooting PHP/PHPStan) — docblock `array<string,mixed>` bentrok dengan
 tipe induk yang lebih sempit (PHPStan `method.childReturnType`). Dibiarkan polos =
 mewarisi tipe induk yang benar.
 
@@ -553,13 +553,21 @@ pest()->extend(Tests\TestCase::class)
   test) dan `TestCase` Laravel (akses penuh aplikasi).
 - Test di `Unit` tidak (lebih ringan, tanpa DB).
 
-### `phpunit.xml` (DB `:memory:`)
+### `phpunit.xml` (MySQL `tas_testing`, isolasi di-force)
 ```xml
-<env name="DB_CONNECTION" value="sqlite"/>
-<env name="DB_DATABASE" value=":memory:"/>
+<env name="DB_CONNECTION" value="mysql"/>
+<env name="DB_HOST" value="127.0.0.1"/>          <!-- tanpa force: beda per jalur -->
+<env name="DB_PORT" value="3307"/>
+<env name="DB_DATABASE" value="tas_testing" force="true"/>
+<env name="CACHE_STORE" value="array" force="true"/>
+<env name="QUEUE_CONNECTION" value="sync" force="true"/>
 ```
-Test pakai SQLite di RAM: cepat & **tidak menyentuh** `database/database.sqlite`
-(data dev aman). Tanpa ini, `RefreshDatabase` akan menghapus data dev tiap run.
+Test memakai DB **terpisah** dari DB dev `tas`, karena `RefreshDatabase` menjalankan `migrate:fresh`.
+MySQL, bukan SQLite: SQLite tak menerbitkan `SELECT … FOR UPDATE`, jadi test anti-race di atasnya
+tak pernah jujur (§J.1). **`force="true"` saja tidak cukup** — `env()` Laravel membaca `$_SERVER`
+lebih dulu, tempat env var container tertanam; `tests/TestCase.php` menyalin `$_ENV` ke `$_SERVER`.
+Tanpa keduanya, test di container menulis ke DB dev sambil tetap hijau (`SETUP-GUIDE §6`).
+Riwayat: sampai 2026-09-12 test memakai SQLite `:memory:`.
 
 ### `composer.json` scripts
 ```json
@@ -1212,7 +1220,7 @@ public function dueForNoShow(CarbonInterface $now, int $graceMinutes): Collectio
 }
 ```
 **Kenapa saring kasar di DB lalu refine di PHP:** menggabung `date` + `end_time` jadi
-satu timestamp via ekspresi SQL berbeda antara SQLite (test) & MySQL (prod). Filter
+satu timestamp via ekspresi SQL berbeda antara SQLite (e2e) & MySQL (dev/test/prod). Filter
 PHP (Carbon) menjaga query tetap portabel.
 
 `MarkNoShowAction` = kembar `CancelAppointmentAction` (lock baris + window, cek
@@ -1303,8 +1311,9 @@ duplikat ditahan selama job masih pending di antrian, dan reminder hasil resched
 berbeda) tetap lolos. Gerbangnya **dibuktikan menggigit lewat mutasi** — `uniqueId()` dikembalikan
 ke appointment id saja, 2 dari 3 test langsung merah.
 
-Test itu **dilewati** kalau Redis tak terjangkau (keadaan normal di PHP native Windows), jadi
-service `redis` wajib ada di CI — gerbang yang dilewati di CI sama saja dengan tak ada.
+Test itu **dilewati** tanpa ekstensi `redis` (keadaan normal di PHP native Windows) atau tanpa
+Redis terjangkau, jadi service `redis` wajib ada di CI — gerbang yang dilewati di CI sama saja
+dengan tak ada. Di container ketiganya jalan.
 
 > Ini kelas perbaikan yang sama dengan temuan D1: aturannya sudah benar sejak lama, tapi yang
 > menjaganya menguji **bentuk**, bukan **akibat**. Kalau menemukan catatan "tak bisa dites karena

@@ -28,17 +28,18 @@ Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan 
 
 * Backend: Laravel 12, PHP 8.3+ (`declare(strict_types=1)` wajib)
 * Auth: Sanctum (token + scopes) — scope per role, lihat `docs/BUSINESS-FLOW.md §1`
-* Queue/Cache/Session — **di container: Redis 7 + Horizon (sudah dipakai, bukan lagi target).** **Di jalur native Windows: driver `database`** (PHP native tak punya ekstensi redis). `BROADCAST_CONNECTION=log` di dev. Bedanya bukan sekadar catatan — lihat konsekuensinya di §Hardening → Cache.
+* Queue/Cache/Session — **Redis 7 + Horizon** (container). Broadcast `reverb` (container). Nilai `database`/`log` di `.env` hanya untuk `composer dev` native, yang tak lagi jadi jalur jalan — lihat §Hardening → Cache.
 * Realtime: Reverb (WebSocket) + Laravel Echo — channel `slot.{gateId}` (kuota live) & `gate.queue.{terminalId}`
 * RBAC: Spatie Permission · Audit: Spatie Activity Log · DTO: Spatie Laravel Data
 * Frontend: Vue 3 (Composition API) + TypeScript + Pinia + Vue Router + TanStack Query + Axios
 * Test: Pest (backend) + Vitest (frontend) · Analysis: PHPStan level 8
-* Infra dev: **Docker = jalur jalan utama** (`docker-compose.yml` — `mysql` · `redis` · `app` · `horizon` · `scheduler` · `reverb`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi selesai kecuali dokumen (D5′), lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**:
+* Infra dev: **Docker = jalur jalan utama** (`docker-compose.yml` — `mysql` · `redis` · `app` · `horizon` · `scheduler` · `reverb`). **Frontend/Vite tetap native** di Windows, bukan container. Migrasi selesai, lihat **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**; cara jalan & "setelah mengubah X": `docs/SETUP-GUIDE.md §1–§3`:
   * ✅ **Sudah jadi keadaan:** MySQL 8.4 (DB dev + test) · app Laravel di container (PHP 8.3 + `pdo_mysql`/`pcntl`/`posix`/`gd`/`zip`/`redis`) · **Redis 7 untuk queue/cache/session** · **Horizon jalan** (`docker compose exec app php artisan horizon:status`) · **scheduler** (`schedule:work` — `NoShowSweepJob` benar-benar jalan) · **Reverb** (port 8080; PHP publish ke `reverb:8080`, browser ke `localhost:8080`).
   * 🔒 **Dua pengaman yang JANGAN dicabut** (keduanya pernah absen dan suite tetap hijau — D6′): (1) `--no-reload` di `CMD` `docker/php/Dockerfile` — tanpanya server web container membuang env compose dan diam-diam membaca `.env`/SQLite; (2) `tests/TestCase.php` menyalin `$_ENV`→`$_SERVER` + `force="true"` di `phpunit.xml` — tanpa **keduanya**, test di container menembak DB dev `tas` + Redis sungguhan.
-  * ⚠️ **Jalur native Windows = untuk `composer test` saja** (driver `database`, tanpa ekstensi redis). `composer dev` / `artisan serve` / `reverb:start` native **jangan** dinyalakan bersamaan container (port 8000/8080 bentrok; `serve` pindah diam-diam ke 8001 dengan DB SQLite).
-  * **Dua jalur test sama-sama sah:** `composer test` di Windows (MySQL lewat port host 3307) **dan** `docker compose exec app composer test` (MySQL lewat jaringan compose). Container ~1,7× lebih lambat karena bind mount NTFS — diukur, diterima sadar, lihat ADR-0007.
-  * Checkpoint terakhir era native: tag git **`pre-docker`**.
+  * 📦 **`vendor/` container ada di named volume `tas-vendor`, terpisah dari `vendor/` Windows** (bind mount NTFS membuat tiap request ~3,4 dtk; dengan volume 0,12 dtk — `SETUP-GUIDE §17a`). Konsekuensi: **setiap `composer.lock` berubah → `docker compose run --rm --no-deps app composer install`** (+ `composer install` di Windows bila memakai jalur native). Lupa → `Class not found`.
+  * ⚠️ **Jalur native Windows = test / IDE / PHPStan / e2e saja** (driver `database`, tanpa ekstensi redis). `composer dev` / `artisan serve` / `reverb:start` native **jangan** dinyalakan bersamaan container (port 8000/8080 bentrok; `serve` pindah diam-diam ke 8001 dengan DB SQLite).
+  * **Dua jalur test sama-sama sah:** `docker compose exec app composer test` (±30 dtk) **dan** `composer test` di Windows (MySQL port host 3307, ±36 dtk, 3 test Redis dilewati).
+  * Era native Windows + SQLite (dan panduannya): tag git **`pre-docker`** — tidak berlaku di `main`.
 * CI: GitHub Actions — `.github/workflows/ci.yml` (2 job: backend Pint/PHPStan/Pest · frontend Vitest/vue-tsc/build). Cara pakai & baca kegagalan: `docs/SETUP-GUIDE.md §14`. **Gerbang baru wajib ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
 ## Aturan layer (non-negotiable)
@@ -77,12 +78,12 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 
 ### Cache
 * Invalidasi selektif saat booking/cancel: **explicit-key `Cache::forget`** (lihat `SlotRepository`). Jangan `Cache::flush()`.
-* **Status `Cache::tags` (diperbarui D3′):** Redis sudah dipakai di container, jadi tagging **kini secara teknis mungkin** — tapi refaktornya **sengaja BELUM dikerjakan**, dipisah dari migrasi infra supaya perubahan perilaku cache tak bercampur dalam commit yang sulit di-*revert*. Selama jalur native Windows (driver `database`, tak mendukung tagging) masih didukung, `Cache::forget` eksplisit **tetap satu-satunya yang benar di kedua jalur**. Jangan pakai `Cache::tags` sebelum keputusan itu diambil terpisah.
+* **Status `Cache::tags`:** secara teknis kini mungkin di semua jalur yang dipakai — app pakai Redis, test pakai store `array` (keduanya mendukung tag); satu-satunya store yang tak mendukung (`database`) hanya milik `composer dev` native yang tak lagi jadi jalur jalan. Refaktornya **sengaja BELUM dikerjakan** dan butuh keputusan terpisah (commit sendiri, supaya perubahan perilaku cache bisa di-*revert* sendirian). Sampai diputuskan: tetap `Cache::forget` eksplisit, jangan pakai `Cache::tags`.
 * Endpoint publik ketersediaan slot (`GET /api/v1/slots/availability`) di-poll banyak transporter → `Cache::flexible($key, [10, 30], $cb)` (anti-stampede).
 
 ### Queue
 * Job: `implements ShouldQueue, ShouldBeUnique`. Set `$tries`, `$backoff`, `uniqueId()`, `failed()`.
-* ✅ **`ShouldBeUnique` dijaga `tests/Feature/Hardening/RedisUniqueJobTest.php`** (D3′) — menguji **perilaku** di atas Redis nyata: duplikat ditahan selama job pending, reminder hasil reschedule tetap lolos. Sebelumnya mustahil karena `QUEUE_CONNECTION=sync` melepas lock seketika, jadi yang dijaga cuma string `uniqueId()`. Test ini **skip** kalau Redis tak terjangkau (normal di native Windows) → service `redis` **wajib** ada di CI.
+* ✅ **`ShouldBeUnique` dijaga `tests/Feature/Hardening/RedisUniqueJobTest.php`** (D3′) — menguji **perilaku** di atas Redis nyata: duplikat ditahan selama job pending, reminder hasil reschedule tetap lolos. Sebelumnya mustahil karena `QUEUE_CONNECTION=sync` melepas lock seketika, jadi yang dijaga cuma string `uniqueId()`. Test ini **skip** tanpa ekstensi `redis` (native Windows) atau tanpa Redis terjangkau → service `redis` **wajib** ada di CI.
 * `AppointmentReminderJob` (H-2 jam) → `uniqueId()` = **`{appointmentId}:{slotWindowId}`**, BUKAN appointment id saja. Window ikut karena lock `ShouldBeUnique` bertahan selama job masih pending: dengan appointment id saja, reminder baru hasil reschedule dibuang diam-diam dan sopir tak pernah diingatkan (temuan ronde 4). Dijaga `RedisUniqueJobTest`.
 * `NoShowSweepJob` (cron tiap 5 menit) → `WithoutOverlapping`, tandai appointment lewat grace period jadi `NO_SHOW` + balikin kuota.
 * `ProcessGateEventJob` → `WithoutOverlapping` per appointment.
@@ -95,11 +96,13 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 ## Perintah
 
 ```bash
-composer test            # pest --parallel
-composer analyse         # phpstan level 8
-composer fix             # pint
 docker compose up -d     # SELURUH stack dev: mysql redis app(:8000) horizon scheduler reverb(:8080)
+docker compose exec app composer test      # pest --parallel (native Windows: `composer test`)
+docker compose exec app composer analyse   # phpstan level 8
+docker compose exec app composer fix       # pint
 docker compose exec app php artisan migrate:fresh --seed   # reset + demo data di MySQL `tas` (docs/DUMMY-DATA.md)
+docker compose run --rm --no-deps app composer install     # tiap composer.lock berubah (vendor/ container terpisah)
+docker compose exec app php artisan horizon:terminate      # setelah edit kode job/listener
 composer dev             # NATIVE ONLY (SQLite) — jangan bersamaan container, lihat §Stack
 npm run dev | test:js | type-check | build   # `type-check` & `build` ikut gerbang CI
 ```
@@ -113,15 +116,7 @@ Alur: brainstorm di mobile (claude.ai) → eksekusi presisi di Claude Code. CLAU
 2. **Plan dulu, kode belakangan.** Sebutkan file yang akan dibuat/diubah + test yang ditulis. Tunggu OK bila lingkupnya besar.
 3. Kerjakan **1 vertical slice per sesi** (1 Action + test + wiring), bukan seluruh fitur sekaligus. Konteks tetap ramping.
 
-**Urutan build (sekali di awal):**
-1. Scaffold Laravel 12 + Pest + PHPStan(8) + Pint + GitHub Actions. (Docker Compose **tidak** dipakai — dev native, lihat §Stack.)
-2. Install paket inti (konfirmasi via `composer.json` dulu): Sanctum, Horizon, Reverb, Spatie Permission/Activity Log/Laravel Data.
-3. Migrasi + Model + Factory dari `BUSINESS-FLOW.md §4`, lalu jalankan seeder yang sudah ada.
-4. Contracts + Repository (`SlotRepositoryInterface`, `AppointmentRepositoryInterface`) → bind di `AppServiceProvider`.
-5. DTO (Laravel Data) + Form Request + API Resource.
-6. **Mulai dari jantung domain:** slot availability → `BookAppointmentAction` (di sinilah race condition diuji). Baru gate-in/out, reschedule, cancel, lalu `NoShowSweepJob`.
-7. Event/Listener + Job + Policy + channel Reverb.
-8. Frontend Vue belakangan, setelah API stabil & ber-test.
+**Urutan build awal sudah selesai** (foundation → booking → gate/reschedule/cancel → job → realtime → SPA). Fitur baru mengikuti loop di bawah + skill `/slice`.
 
 **Loop per Action (TDD, wajib):**
 ```
@@ -139,7 +134,7 @@ Alur: brainstorm di mobile (claude.ai) → eksekusi presisi di Claude Code. CLAU
 
 * Jangan tambah package tanpa konfirmasi (cek `composer.json` dulu).
 * Jangan ubah migrasi yang sudah jalan di prod — buat migrasi baru.
-* Jangan taruh secret di kode. `.env` only.
+* Jangan taruh secret di kode. `.env` only. (Kredensial **khusus dev lokal** yang sengaja ter-commit — password MySQL `secret`, kunci Reverb di `.env.example` — bukan secret; produksi wajib nilai acak.)
 * Jangan bikin file baru kalau bisa edit yang ada.
 * Jangan skip test saat ubah Action/Repository.
 * Jangan kurangi/tambah kuota slot langsung lewat update Model — selalu lewat Action ber-lock.

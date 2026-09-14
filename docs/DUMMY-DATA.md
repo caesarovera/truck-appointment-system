@@ -1,17 +1,17 @@
 # docs/DUMMY-DATA.md — truck-appointment-system
 
-Jalankan: `docker compose exec app php artisan migrate:fresh --seed` (di container, DB `tas`)
-atau `php artisan migrate:fresh --seed` (jalur native, DB SQLite). Sejak ADR-0007 keduanya
-mengisi **database yang berbeda** — lihat `SETUP-GUIDE §16d`.
+Jalankan: `docker compose exec app php artisan migrate:fresh --seed` — mengisi DB dev `tas` di
+container (**menghapus isi sebelumnya**). Test tak pernah menyentuh DB ini (`SETUP-GUIDE §6`).
+`DatabaseSeeder` memanggil `RolePermissionSeeder` (role & permission duluan) lalu `DemoSeeder`.
 
-**Prasyarat:** `DatabaseSeeder.php` (bawaan Laravel, sudah ada) harus memanggil keduanya dengan urutan ini:
-```php
-$this->call([
-    RolePermissionSeeder::class, // role & permission duluan
-    DemoSeeder::class,
-]);
-```
-`DatabaseSeeder` memanggil `RolePermissionSeeder` lalu `DemoSeeder`.
+> **Data relatif ke tanggal seed** (`Carbon::today()`): "hari ini/kemarin/besok" = tanggal saat
+> perintah di atas dijalankan. DB yang di-seed beberapa hari lalu tak punya window hari ini — seed
+> ulang sebelum curiga ke kode.
+>
+> **Scheduler benar-benar jalan** (service `scheduler`). Appointment `BOOKED`/`CONFIRMED` yang
+> window-nya lewat grace 30 menit ditandai `NO_SHOW` oleh `NoShowSweepJob` dalam ≤5 menit — jadi
+> `CONFIRMED` "hari ini" untuk jam yang sudah lewat tak lama berubah status. Itu perilaku domain
+> yang benar. Butuh data gate-in segar: seed ulang, atau buka window baru sebagai planner.
 
 ## Yang dibuat
 
@@ -46,5 +46,3 @@ $this->call([
 - 1× `CANCELLED` besok.
 
 Tiap appointment punya `booking_code`, 1 container, dan terhubung ke truk+sopir company yang benar — sehingga Policy `company_id` & `driver_id` bisa langsung diuji.
-
-> Catatan: seeder mengasumsikan model & migrasi sudah dibuat sesuai entitas di `BUSINESS-FLOW.md §4`. Bangun model/migrasi dulu di Claude Code, baru jalankan seeder.

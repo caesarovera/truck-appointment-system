@@ -68,7 +68,7 @@ jobs:
         with:
           php-version: '8.3'
           # pcntl/posix dibutuhkan Horizon. Di Windows keduanya tak ada — makanya
-          # dev lokal perlu --ignore-platform-req (lihat SETUP-GUIDE §3b). Di Linux
+          # jalur native Windows perlu --ignore-platform-req (lihat SETUP-GUIDE §4). Di Linux
           # keduanya tersedia, jadi CI TIDAK memakai flag itu: composer install di
           # sini memverifikasi dependensi apa adanya, tanpa pengecualian.
           # gd: dipakai endroid/qr-code (PngWriter) buat generate gambar QR
@@ -77,8 +77,8 @@ jobs:
           # lupa ditambah, tapi QrImageTest akan meledak runtime. Eksplisit di
           # sini biar tak bergantung asumsi "ubuntu runner biasanya sudah ada gd".
           # pdo_mysql: WAJIB sejak D1 — test berjalan di MySQL (lihat services: di atas).
-          # pdo_sqlite/sqlite3 dipertahankan: .env.example masih DB_CONNECTION=sqlite dan
-          # dipakai perintah artisan di luar test.
+          # pdo_sqlite/sqlite3 dipertahankan: .env.example masih DB_CONNECTION=sqlite (nilai
+          # jalur native) dan dipakai perintah artisan di luar test, mis. key:generate di bawah.
           # redis: dibutuhkan RedisUniqueJobTest (slice D3'). Tanpa ekstensi ini test
           # tersebut otomatis skip, dan gerbangnya tak berlaku di CI.
           extensions: pcntl, posix, pdo_mysql, pdo_sqlite, sqlite3, mbstring, gd, redis
@@ -112,10 +112,10 @@ jobs:
 
       - name: Pest
         if: ${{ !cancelled() }}
-        # phpunit.xml sudah memuat nilai default yang cocok untuk mesin dev (port 3307,
-        # karena laragon memakai 3306 di sana). Di CI port-nya 3306. PHPUnit TIDAK
-        # menimpa env var yang sudah ada di environment — tanpa force="true" — jadi
-        # nilai di sini menang tanpa perlu menyentuh phpunit.xml.
+        # phpunit.xml memuat default untuk mesin dev (port 3307, karena laragon memakai 3306
+        # di sana). Di CI port-nya 3306. DB_HOST/DB_PORT di phpunit.xml sengaja TANPA force,
+        # jadi nilai di sini menang. DB_DATABASE di-force (tas_testing, sama dengan di sini) —
+        # isolasi test tak boleh ditentukan environment; lihat SETUP-GUIDE §6.
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1

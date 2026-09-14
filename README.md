@@ -12,28 +12,23 @@ Arsitektur **API-first decoupled**: Laravel 12 (REST API murni) + Vue 3 (SPA ter
 ## Stack
 **Backend:** Laravel 12 · PHP 8.3+ · Sanctum · Reverb (WebSocket) ·
 Spatie Permission/Activity Log/Laravel Data · Pest · PHPStan level 8 (Larastan) · Pint.
-Queue/cache/session: **Redis 7 + Horizon di container** (sudah dipakai, bukan lagi target);
-jalur native Windows masih driver `database`. Lihat [`CLAUDE.md`](CLAUDE.md) §Stack.
+**Dev = Docker** ([ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)): MySQL 8.4 · Redis 7
+(cache/session/queue) · app Laravel · Horizon · scheduler · Reverb — 6 service di
+`docker-compose.yml`. Frontend (Vite) tetap native. PHP native Windows hanya untuk test/IDE/e2e.
+Kenapa lingkungannya berbentuk begini: [`docs/SETUP-GUIDE.md §17`](docs/SETUP-GUIDE.md#17-docker-app-di-container--kenapa-bentuknya-begini).
 
-> ⏳ **Migrasi ke Docker sedang berjalan** — [**ADR-0007**](docs/adr/0007-docker-redis-mysql-migration.md).
-> **Sudah jadi kenyataan:** **MySQL** untuk test (sqlite tak menerbitkan `SELECT … FOR UPDATE`,
-> sehingga gerbang anti-race mustahil jujur di atasnya), **app Laravel di container**, serta
-> **Redis + Horizon** untuk queue/cache/session. Horizon akhirnya benar-benar jalan — `ext-pcntl`
-> yang ia tuntut tak pernah ada di PHP Windows.
-> **Belum:** Reverb di container (opsional, sudah jalan native).
-> **Sebelum menjalankan apa pun: `docker compose up -d`.** Jalur native Windows **tetap
-> didukung** — lihat [`docs/SETUP-GUIDE.md §16-§17`](docs/SETUP-GUIDE.md).
-> Checkpoint terakhir era native ada di tag git `pre-docker`.
+> Riwayat: sampai 2026-09-12 proyek ini dev native Windows + SQLite. Keadaan itu (dan panduannya)
+> tersimpan di tag git **`pre-docker`** — **tidak** lagi berlaku di `main`.
 
 **Frontend:** Vue 3 (`<script setup>` + TS) · Pinia · Vue Router · TanStack Query ·
 Axios · Vitest (di `resources/js`, lihat [`docs/FRONTEND.md`](docs/FRONTEND.md)).
 
-Status: backend MVP API lengkap & ber-test (**262 Pest**, termasuk test konkurensi booking
-lintas-proses); SPA mencakup UI **4 persona**
+Status: backend MVP API lengkap & ber-test (Pest, termasuk test konkurensi booking lintas-proses di
+MySQL sungguhan); SPA mencakup UI **4 persona**
 (transporter, driver, gate-officer, planner) + **CRUD master data admin** (terminal/gate/
 company/user/**role & izin**) + **CRUD armada truk transporter** + **riwayat gate-in/out**
-+ **QR gate-in (token ter-sign)** + **realtime kuota/antrian live (Reverb + Echo)**
-(**111 Vitest**). Detail hidup: [`HANDOVER.md`](HANDOVER.md).
++ **QR gate-in (token ter-sign)** + **realtime kuota/antrian live (Reverb + Echo)** (Vitest).
+Angka test terkini & detail hidup: [`HANDOVER.md`](HANDOVER.md) §Status.
 
 **CI:** tiap push ke `main` & tiap PR menjalankan ulang semua gerbang di mesin bersih —
 backend (Pint · PHPStan lvl 8 · Pest) dan frontend (Vitest · vue-tsc · build) sebagai dua job
@@ -49,7 +44,7 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 1. **README ini** — gambaran + cara jalankan (di bawah).
 2. [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — panduan developer baru (peta mental + tahapan).
 3. [`CLAUDE.md`](CLAUDE.md) — kontrak arsitektur. **Wajib sebelum menulis kode.**
-4. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — siapkan & jalankan project langkah-demi-langkah.
+4. [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) — jalankan project (Docker) + operasional sehari-hari.
 5. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — pola arsitektur, peta folder, trace request antar-lapisan.
 6. [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) — domain: RBAC, state machine, alur, ERD.
 7. [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) (backend) & [`docs/FRONTEND.md`](docs/FRONTEND.md) (SPA) — "kenapa" tiap kode.
@@ -63,7 +58,7 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 | [`CLAUDE.md`](CLAUDE.md) | **Kontrak arsitektur** (aturan layer, hardening, larangan) | sebelum menulis kode apa pun |
 | [`docs/PRD.md`](docs/PRD.md) | **Kenapa** & batas scope MVP | menentukan scope |
 | [`docs/BUSINESS-FLOW.md`](docs/BUSINESS-FLOW.md) | **Apa**-nya: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema |
-| [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Buku panduan setup & build manual** langkah-demi-langkah (**§14 = CI**) | menyiapkan/menjalankan project · CI merah |
+| [`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md) | **Menjalankan & mengoperasikan** (Docker): clone → jalan, "setelah mengubah X", test, endpoint, troubleshooting, **§14 CI**, §17 kenapa lingkungannya begini | menyiapkan/menjalankan project · CI merah · ada yang aneh di container |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Pola arsitektur & peta folder** + trace request antar-lapisan | memahami struktur & aliran besar |
 | [`docs/adr/`](docs/adr/) | **Architecture Decision Records** — keputusan beralasan ("kenapa dulu begini") | sebelum mengubah keputusan arsitektur |
 | [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md) | **Penjelasan detail kode backend** + contoh | memahami "kenapa" sebuah kode backend |
@@ -75,26 +70,33 @@ glosarium, rencana minggu pertama, latihan, dan FAQ. Ringkasnya, urutan baca:
 
 ## Mulai cepat
 
+Prasyarat: **Docker Desktop**, **Git**, **Node 22**. (PHP di Windows opsional — SETUP-GUIDE §4.)
+Diverifikasi dari clone kosong, total ±1 menit:
+
 ```bash
-# Prasyarat: PHP 8.3+, Composer 2.8+, Docker, driver pdo_sqlite + pdo_mysql aktif (SETUP-GUIDE §1)
 cp .env.example .env
-php artisan key:generate
-php artisan migrate:fresh --seed     # bikin skema + data demo (app masih SQLite)
+docker compose run --rm --no-deps app composer install
+docker compose run --rm --no-deps app php artisan key:generate
+docker compose up -d --wait                                # mysql redis app horizon scheduler reverb
+docker compose exec app php artisan migrate:fresh --seed   # skema + data demo
 
-docker compose up -d # WAJIB sebelum test: MySQL untuk Pest (SETUP-GUIDE §16)
-composer test        # pest
-composer analyse     # phpstan level 8
-composer fix         # pint
+npm install
+npm run dev          # terminal lain — Vite HMR
+# buka http://localhost:8000  (bukan :5173) — login dispatcher@majulog.test / password
 
-# Frontend (SPA Vue di resources/js) — buka app di http://localhost:8000
-php artisan serve    # shell + API (port 8000)
-npm install && npm run dev   # Vite HMR (di terminal lain)
-npm run test:js      # Vitest
-npm run build        # bundel produksi → public/build
+# Gerbang kualitas
+docker compose exec app composer test       # Pest
+docker compose exec app composer analyse    # PHPStan level 8
+docker compose exec app composer fix        # Pint
+npm run test:js && npm run type-check && npm run build
 ```
 
-Detail tiap langkah, troubleshooting, dan contoh output: **[`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md)**
-(frontend: §9a, daftar endpoint: §10d).
+> **Jangan** jalankan `composer dev` / `php artisan serve` native bersamaan container — port 8000
+> bentrok dan `serve` diam-diam pindah ke 8001 dengan database lain (SQLite).
+
+Setelah `git pull` yang mengubah `composer.lock`: `docker compose run --rm --no-deps app composer install`.
+Semua "setelah mengubah X", troubleshooting, dan endpoint: **[`docs/SETUP-GUIDE.md`](docs/SETUP-GUIDE.md)**
+(§3 sehari-hari, §9a frontend, §10d endpoint, §11 troubleshooting).
 
 ## Akun demo
 Password semua `password`. Mis. `admin@tas.test`, `planner@tas.test`,

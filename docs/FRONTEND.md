@@ -5,9 +5,9 @@
 > `resources/js`, decoupled penuh dari Laravel (REST `/api/v1` + token Sanctum), bukan
 > Inertia. Stack & pin versi: lihat `HANDOVER.md`.
 >
-> Cara menjalankan: `php artisan serve` (port 8000, shell + API) **dan** `npm run dev`
-> (Vite HMR). App dibuka di `http://localhost:8000`, bukan port Vite. Detail di
-> `SETUP-GUIDE.md §9a`.
+> Cara menjalankan: `docker compose up -d` (app Laravel di container, port 8000) **dan**
+> `npm run dev` (Vite HMR, native). App dibuka di `http://localhost:8000`, bukan port Vite.
+> Detail (termasuk jebakan `public/hot` basi): `SETUP-GUIDE.md §9a`.
 
 ---
 

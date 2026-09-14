@@ -1,6 +1,6 @@
 # ADR-0007 — Migrasi ke Docker penuh + Redis + MySQL; test konkurensi didahulukan
 
-**Status:** Accepted · 2026-09-12
+**Status:** Accepted · 2026-09-12 · **dieksekusi penuh 2026-09-14** (D1–D6′ + D5′ dokumen; lihat *Catatan eksekusi*)
 
 ## Context
 
@@ -235,6 +235,35 @@ responsnya 200 atau test-nya hijau:*
 
 *Temuan terbuka.* OPcache mati untuk SAPI CLI → tiap request ~3 detik di jalur yang kini utama.
 Detail & kandidat fix: `HANDOVER` §Temuan D6′.
+
+**[2026-09-14] Kecepatan app di container + clone kosong + D5′ (dokumen) — migrasi selesai.**
+
+1. **Koreksi atas catatan D2′ "`vendor/` sengaja tidak di named volume".** Begitu Docker jadi jalur
+   utama, app di container butuh median **3,4 dtk** per request API (lonjakan 8 dtk). Diukur
+   bertahap: `opcache.enable_cli=1` sendirian **tak membantu** (4,0 dtk) walau OPcache terbukti
+   aktif; eksperimen `validate_timestamps=0` → 0,2 dtk, jadi biayanya `stat()` ~925 berkas per request
+   lewat bind mount NTFS — 816 di antaranya `vendor/`. `validate_timestamps=0` **ditolak** (kode lama
+   jalan diam-diam sampai restart). Diputuskan: `vendor/` di named volume `tas-vendor` **hanya di
+   dalam container** + OPcache CLI dengan `validate_timestamps=1` → **0,12 dtk** beruntun, 0,68 dtk
+   setelah idle, edit PHP tetap terlihat; suite di container 68 → ±30 dtk (kini lebih cepat dari
+   native). Alasan D2′ ("IDE & PHPStan host jadi buta") keliru: host tetap memegang `vendor/`
+   sendiri. Harganya **dua `composer install`** saat `composer.lock` berubah. Repo **tetap** tidak
+   dipindah ke WSL2 — angka sekarang tak lagi menuntutnya. Khusus dev; produksi memanggang kode +
+   vendor ke image.
+2. **Clone kosong diuji** (stack terisolasi: project, container, volume, dan port terpisah). Temuan:
+   `.env.example` mengosongkan kunci Reverb, sehingga dengan compose yang memaksa
+   `BROADCAST_CONNECTION=reverb` **setiap job broadcast gagal** (`Pusher error: Not found`) sementara
+   booking tetap 201. Diisi nilai khusus dev (preseden: password MySQL dev `secret` sudah ter-commit).
+   Setelahnya clone kosong → app jalan ±1 menit, realtime domain end-to-end lulus, 265 test lulus.
+3. **D5′ (dokumen).** `SETUP-GUIDE` ditulis ulang Docker-first (panduan build era native dihapus —
+   tersedia di `git show pre-docker:docs/SETUP-GUIDE.md`); `README`, `ONBOARDING`, `CLAUDE.md`,
+   `CODE-WALKTHROUGH`, `DUMMY-DATA`, `FRONTEND`, `HANDOVER` disinkronkan; klaim yang terbukti salah
+   diberi penanda koreksi, bukan dihapus diam-diam.
+
+*Status butir "Kapan ditinjau ulang" di bawah per 2026-09-14:* `Cache::tags` — kini mungkin di semua
+jalur yang dipakai (Redis & `array`), masih menunggu keputusan terpisah · Reverb — **dikerjakan**
+(D6′), bukan opsional: di container ia putus tanpa service sendiri · WSL2 — ditinjau dengan angka,
+**tidak** diperlukan setelah volume vendor.
 
 ## Kapan ditinjau ulang
 

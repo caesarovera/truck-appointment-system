@@ -10,23 +10,24 @@
 
 ---
 
-> ## ⏳ Dua hal yang harus kamu tahu sebelum mulai (per 2026-09-12)
+> ## Dua hal yang harus kamu tahu sebelum mulai
 >
-> **1. Proyek ini sudah pindah ke Docker, dan panduan ini belum seluruhnya menyusul.**
-> Per 2026-09-12: **MySQL, app Laravel, Redis, dan Horizon sudah jalan di container**
-> ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)). **Jalankan `docker compose up -d` dulu**
-> — tanpa itu `composer test` gagal konek. Langkah native di panduan ini masih didukung dan masih
-> benar untuk app, tapi bukan lagi satu-satunya jalur. Baca `SETUP-GUIDE §16–§18`.
-> Checkpoint terakhir era murni native: tag git **`pre-docker`**.
+> **1. Dev berjalan di Docker.** MySQL, Redis, app Laravel, Horizon, scheduler, dan Reverb adalah
+> service di `docker-compose.yml` ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)); hanya
+> Vite (frontend) yang native. Clone → app jalan ±1 menit: `SETUP-GUIDE §1`. Panduan era native
+> Windows + SQLite sudah usang dan hanya ada di tag git **`pre-docker`**.
 >
-> **2. Pelajaran terpenting proyek ini, dan ia lahir dari kesalahan nyata.** Sampai 2026-09-12,
-> dokumen mengklaim "race condition sudah teruji" — **tidak benar**. Test yang ada memanggil
-> Action dua kali **berurutan dalam satu proses**, jadi ia tetap hijau walau `lockForUpdate()`
-> dihapus total. Sudah ditutup (`tests/Concurrency/`), tapi cara menemukannya yang wajib kamu
-> tiru: **jangan tanya "apakah test hijau", tanya "apakah test ini MERAH kalau fitur yang
-> dijaganya saya rusak?"** — lalu rusak beneran dan jalankan. Namanya mutation testing, butuh
-> kurang dari satu menit, dan di proyek ini ia sudah dua kali menemukan gerbang bolong.
-> Detail: `CODE-WALKTHROUGH §J.1` & `§O.3`.
+> **2. Pelajaran terpenting proyek ini: "hijau" bukan bukti.** Dokumen proyek ini **tiga kali**
+> mengklaim sesuatu terverifikasi padahal tidak:
+> - **Race condition** — test memanggil Action dua kali berurutan dalam satu proses, jadi tetap
+>   hijau walau `lockForUpdate()` dihapus (`CODE-WALKTHROUGH §J.1`).
+> - **Isolasi test di container** — suite hijau sambil menulis ke DB dev (`SETUP-GUIDE §6`).
+> - **App di container** — `/up` membalas 200 padahal server web membaca SQLite, bukan MySQL
+>   (`SETUP-GUIDE §17c`).
+>
+> Dua kebiasaan yang menemukannya, wajib kamu tiru: **(a)** tanya *"apakah test ini MERAH kalau fitur
+> yang dijaganya saya rusak?"* — lalu rusak beneran dan jalankan (mutation testing, <1 menit);
+> **(b)** tanya *"data ini benar-benar mendarat di mana?"* — bukan sekadar "responsnya 200".
 
 ---
 
@@ -150,7 +151,7 @@ Target realistis. Setiap hari diakhiri dengan satu hasil nyata.
 | Hari | Fokus | Hasil akhir hari itu |
 |------|-------|----------------------|
 | **1** | Orientasi + kontrak (Tahap 0–1) | Paham peta mental & 3 aturan emas; bisa sebut larangan utama |
-| **2** | Jalankan project (Tahap 2) | `composer test` **260 hijau** + `npm run test:js` **111 hijau** di mesinmu (angka ini akan basi lagi, lihat `HANDOVER.md` §Status utk yang terkini); bisa login SPA |
+| **2** | Jalankan project (Tahap 2) | `docker compose exec app composer test` + `npm run test:js` hijau di mesinmu (angka terkini: `HANDOVER.md` §Status); bisa login SPA di `localhost:8000` |
 | **3** | Domain (Tahap 3) | Bisa gambar ulang state machine appointment & jelaskan 5 role |
 | **4** | Golden path (Tahap 4a) | Berhasil booking via curl + uji idempotency; paham `BookAppointmentAction` |
 | **5** | Latihan pertama | Selesaikan 1 latihan kecil (§12) lewat loop TDD; semua gerbang hijau |
@@ -165,7 +166,7 @@ Baca **persis** yang ditunjuk (jangan baca semua sekaligus).
 |------|-------------|---------|---------------|
 | **0. Orientasi** | `README.md` | — | "TAS menyelesaikan masalah apa dalam 1 kalimat?" |
 | **1. Kontrak** ⚠️ | `CLAUDE.md` → *Aturan layer*, *Hardening*, *JANGAN* | Tulis ulang 3 larangan utama | "Boleh `Model::create($request->all())`? Kenapa tidak?" |
-| **2. Hidupkan** | `docs/SETUP-GUIDE.md` §1–§9 (+ §11 Troubleshooting) | `migrate:fresh --seed` → `composer test` → `npm run test:js` | "Kenapa test pakai SQLite `:memory:`?" (SETUP §8c) |
+| **2. Hidupkan** | `docs/SETUP-GUIDE.md` §0–§3, §6, §9 (+ §11 Troubleshooting) | §1 dari clone → `composer test` di container → `npm run test:js` | "Kenapa test di container butuh DUA pengaman agar tak menulis ke DB dev?" (SETUP §6) |
 | **3. Domain** | `docs/BUSINESS-FLOW.md` §1 RBAC + §2 state machine | Login `admin` lalu `dispatcher@majulog.test`, bandingkan menu | "Kenapa planner **tidak** punya `appointment.write`?" (§1 ¹) |
 | **4a. Golden path** ⭐ | `docs/CODE-WALKTHROUGH.md` §A → **§J** | Booking via curl (SETUP §10d), ulangi dgn `Idempotency-Key` sama | "Apa yang mencegah 2 transporter rebut slot terakhir?" |
 | **4b. Melebar** | §K (auth), §L (policy) → sisanya sesuai tugas | — | "Beda *permission* vs *Policy*?" (§L) |
@@ -287,49 +288,49 @@ Junior hampir pasti kena ini; semua sudah pernah terjadi & dicatat:
 | PHPStan `property.notFound` pada `$this->route('x')->id` | Bertipe `object\|string` → `$m instanceof X ? $m->id : null` | §V.4 |
 | PHPStan "Strict comparison always false" (enum) | Tambah `@property AppointmentStatus $status` di model | SETUP §11 |
 | PHPStan `method.childReturnType` di factory `definition()` | Hapus docblock `@return array<...>` (warisi tipe induk) | SETUP §11 |
-| `Cache::tags() does not support tagging` | Muncul di jalur native (store `database`). Redis di container mendukung tag, tapi refaktornya **sengaja belum dikerjakan** → tetap key eksplisit + `Cache::forget` di kedua jalur | CLAUDE.md §Cache |
-| Horizon gagal di Windows | Butuh `ext-pcntl` yang tak ada di PHP Windows → **sudah jadi service container** sejak D3′: `docker compose up -d`, cek `docker compose exec app php artisan horizon:status`. **Reverb TIDAK butuh pcntl** — masih jalan native | SETUP §18 |
-| Test "menghapus" data dev | Aktifkan `:memory:` di `phpunit.xml` | SETUP §8c |
-| "could not find driver" saat migrate | Aktifkan `pdo_sqlite` + `sqlite3` di php.ini | SETUP §1 |
+| `Cache::tags() does not support tagging` | Store `database`/`file` tak mendukung tag. Proyek **sengaja** tetap key eksplisit + `Cache::forget` (refaktor ke tags belum diputuskan) | CLAUDE.md §Cache |
 | `Declaration ...::data() must be compatible` | Form Request sudah punya `data()`/`date()` → ganti nama (`toData()`) | SETUP §11 |
+| Test menghapus/mengubah data dev | Pengaman isolasi bocor — `phpunit.xml` `force` **dan** `tests/TestCase.php` wajib ada | SETUP §6 |
+| `Class "..." not found` di container setelah `git pull` | `composer.lock` berubah; `vendor/` container terpisah → `docker compose run --rm --no-deps app composer install` | SETUP §3 |
+| Edit kode job tak berefek | Horizon memegang kode lama → `docker compose exec app php artisan horizon:terminate` | SETUP §3 |
+| Buka app tapi datanya "beda" / port 8001 | `composer dev` native menyala bersamaan container (SQLite) — matikan | SETUP §3 |
+| Halaman SPA kosong | `public/hot` basi / Vite yatim | SETUP §9a |
 
 ---
 
 ## 10. Perintah harian
 
 ```bash
-# Setup / reset data
-php artisan migrate:fresh --seed     # skema baru + data demo
+# Menjalankan (seluruh backend + realtime + queue + scheduler)
+docker compose up -d                 # mysql redis app horizon scheduler reverb
+npm run dev                          # Vite HMR (terminal lain)
+# buka http://localhost:8000 — BUKAN :5173 (itu cuma server aset Vite)
+
+# Reset data demo
+docker compose exec app php artisan migrate:fresh --seed
 
 # Gerbang kualitas (backend) — urutan: fix → analyse → test
-composer fix                         # Pint (format)
-composer analyse                     # PHPStan level 8
-composer test                        # Pest (260 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
-./vendor/bin/pest --filter="Book"    # jalankan sebagian (cocokkan nama)
-
-# Menjalankan app
-php artisan serve                    # shell + API (buka http://localhost:8000)
-npm run dev                          # Vite HMR (terminal lain)
+docker compose exec app composer fix                      # Pint (format)
+docker compose exec app composer analyse                  # PHPStan level 8
+docker compose exec app composer test                     # Pest (angka terkini: HANDOVER.md §Status)
+docker compose exec app ./vendor/bin/pest --filter="Book" # jalankan sebagian (cocokkan nama)
 
 # Frontend
-npm run test:js                      # Vitest (111 hijau — angka ini akan basi lagi, lihat HANDOVER.md §Status utk yang terkini)
+npm run test:js                      # Vitest
 npm run type-check                   # vue-tsc
 npm run build                        # bundel produksi
 
-# Keenam perintah di atas juga dijalankan otomatis oleh CI tiap push/PR
+# Keenam gerbang di atas juga dijalankan otomatis oleh CI tiap push/PR
 # (.github/workflows/ci.yml). Jalankan dulu di lokal — jangan pakai push
 # berulang sebagai cara mencari tahu apa yang rusak. Detail: SETUP-GUIDE §14.
 
-# Realtime (Windows native — TANPA Docker):
-php artisan reverb:start             # websocket (butuh BROADCAST_CONNECTION=reverb + worker)
-php artisan queue:listen             # proses job broadcast (ShouldBroadcast → queue)
-
-# Horizon: SUDAH jadi service container sejak D3' — tak perlu dijalankan manual.
-docker compose up -d                 # menyalakan mysql + redis + app + horizon
+# Log & status
+docker compose logs -f app horizon scheduler reverb
 docker compose exec app php artisan horizon:status   # -> Horizon is running
 ```
 
-Buka app di **`http://localhost:8000`** (Laravel), **bukan** port 5173 (itu Vite HMR saja).
+**Jangan** menyalakan `composer dev` / `php artisan serve` / `php artisan reverb:start` native
+bersamaan container (port bentrok, database berbeda). Semua "setelah mengubah X": `SETUP-GUIDE §3`.
 
 ---
 
@@ -413,7 +414,7 @@ Semua password `password`: `admin@tas.test`, `planner@tas.test`, `gate@tas.test`
 | `CLAUDE.md` | **Kontrak arsitektur** (aturan layer, hardening, JANGAN) | sebelum menulis kode | rujuk terus |
 | `docs/ARCHITECTURE.md` | Pola arsitektur, peta folder, trace request antar-lapisan | memahami struktur besar | sekali + rujuk |
 | `docs/adr/` | Architecture Decision Records — alasan keputusan | sebelum mengubah keputusan arsitektur | rujuk |
-| `docs/SETUP-GUIDE.md` | Setup & build manual + endpoint + troubleshooting + **§14 CI** | menyiapkan/menjalankan · CI merah | sekali + rujuk |
+| `docs/SETUP-GUIDE.md` | Menjalankan (Docker) + sehari-hari + endpoint + troubleshooting + **§14 CI** + §17 kenapa lingkungannya begini | menyiapkan/menjalankan · CI merah · container aneh | sekali + rujuk |
 | `docs/BUSINESS-FLOW.md` | Domain: RBAC §1 · state machine §2 · alur §3 · ERD §4 | menyentuh status/akses/skema | rujuk per fitur |
 | `docs/CODE-WALKTHROUGH.md` | Penjelasan detail kode **backend** + "kenapa" | memahami kode backend | rujuk per slice |
 | `docs/FRONTEND.md` | Penjelasan detail **Vue SPA** + pola TanStack Query | memahami/menyentuh SPA | rujuk per fitur FE |

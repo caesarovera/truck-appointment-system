@@ -1,480 +1,291 @@
-# docs/SETUP-GUIDE.md — Buku Panduan Setup & Build Foundation (manual)
+# docs/SETUP-GUIDE.md — Menjalankan, Menguji & Mengoperasikan TAS (dev)
 
-> Panduan **langkah-demi-langkah tanpa AI/vibe coding**. Tujuannya: siapa pun bisa
-> membangun ulang foundation TAS dari nol persis seperti kondisi sekarang, lalu
-> menjalankan, menguji, dan memahami **kenapa** tiap langkah dilakukan.
+> Panduan **operasional** tanpa AI: dari `git clone` sampai app jalan, test hijau, dan paham
+> **kenapa** lingkungannya berbentuk begini.
 >
-> Posisi dokumen: ini *how-to operasional*. Aturan arsitektur ada di `CLAUDE.md`,
-> domain di `BUSINESS-FLOW.md`, status sesi di `HANDOVER.md`.
+> Posisi dokumen: *how-to*. Aturan arsitektur ada di `CLAUDE.md`, domain di `BUSINESS-FLOW.md`,
+> penjelasan kode di `CODE-WALKTHROUGH.md` / `FRONTEND.md`, status sesi di `HANDOVER.md`.
 >
-> Target akhir panduan ini: `migrate:fresh --seed` hijau · PHPStan lvl 8 bersih ·
-> Pint bersih · Pest hijau.
-
----
-
-> ## ⏳ §0–§13 menjelaskan jalur **NATIVE**; Docker ada di §16–§18
+> **Jalur utama = Docker** ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)). PHP native Windows
+> hanya dipakai untuk test/IDE/PHPStan/e2e (§4). Semua perintah & angka di dokumen ini dijalankan
+> ulang pada 2026-09-14, termasuk dari **clone kosong**.
 >
-> Langkah §0–§13 di bawah menggambarkan **dev native Windows** (PHP native, SQLite, driver
-> `database`). Jalur itu **masih didukung dan masih jalan** — tapi ia **bukan lagi satu-satunya**,
-> dan untuk beberapa hal ia bukan lagi yang utama.
->
-> **Sudah berubah per 2026-09-12** ([ADR-0007](adr/0007-docker-redis-mysql-migration.md)):
->
-> | Slice | Perubahan | Rinci |
-> |---|---|---|
-> | **D1** | `composer test` butuh **MySQL di Docker**, bukan sqlite `:memory:` | §16 |
-> | **D2′** | App Laravel jalan di container → `http://localhost:8000` | §17 |
-> | **D3′** | **Redis + Horizon** untuk cache/session/queue di container | §18 |
->
-> **Karena itu: `docker compose up -d` dulu sebelum menjalankan test apa pun.**
->
-> Yang **belum** berubah di §0–§13: app native masih SQLite + driver `database` (PHP Windows tak
-> punya ekstensi redis), dan frontend/Vite memang tetap native. Checkpoint terakhir era murni
-> native ada di tag git **`pre-docker`**.
->
-> **Batas pra-Docker ditandai tag git `pre-docker`.** Untuk membaca/menjalankan proyek persis
-> seperti dokumen ini: `git checkout pre-docker`.
+> **Panduan era pra-Docker** (build foundation dari nol di PHP native + SQLite: aktifkan ekstensi,
+> `composer require` tiap paket, publish config, dst.) **sudah usang dan dihapus dari sini**. Masih
+> utuh di git: `git show pre-docker:docs/SETUP-GUIDE.md`.
 
 ---
 
 ## Daftar Isi
-0. [Prasyarat & versi](#0-prasyarat--versi)
-1. [Aktifkan ekstensi PHP (SQLite)](#1-aktifkan-ekstensi-php-sqlite)
-2. [Siapkan project & environment](#2-siapkan-project--environment)
-3. [Install paket wajib](#3-install-paket-wajib)
-4. [Publish config & scaffolding paket](#4-publish-config--scaffolding-paket)
-5. [Bangun skema database (migrasi)](#5-bangun-skema-database-migrasi)
-6. [Bangun Enum, Model, Factory](#6-bangun-enum-model-factory)
-7. [Jalankan migrasi + seeder](#7-jalankan-migrasi--seeder)
-8. [Pasang tooling kualitas](#8-pasang-tooling-kualitas)
-9. [Menjalankan gerbang kualitas](#9-menjalankan-gerbang-kualitas) · [9a dev server](#9a-dev-server-php-artisan-serve-vs-npm-run-dev) · [9b quality gates](#9b-gerbang-kualitas-sebelum-commit)
-10. [Cara menulis & menjalankan test](#10-cara-menulis--menjalankan-test)
-11. [Troubleshooting (error nyata yang kami temui)](#11-troubleshooting)
-12. [Checklist verifikasi akhir](#12-checklist-verifikasi-akhir)
-13. [Lampiran: peta file yang dihasilkan](#13-lampiran-peta-file-yang-dihasilkan)
+0. [Prasyarat](#0-prasyarat)
+1. [Mulai dari clone (±1 menit)](#1-mulai-dari-clone-1-menit)
+2. [Peta service, port & URL](#2-peta-service-port--url)
+3. [Sehari-hari: perintah & "setelah mengubah X"](#3-sehari-hari-perintah--setelah-mengubah-x)
+4. [Jalur native Windows (test, IDE, PHPStan, e2e)](#4-jalur-native-windows-test-ide-phpstan-e2e)
+5. [Data demo & reset database](#5-data-demo--reset-database)
+6. [Isolasi test — dua pengaman yang wajib ada](#6-isolasi-test--dua-pengaman-yang-wajib-ada)
+7. [Environment (`.env`): native vs Docker](#7-environment-env-native-vs-docker)
+8. [Tooling kualitas (konfigurasi)](#8-tooling-kualitas-konfigurasi)
+9. [Frontend dev server & gerbang kualitas](#9-frontend-dev-server--gerbang-kualitas) · [9a dev server](#9a-dev-server-vite) · [9b gerbang kualitas](#9b-gerbang-kualitas-sebelum-commit)
+10. [Menulis & menjalankan test + referensi API](#10-menulis--menjalankan-test--referensi-api)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Checklist verifikasi](#12-checklist-verifikasi)
+13. [Peta file](#13-peta-file)
 14. [CI (GitHub Actions)](#14-ci-github-actions) · [14a untuk apa](#14a-untuk-apa-ci-ini-ada) · [14b apa yang dijalankan](#14b-apa-yang-dijalankan) · [14c cara memakai](#14c-cara-memakainya-sehari-hari)
 15. [E2E (Playwright) — lokal-only](#15-e2e-playwright--lokal-only)
-16. [Docker: MySQL untuk test (slice D1)](#16-docker-mysql-untuk-test-slice-d1)
-17. [Docker: app di container (slice D2′)](#17-docker-app-di-container-slice-d2)
-18. [Docker: Redis + Horizon (slice D3′)](#18-docker-redis--horizon-slice-d3)
+16. [Docker: MySQL & database test](#16-docker-mysql--database-test)
+17. [Docker: app di container — kenapa bentuknya begini](#17-docker-app-di-container--kenapa-bentuknya-begini)
+18. [Docker: Redis, Horizon, scheduler & Reverb](#18-docker-redis-horizon-scheduler--reverb)
 
 ---
 
-## 0. Prasyarat & versi
+## 0. Prasyarat
 
-Yang harus ada di mesin (versi yang teruji di sesi ini):
+| Tool | Wajib? | Untuk apa | Cek |
+|------|--------|-----------|-----|
+| Docker Desktop (Compose v2) | **wajib** | seluruh backend: MySQL, Redis, app, Horizon, scheduler, Reverb | `docker compose version` |
+| Git | **wajib** | — | `git --version` |
+| Node.js 22 + npm | **wajib** | Vite (SPA), Vitest, vue-tsc, build — frontend tetap native | `node -v` |
+| PHP 8.3 + Composer (Windows) | opsional | autocomplete IDE, PHPStan di host, `composer test` native, e2e — lihat §4 | `php -v` |
 
-| Tool | Versi teruji | Cek |
-|------|--------------|-----|
-| PHP | 8.3.31 | `php -v` |
-| Composer | 2.8.11 | `composer --version` |
-| Node.js + npm | LTS (untuk frontend nanti) | `node -v && npm -v` |
-| Git | apa saja | `git --version` |
-| (opsional) Docker | untuk **Horizon** & Redis/MySQL paritas produksi. **Reverb tidak butuh** — jalan native (lihat catatan di bawah) | `docker --version` |
-
-> **Catatan Windows/laragon:** PHP berada di
-> `C:\laragon\bin\php\php-8.3.31-Win32-vs16-x64\`. **Hanya Horizon** yang butuh
-> `ext-pcntl`/`ext-posix` (tak ada di PHP Windows native) → jalankan di Docker (Linux).
-> **Reverb TIDAK butuh ekstensi itu** — jalan native (`reverb:start` bind port di Windows,
-> terverifikasi 2026-07-25). Lihat langkah 3 & Troubleshooting.
-
-Verifikasi cepat:
-```bash
-php -v
-composer --version
-```
+Teruji di: Windows 11 + Docker Desktop (Compose v5.5), Node 22, PHP 8.3.31 (laragon).
 
 ---
 
-## 1. Aktifkan ekstensi PHP (SQLite)
+## 1. Mulai dari clone (±1 menit)
 
-Project default memakai **SQLite** (`DB_CONNECTION=sqlite`). PHP harus punya driver
-`pdo_sqlite`. Cek dulu:
+Urutan di bawah dijalankan pada **clone kosong** (tanpa `vendor/`, `node_modules/`, `.env`) —
+setiap langkah terverifikasi, angka durasi dari run itu.
 
 ```bash
-php -r "print_r(PDO::getAvailableDrivers());"
+git clone <repo> truck-appointment-system && cd truck-appointment-system
+cp .env.example .env                                           # (PowerShell: Copy-Item .env.example .env)
+
+docker compose run --rm --no-deps app composer install        # ±25 dtk — vendor/ milik container (§17)
+docker compose run --rm --no-deps app php artisan key:generate
+docker compose up -d --wait                                    # ±20 dtk — 6 service, lihat §2
+docker compose exec app php artisan migrate:fresh --seed       # ±7 dtk — skema + data demo di MySQL `tas`
+
+npm install
+npm run dev                                                    # terminal lain; Vite HMR (native)
 ```
 
-Kalau output **tidak** memuat `sqlite` (mis. hanya `mysql`), aktifkan ekstensi.
+Buka **`http://localhost:8000`**, login `dispatcher@majulog.test` / `password`.
 
-Edit `php.ini` (temukan lokasinya dengan `php --ini` → baris *Loaded Configuration File*).
-Cari dua baris ini dan **hapus tanda titik-koma** di depannya:
-
-```ini
-;extension=pdo_sqlite   →   extension=pdo_sqlite
-;extension=sqlite3      →   extension=sqlite3
-```
-
-Simpan, lalu verifikasi:
+Pastikan semuanya sehat:
 ```bash
-php -r "print_r(PDO::getAvailableDrivers());"
-# Harus muncul: Array ( [0] => mysql [1] => sqlite )
+docker compose exec app composer test          # 265 passed (±30 dtk)
+docker compose exec app php artisan horizon:status   # Horizon is running
 ```
 
-> **Kenapa:** tanpa driver ini, perintah `php artisan migrate` gagal dengan
-> `PDOException: could not find driver`.
+> **Kenapa `composer install` lewat container, bukan di Windows?** `vendor/` yang dipakai app
+> ada di **volume Linux** container (alasan & angka: §17). `composer install` di Windows mengisi
+> `vendor/` yang **lain** — perlu hanya untuk jalur native (§4).
+>
+> **Kenapa kunci Reverb di `.env.example` sudah terisi?** Nilai **khusus dev lokal**. Dengan kunci
+> kosong, setiap job broadcast gagal di Horizon (`Pusher error: Not found`) sementara booking tetap
+> 201 — realtime mati tanpa pesan. Detail: §7.
 
 ---
 
-## 2. Siapkan project & environment
+## 2. Peta service, port & URL
 
-Jika project sudah ada (kasus kita), cukup pastikan `.env` dan APP_KEY siap.
+| Service | Isi | Dari Windows | Dari container lain |
+|---------|-----|--------------|---------------------|
+| `mysql` | MySQL 8.4 — DB `tas` (dev) + `tas_testing*` (test), §16 | `127.0.0.1:3307` | `mysql:3306` |
+| `redis` | Redis 7 — cache/session/queue (`appendonly`) | `127.0.0.1:6379` | `redis:6379` |
+| `app` | `php artisan serve --no-reload` — API + shell SPA | **`http://localhost:8000`** | `app:8000` |
+| `horizon` | worker antrian (job, reminder, broadcast) | `http://localhost:8000/horizon` | — |
+| `scheduler` | `schedule:work` — `NoShowSweepJob` tiap 5 mnt, prune token harian | — | — |
+| `reverb` | WebSocket realtime | `ws://localhost:8080` (browser) | `reverb:8080` (publish PHP) |
+| *(native)* Vite | HMR aset SPA | `http://localhost:5173` — **bukan** entry point | — |
 
-```bash
-cd C:/Dev/Personal-Projects/truck-appointment-system
+Port kiri bisa digeser lewat `.env` (`DB_PORT_HOST`, `REDIS_PORT_HOST`, `APP_PORT`,
+`REVERB_PORT_HOST`). **3307, bukan 3306**: laragon di mesin dev memegang 3306.
 
-# 1) Buat .env kalau belum ada
-cp .env.example .env          # (Windows PowerShell: Copy-Item .env.example .env)
-
-# 2) Buat file database SQLite kosong
-#    (Bash)         touch database/database.sqlite
-#    (PowerShell)   New-Item -ItemType File database/database.sqlite
-
-# 3) Generate APP_KEY (wajib, untuk enkripsi/sesi/token)
-php artisan key:generate
-```
-
-Pastikan di `.env`:
-```env
-DB_CONNECTION=sqlite
-# DB_DATABASE dibiarkan default → file database/database.sqlite
-```
-
-> **Kenapa:** Laravel butuh `APP_KEY` untuk enkripsi. `DB_CONNECTION=sqlite`
-> membuat dev ringan tanpa server DB terpisah.
+> **Kenapa Reverb punya dua alamat:** di dalam container, `localhost` = container itu sendiri.
+> PHP mem-publish ke `reverb:8080` (env compose), browser tersambung ke `localhost:8080`
+> (`VITE_REVERB_*` di `.env`). Nilai `localhost` untuk PHP pernah membuat realtime putus di
+> container tanpa error — §18.
 
 ---
 
-## 3. Install paket wajib
+## 3. Sehari-hari: perintah & "setelah mengubah X"
 
-Paket-paket ini adalah **kontrak** (lihat `CLAUDE.md` → Stack). Pasang dalam 3
-kelompok agar mudah dibaca dan di-debug.
-
-### 3a. Paket runtime inti
 ```bash
-composer require \
-  laravel/sanctum \
-  spatie/laravel-permission \
-  spatie/laravel-activitylog \
-  spatie/laravel-data
+docker compose up -d                      # nyalakan (container juga hidup lagi sendiri setelah reboot)
+docker compose ps                         # mysql & redis harus "healthy"
+docker compose logs -f app horizon scheduler reverb
+docker compose exec app php artisan ...   # artisan apa pun, di dalam container
+docker compose exec app bash              # masuk ke container
+docker compose down                       # matikan (data TETAP di volume)
 ```
 
-### 3b. Horizon + Reverb (butuh flag platform di Windows)
-```bash
-composer require laravel/horizon laravel/reverb \
-  --ignore-platform-req=ext-pcntl \
-  --ignore-platform-req=ext-posix
-```
+**Setelah mengubah X, lakukan Y:**
 
-> **Kenapa flag itu:** **Horizon** men-*declare* `ext-pcntl`/`ext-posix` di composer.json-nya
-> yang tak tersedia di PHP Windows native → tanpa flag, `composer require`/`install` gagal.
-> Flag membuat Composer tetap menulis paket. **Saat dijalankan**, hanya Horizon yang butuh
-> Docker (Linux); **Reverb jalan native di Windows** (composer.json Reverb tak minta ekstensi
-> itu). `composer install` berikutnya di Windows tetap perlu flag selama Horizon terpasang.
+| Yang berubah | Yang harus dilakukan | Kenapa |
+|---|---|---|
+| Kode PHP (`app/`, `routes/`, `config/`…) | **tidak ada** — terlihat ≤2 dtk | OPcache `validate_timestamps=1` (§17) |
+| Kode job/listener yang dijalankan Horizon | `docker compose exec app php artisan horizon:terminate` | worker proses panjang memegang kode lama di memori |
+| `composer.lock` (`composer require`, `git pull`) | `docker compose run --rm --no-deps app composer install` **dan** (bila memakai §4) `composer install` di Windows | ada **dua** `vendor/` (§17); lupa yang container → error keras `Class not found` |
+| `.env` | `docker compose up -d --force-recreate app horizon scheduler reverb` | server web jalan dengan `--no-reload` (§17) |
+| `docker/php/Dockerfile` | `docker compose build && docker compose up -d` | image dibangun ulang |
+| `docker/mysql/init/` | `docker compose down -v && docker compose up -d` (**HAPUS DATA**) | skrip init hanya jalan saat volume kosong |
+| `package.json` / `package-lock.json` | `npm install` | frontend native |
 
-### 3c. Paket dev (test + analisis)
-```bash
-composer require --dev \
-  pestphp/pest \
-  pestphp/pest-plugin-laravel \
-  larastan/larastan \
-  --with-all-dependencies \
-  --ignore-platform-req=ext-pcntl \
-  --ignore-platform-req=ext-posix
-```
-
-Verifikasi tidak ada celah keamanan:
-```bash
-composer audit
-# Harapan: "No security vulnerability advisories found."
-```
-
-| Paket | Untuk apa |
-|-------|-----------|
-| `laravel/sanctum` | Auth token API + scope per role |
-| `spatie/laravel-permission` | RBAC (role & permission) |
-| `spatie/laravel-activitylog` | Audit trail perubahan status |
-| `spatie/laravel-data` | DTO (input/output terstruktur) |
-| `laravel/horizon` | Dashboard + worker queue Redis |
-| `laravel/reverb` | Server WebSocket (realtime kuota/antrian) |
-| `pestphp/pest` | Framework test |
-| `larastan/larastan` | PHPStan + pemahaman Eloquent (analisis statis) |
+> **`composer dev` = NATIVE ONLY.** Ia menjalankan `php artisan serve` + `queue:listen` di Windows
+> dengan SQLite. **Jangan** dinyalakan bersamaan container: port 8000 dipegang Docker, `serve`
+> diam-diam pindah ke 8001 dengan database lain, dan antriannya tak pernah dilihat Horizon. Sama
+> untuk `php artisan reverb:start` native (port 8080 bentrok).
 
 ---
 
-## 4. Publish config & scaffolding paket
+## 4. Jalur native Windows (test, IDE, PHPStan, e2e)
 
-### 4a. Scaffolding API (Sanctum)
+Opsional. Butuh PHP 8.3 dengan `pdo_mysql` (+ `pdo_sqlite`/`sqlite3` untuk e2e), dan **stack Docker
+tetap menyala** karena test memakai MySQL container.
+
 ```bash
-php artisan install:api
-```
-Ini membuat `routes/api.php`, mendaftarkannya di `bootstrap/app.php`, membuat
-`routes/channels.php`, dan migrasi `personal_access_tokens`.
-
-> **Catatan:** perintah ini juga mencoba `php artisan migrate`. Kalau langkah 1
-> (SQLite) belum beres, di sinilah ia gagal "could not find driver".
-
-### 4b. Publish migrasi/config Spatie
-```bash
-php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
-php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider"
+composer install --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
+composer test        # MySQL lewat 127.0.0.1:3307 → 262 passed + 3 skipped (±36 dtk)
+composer analyse     # PHPStan lvl 8
+composer fix         # Pint
 ```
 
-### 4c. Horizon & Reverb
-```bash
-php artisan horizon:install
-php artisan vendor:publish --provider="Laravel\Reverb\ReverbServiceProvider"
-```
-
-> **Realtime SUDAH tersambung ujung-ke-ujung (server + klien), 2026-07-25.** Event
-> `ShouldBroadcast` `SlotAvailabilityChanged`/`GateQueueUpdated` + listener + channel
-> auth (`bootstrap/app.php` → `withBroadcasting(..., ['middleware'=>['auth:sanctum']])`,
-> WAJIB bukan `web` karena SPA pakai Bearer token) + klien Echo (`resources/js/echo.ts`,
-> `composables/useRealtime.ts`) menyala di SlotAvailability & GateDashboard.
-> **Menyalakan (Windows native, TANPA Docker):** (1) `BROADCAST_CONNECTION=reverb` di
-> `.env` (default `log`); (2) `php artisan reverb:start` + `composer dev` (queue:listen
-> wajib — `ShouldBroadcast` ke queue dulu, tanpa worker event diam). **Reverb tak butuh
-> `ext-pcntl`** (cek: bind port di Windows native) — hanya Horizon yang butuh. TOS push
-> masih `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
+- **Kenapa flag platform:** Horizon men-*declare* `ext-pcntl`/`ext-posix`, yang tak ada di PHP
+  Windows. Flag hanya membuat Composer mau menulis paket; Horizon sendiri jalan di container.
+- **Kenapa 3 test dilewati:** `RedisUniqueJobTest` butuh ekstensi `redis`, yang tak ada di PHP
+  Windows. Di container dan CI ketiganya jalan — itulah sebabnya CI wajib punya service `redis`.
+- Test di container kini **lebih cepat** dari native (±30 vs ±36 dtk, §17) — native dipakai
+  terutama untuk IDE/PHPStan dan e2e (§15).
 
 ---
 
-## 5. Bangun skema database (migrasi)
-
-Semua migrasi ada di `database/migrations/`. Buat dengan:
-```bash
-php artisan make:migration create_terminals_table
-# ...dst untuk tiap tabel
-```
-Lalu isi sesuai ERD `BUSINESS-FLOW.md §4`. Urutan **penting** karena foreign key:
-
-```
-1. terminals
-2. gates                 (FK → terminals)
-3. transport_companies
-4. trucks                (FK → transport_companies)
-5. slot_windows          (FK → gates)
-6. appointments          (FK → companies, trucks, users, slot_windows)
-7. containers            (FK → appointments;  + slot_window_id nullable)
-8. gate_transactions     (FK → appointments, users)
-```
-
-Plus 1 perubahan kecil di migrasi **users** bawaan: tambah kolom
-`terminal_id` & `company_id` (nullable, ber-index, tanpa FK lintas-tabel agar
-`migrate:fresh` di SQLite tidak rewel soal urutan ALTER).
-
-Aturan hardening yang ditanam di skema (lihat `CLAUDE.md`):
-- `slot_windows`: unik `(gate_id, date, start_time)` + index `(gate_id, date, status)`.
-- `appointments`: `version` (optimistic lock), `booking_code` unik, banyak index status.
-- `containers`: unik `(slot_window_id, container_no)` — pertahanan terakhir anti
-  double-booking. `slot_window_id` nullable: saat cancel/no-show di-NULL-kan agar
-  kontainer bisa dipakai lagi (NULL ganda diizinkan SQLite & MySQL).
-- `gate_transactions`: unik `(appointment_id, type)` — cegah double gate-in/out.
-
-> **Kenapa enum disimpan sebagai `string` di DB, bukan `enum()` MySQL:** portabel
-> (SQLite + MySQL sama), dan tipe-amannya ditegakkan di level aplikasi via PHP Enum
-> (lihat langkah 6).
-
----
-
-## 6. Bangun Enum, Model, Factory
-
-### 6a. Enum (di `app/Enums/`)
-Lima enum: `AppointmentStatus`, `MoveType`, `SlotWindowStatus`,
-`GateTransactionType`, `TruckStatus`.
-
-`AppointmentStatus` **memuat state machine** (`BUSINESS-FLOW.md §2`) sebagai
-method, bukan sekadar daftar nilai:
-```php
-AppointmentStatus::BOOKED->canTransitionTo(AppointmentStatus::CONFIRMED); // true
-AppointmentStatus::COMPLETED->isFinal();                                  // true
-AppointmentStatus::CONFIRMED->holdsQuota();                               // true
-```
-> **Kenapa di enum:** satu sumber kebenaran transisi; Action tinggal memanggilnya,
-> tidak menyebar `if` status ke mana-mana.
-
-### 6b. Model (di `app/Models/`)
-8 model + update `User`. Yang penting:
-- `User`: tambah trait `HasApiTokens` (Sanctum) & `HasRoles` (Spatie), set
-  `protected string $guard_name = 'api';`, tambah `terminal_id`/`company_id` ke
-  `$fillable`, relasi `terminal()`/`company()`.
-- `Appointment`: pakai trait `LogsActivity` (audit), casts enum, relasi lengkap,
-  helper `isGatedIn()`, plus docblock `@property` (lihat catatan PHPStan).
-- `SlotWindow`: casts + helper `isOpen()`, `hasCapacity()`, `remaining()`.
-
-> **Wajib `@property` di model untuk PHPStan level 8.** Larastan menebak tipe kolom
-> dari DB sebagai `string`; tanpa anotasi `@property AppointmentStatus $status`,
-> perbandingan enum dianggap "selalu false". Anotasi memberi tahu tipe sebenarnya.
-
-### 6c. Factory (di `database/factories/`)
-Satu factory per model untuk test & seeding. Contoh state berguna:
-```php
-SlotWindow::factory()->nearlyFull()->create(); // sisa 1 slot → uji race
-SlotWindow::factory()->full()->create();        // penuh → uji 409
-Appointment::factory()->confirmed()->create();
-```
-
-> **Jebakan PHPStan pada factory:** JANGAN tulis `/** @return array<string,mixed> */`
-> di atas `definition()`. Induk `Factory::definition()` (versi Larastan) bertipe
-> `array<model property of TModel, mixed>` yang lebih sempit; menimpa dengan tipe
-> lebih lebar melanggar covariance → error `method.childReturnType`. Solusi:
-> **hapus docblock-nya** agar mewarisi tipe induk. (Detailnya di Troubleshooting.)
-
----
-
-## 7. Jalankan migrasi + seeder
+## 5. Data demo & reset database
 
 ```bash
-php artisan migrate:fresh --seed
+docker compose exec app php artisan migrate:fresh --seed   # reset total DB dev `tas`
 ```
 
-Urutan seeder diatur `database/seeders/DatabaseSeeder.php`:
-`RolePermissionSeeder` (role & permission dulu) → `DemoSeeder` (data demo).
+`RolePermissionSeeder` (5 role + permission, `BUSINESS-FLOW.md §1`) → `DemoSeeder` (7 akun, password
+semua `password`, 1 terminal + 2 gate, 2 perusahaan + armada + sopir, appointment di semua status).
+Detail akun: `docs/DUMMY-DATA.md`.
 
-Output yang diharapkan: semua migrasi `DONE`, lalu:
-```
-Database\Seeders\RolePermissionSeeder ... DONE
-Database\Seeders\DemoSeeder ........... DONE
-```
+Dua hal yang sering disangka bug:
+- **Data demo relatif ke tanggal saat seed** (`Carbon::today()`). DB yang di-seed beberapa hari lalu
+  tak punya window hari ini → seed ulang dulu sebelum curiga ke kode.
+- **Scheduler benar-benar jalan.** Appointment demo `BOOKED`/`CONFIRMED` yang window-nya lewat
+  grace (30 mnt) akan ditandai `NO_SHOW` oleh `NoShowSweepJob` dalam ≤5 menit. Itu perilaku
+  domain yang benar, bukan data rusak.
 
-Apa yang dibuat (lihat `docs/DUMMY-DATA.md`):
-- 5 role + permission sesuai matriks RBAC `BUSINESS-FLOW.md §1`.
-- 7 akun demo (password semua `password`), 1 terminal + 2 gate, 2 perusahaan +
-  armada + sopir, slot kemarin/hari-ini/besok, dan appointment menyentuh **semua**
-  status. Satu window hari ini sengaja **hampir penuh** untuk demo race.
-
-Cek cepat lewat tinker:
-```bash
-php artisan tinker
->>> App\Models\Appointment::count();
->>> App\Models\User::where('email','planner@tas.test')->first()->can('slot.manage'); // true
-```
+Test **tak pernah** menyentuh `tas` — lihat §6 & §16.
 
 ---
 
-## 8. Pasang tooling kualitas
+## 6. Isolasi test — dua pengaman yang wajib ada
 
-### 8a. PHPStan (`phpstan.neon` di root)
-```neon
-includes:
-    - vendor/larastan/larastan/extension.neon
-parameters:
-    level: 8
-    paths:
-        - app
-        - database
-        - routes
-    checkModelProperties: true
-```
+Test memakai `tas_testing` + `array`/`sync`/`null`, bukan DB dev + Redis + Reverb. Di dalam
+container itu **tidak otomatis**, karena service compose menyetel `DB_DATABASE=tas`,
+`CACHE_STORE=redis`, `BROADCAST_CONNECTION=reverb` sebagai env var sungguhan. Dua pengaman:
 
-### 8b. Pest (`tests/Pest.php`)
-```php
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Feature');
-pest()->extend(Tests\TestCase::class)->in('Unit');
-```
+1. **`force="true"`** pada baris isolasi di `phpunit.xml` (termasuk `DB_DATABASE`).
+2. **`tests/TestCase.php::createApplication()` menyalin `$_ENV` → `$_SERVER`.** `force` hanya
+   menulis `$_ENV` + `putenv()`, sedangkan `env()` Laravel membaca `$_SERVER` **lebih dulu**.
 
-### 8c. DB test in-memory (`phpunit.xml`)
-Aktifkan dua baris ini (hapus komentarnya):
-```xml
-<env name="DB_CONNECTION" value="sqlite"/>
-<env name="DB_DATABASE" value=":memory:"/>
-```
-> **Kenapa wajib:** `RefreshDatabase` akan *migrate fresh* tiap run. Tanpa
-> `:memory:`, ia akan **menghapus** isi `database/database.sqlite` (data demo dev).
-> In-memory = cepat + terisolasi + dev DB aman.
-
-### 8d. Shortcut composer (`composer.json` → scripts)
-```json
-"test": "pest --parallel",
-"analyse": "phpstan analyse --memory-limit=1G",
-"fix": "pint",
-"lint": "pint --test"
-```
-
-### 8e. Anti N+1 (`app/Providers/AppServiceProvider.php` → boot())
-```php
-Model::preventLazyLoading(! $this->app->isProduction());
-Model::preventAccessingMissingAttributes(! $this->app->isProduction());
-```
+**Keduanya wajib.** Tanpa salah satunya suite di container tetap **hijau** sambil memakai DB dev —
+dan satu `pest` non-paralel mengosongkannya (terbukti 2026-09-14: users 7 → 0). Aturannya:
+*environment boleh menentukan DI MANA (host/port DB), tidak boleh menentukan APAKAH test terisolasi.*
+`DB_HOST`/`DB_PORT` sengaja tanpa `force` karena berbeda antara Windows (`127.0.0.1:3307`),
+container (`mysql:3306`), dan CI (`127.0.0.1:3306`). Redis test memakai DB 15 (`REDIS_DB`), karena
+`RedisUniqueJobTest` mem-*flush*-nya.
 
 ---
 
-## 9. Menjalankan gerbang kualitas
+## 7. Environment (`.env`): native vs Docker
 
-### 9a. Dev server: `php artisan serve` vs `npm run dev`
+Satu berkas `.env` dibaca kedua jalur, dengan pembagian tegas:
 
-Untuk melihat app, buka **`http://localhost:8000`** (Laravel) — bukan `localhost:5173`.
-Port 5173 adalah Vite HMR server, bukan entry point app.
+| Kunci | Dipakai oleh | Di Docker |
+|-------|--------------|-----------|
+| `DB_*`, `CACHE_STORE`, `SESSION_DRIVER`, `QUEUE_CONNECTION`, `BROADCAST_CONNECTION`, `REDIS_*` | jalur native (`composer dev`, SQLite) | **ditimpa** env var `docker-compose.yml` — jangan diubah untuk Docker |
+| `APP_KEY`, `APP_*`, `MAIL_*`, `SANCTUM_EXPIRATION`, `TAS_*` | keduanya | dipakai apa adanya |
+| `REVERB_APP_ID/KEY/SECRET` | keduanya | dipakai apa adanya |
+| `REVERB_HOST/PORT/SCHEME` → `VITE_REVERB_*` | **browser** (dibaca Vite saat dev/build) | PHP memakai `reverb:8080` dari compose |
 
-| Situasi | Command |
-|---------|---------|
-| Lagi coding aktif | `php artisan serve` + `npm run dev` |
-| Hanya test fitur, tidak edit kode | `php artisan serve` saja (asal sudah ada hasil build) |
-| Deploy ke server | `npm run build` sekali, Vite tidak diperlukan lagi |
-
-**Tanpa `npm run dev`:** browser load JS/CSS dari hasil build terakhir di `public/build/`.
-Edit `.vue`/`.ts` → harus `npm run build` manual → refresh browser manual.
-
-**Dengan `npm run dev`:** Hot Module Replacement (HMR) aktif — edit komponen Vue →
-browser otomatis update tanpa full refresh, state Pinia tetap. Perubahan terlihat
-dalam milidetik. `npm run dev` murni untuk kenyamanan developer, bukan keharusan fungsional.
-
-> **Penjelasan kode SPA** (arsitektur, TanStack Query, tiap halaman + *kenapa*):
-> `docs/FRONTEND.md`. Test frontend: `npm run test:js` · type-check: `npm run type-check`.
+- **Kunci Reverb dev terisi di `.env.example`** (`100001` / `tas-local-dev-key` / `tas-local-dev-secret`).
+  `php artisan reverb:install` **bukan** penggantinya: ia tak mengisi kunci yang sudah ada walau
+  kosong, dan ikut mengubah config proyek. **Produksi wajib nilai acak.**
+- **`DB_ROOT_PASSWORD` (default `secret`)** dipakai compose; `phpunit.xml` memakai nilai yang sama.
+- **Ubah `.env` → recreate service** (§3). Tanpa itu nilai lama tetap dipakai.
 
 ---
+
+## 8. Tooling kualitas (konfigurasi)
+
+| Berkas | Isi yang penting |
+|--------|------------------|
+| `phpstan.neon` | Larastan, **level 8**, paths `app`/`database`/`routes` (tests tidak dianalisis) |
+| `tests/Pest.php` | `Feature` → `RefreshDatabase`; `Concurrency` → `DatabaseTruncation` (§10e); `Unit` tanpa DB |
+| `phpunit.xml` | 3 testsuite (`Unit`, `Feature`, `Concurrency`); MySQL `tas_testing`; isolasi di-`force` (§6) |
+| `tests/TestCase.php` | sinkron `$_ENV` → `$_SERVER` (§6) |
+| `composer.json` scripts | `test` (pest --parallel) · `analyse` · `fix` (pint) · `lint` (pint --test) · `dev` (native only) |
+| `app/Providers/AppServiceProvider.php` | `preventLazyLoading` / `preventAccessingMissingAttributes` / `preventSilentlyDiscardingAttributes` (non-prod), bindings repo, rate limiter |
+
+---
+
+## 9. Frontend dev server & gerbang kualitas
+
+### 9a. Dev server (Vite)
+
+Buka app di **`http://localhost:8000`** (Laravel di container) — **bukan** `localhost:5173`.
+Port 5173 hanya server aset Vite; container menyajikan HTML yang menunjuk ke sana lewat berkas
+`public/hot` (terverifikasi: aset dari `[::1]:5173` termuat 200 dari halaman container).
+
+| Situasi | Perintah |
+|---------|----------|
+| Coding frontend aktif | `npm run dev` (HMR — edit `.vue` langsung terlihat, state Pinia tetap) |
+| Hanya memakai app | `npm run build` sekali; container menyajikan `public/build/` |
+
+> **Jebakan `public/hot` basi.** Kalau proses Vite mati tidak bersih (mis. terminal ditutup paksa),
+> `public/hot` bisa **tertinggal** — atau Vite tetap hidup sebagai proses yatim. Gejala: halaman
+> kosong / aset gagal dimuat. Hapus `public/hot` dan pastikan port 5173 kosong. Matikan Vite
+> dengan **Ctrl+C**.
+
+Penjelasan kode SPA: `docs/FRONTEND.md`.
 
 ### 9b. Gerbang kualitas (sebelum commit)
 
-Jalankan ketiganya tiap sebelum commit (Definition of Done di `CLAUDE.md`):
+Urutan **fix → analyse → test** (Definition of Done `CLAUDE.md`):
 
 ```bash
-composer fix        # atau: ./vendor/bin/pint        → rapikan format
-composer analyse    # atau: ./vendor/bin/phpstan ...  → analisis statis lvl 8
-composer test       # atau: ./vendor/bin/pest         → semua test
+docker compose exec app composer fix       # Pint
+docker compose exec app composer analyse   # PHPStan lvl 8
+docker compose exec app composer test      # Pest (265)
+npm run test:js && npm run type-check && npm run build
 ```
 
-Contoh output sehat:
-```
-# composer analyse
- [OK] No errors
-
-# composer fix
-.................  (PASS) atau daftar file yang dirapikan
-
-# composer test
-  PASS  Tests\Unit\AppointmentStatusTest
-  PASS  Tests\Feature\FoundationSeedTest
-  ...
-  Tests:    194 passed (501 assertions)
-```
-
-> Urutan disarankan: **fix → analyse → test**. `fix` merapikan dulu agar `analyse`
-> tidak terganggu gaya kode; baru pastikan logika lewat `test`.
+Ketiga perintah `composer` bisa juga dijalankan native (§4). Angka test terkini selalu ada di
+`HANDOVER.md` §Status — angka di dokumen ini akan basi.
 
 ---
 
-## 10. Cara menulis & menjalankan test
+## 10. Menulis & menjalankan test + referensi API
 
-### 10a. Test unit murni (tanpa DB) — contoh enum
-`tests/Unit/AppointmentStatusTest.php`:
+### 10a. Test unit murni (tanpa DB)
 ```php
 it('follows the documented transition graph', function (): void {
-    expect(AppointmentStatus::BOOKED->canTransitionTo(AppointmentStatus::CONFIRMED))
-        ->toBeTrue();
+    expect(AppointmentStatus::BOOKED->canTransitionTo(AppointmentStatus::CONFIRMED))->toBeTrue();
 });
 ```
 
-### 10b. Test feature (pakai DB in-memory) — contoh seed/RBAC
+### 10b. Test feature (DB `tas_testing`, di-reset tiap test)
 `tests/Feature/FoundationSeedTest.php`:
 ```php
 use function Pest\Laravel\seed;
 
 it('wires the RBAC matrix', function (): void {
     seed([RolePermissionSeeder::class, DemoSeeder::class]);
-    $planner = User::query()->where('email','planner@tas.test')->firstOrFail();
+    $planner = User::query()->where('email', 'planner@tas.test')->firstOrFail();
     expect($planner->can('slot.manage'))->toBeTrue()
         ->and($planner->can('appointment.write'))->toBeFalse();
 });
@@ -482,18 +293,17 @@ it('wires the RBAC matrix', function (): void {
 
 ### 10c. Menjalankan sebagian
 ```bash
-./vendor/bin/pest tests/Unit/AppointmentStatusTest.php   # satu file
-./vendor/bin/pest --filter="RBAC"                        # cocokkan nama test
-./vendor/bin/pest --parallel                             # paralel (cepat)
+docker compose exec app ./vendor/bin/pest tests/Unit/AppointmentStatusTest.php   # satu file
+docker compose exec app ./vendor/bin/pest --filter="RBAC"                        # cocokkan nama
+docker compose exec app ./vendor/bin/pest --testsuite=Concurrency                # satu testsuite
 ```
 
-> **Pola TDD wajib (per Action)** sesuai `CLAUDE.md`: tulis test dulu (happy path +
-> edge: kuota penuh→409, double-submit + Idempotency-Key, bentrok `version`) →
-> implement sampai hijau → `fix && analyse && test` → commit kecil.
+> **Pola TDD wajib (per Action)** — `CLAUDE.md`: test dulu (happy path + edge: kuota penuh → 409,
+> double-submit + `Idempotency-Key`, bentrok `version`) → implement sampai hijau →
+> `fix && analyse && test` → commit kecil. **Lalu rusak sengaja hal yang dijaga test itu dan
+> pastikan ia MERAH** — "hijau" saja tak membuktikan apa-apa (§10e).
 
-### 10d. Menguji API booking secara MANUAL (curl)
-
-Endpoint yang sudah ada:
+### 10d. Referensi endpoint & uji manual (curl)
 
 | Method | Endpoint | Auth | Permission | Guna |
 |--------|----------|------|------------|------|
@@ -538,190 +348,156 @@ hapus → **409 `entity_in_use`** bila masih ada dependen):
 | `GET` | `/admin/roles` | `role.manage` | list 5 role + permission masing-masing + `meta.all_permissions` (universe checkbox FE) |
 | `PUT` | `/admin/roles/{name}/permissions` | `role.manage` | ganti (sync, bukan tambah) seluruh permission 1 role; `{name}` = nama role bukan id; role `admin` ditolak 422 `role_immutable` — **tak bisa bikin/hapus role baru**, lihat `CODE-WALKTHROUGH §V.6` |
 
-Jalankan server: `php artisan serve` (default `http://127.0.0.1:8000`), pastikan data
-demo ada (`php artisan migrate:fresh --seed`).
+**Uji manual** (terverifikasi 2026-09-14 pada data seed; stack menyala + DB sudah di-seed, §5):
 
-**0) Login** untuk dapat token (akun demo, password `password`):
+**0) Login** (password `password`):
 ```bash
-curl -s -X POST http://127.0.0.1:8000/api/v1/login \
+curl -s -X POST http://localhost:8000/api/v1/login \
   -H "Accept: application/json" -H "Content-Type: application/json" \
   -d '{"email":"dispatcher@majulog.test","password":"password"}'
-# → 201 {"token":"3|abcdef...","token_type":"Bearer","user":{...,"permissions":[...]}}
-```
-Salin nilai `token` → pakai sebagai `TOKEN` di langkah berikutnya.
-
-**1) Lihat ketersediaan slot** (ganti `TOKEN` & `GATE_ID`):
-```bash
-curl -s http://127.0.0.1:8000/api/v1/slots/availability?gate=1 \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Accept: application/json"
-# → {"data":[{"id":..,"remaining":..,"status":"OPEN",...}]}
+# → 201 {"token":"3|abcdef...","token_type":"Bearer","user":{...}}
 ```
 
-**2) Booking** (pakai id slot/truk/sopir milik company dispatcher tsb):
+**1) Ambil id truk & sopir milik company-mu, lalu window yang masih buka** (gate 2 = GATE-B; window
+**besok** dijamin belum berakhir, jam berapa pun DB di-seed):
 ```bash
-curl -s -X POST http://127.0.0.1:8000/api/v1/appointments \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: demo-001" \
-  -d '{"slot_window_id":5,"truck_id":1,"driver_id":6,"move_type":"DELIVERY","container_no":"MAUU1234567","iso_type":"22G1","size":20}'
+curl -s http://localhost:8000/api/v1/me/fleet -H "Authorization: Bearer TOKEN" -H "Accept: application/json"
+# → {"data":{"trucks":[{"id":1,...}],"drivers":[{"id":5,"name":"Budi Santoso"}]}}
+curl -s "http://localhost:8000/api/v1/slots/availability?gate=2&date=YYYY-MM-DD" \
+  -H "Authorization: Bearer TOKEN" -H "Accept: application/json"
+# → {"data":[{"id":25,"start_time":"06:00:00","remaining":5,"status":"OPEN","ended":false},...]}
+```
+
+**2) Booking** (id dari langkah 1 — **jangan** menebak: sopir company lain → 422):
+```bash
+curl -s -X POST http://localhost:8000/api/v1/appointments \
+  -H "Authorization: Bearer TOKEN" -H "Accept: application/json" \
+  -H "Content-Type: application/json" -H "Idempotency-Key: demo-001" \
+  -d '{"slot_window_id":25,"truck_id":1,"driver_id":5,"move_type":"DELIVERY","container_no":"MAUU1234567","iso_type":"22G1","size":20}'
 # → 201 {"data":{"status":"CONFIRMED","booking_code":"TAS-....",...}}
 ```
 
-**3) Uji idempotency** — ulangi perintah (2) **persis** (Idempotency-Key sama):
-respons 201 yang sama diputar ulang, header `Idempotent-Replayed: true`, dan **tidak**
-ada appointment baru. Cek jumlah: `php artisan tinker --execute="echo App\Models\Appointment::count();"`.
+**3) Uji idempotency** — ulangi (2) **persis** (key sama): respons 201 yang sama diputar ulang dengan
+header `Idempotent-Replayed: true`, dan **tidak** ada appointment baru:
+`docker compose exec app php artisan tinker --execute="echo App\Models\Appointment::count();"`.
 
 **Respons error yang diharapkan:**
-- Slot penuh/tutup → `409 {"error":"slot_unavailable"}`
+- Slot penuh/tutup/berakhir → `409 {"error":"slot_unavailable"}`
 - Kontainer dobel di window sama → `409 {"error":"duplicate_booking"}`
 - Truk/sopir company lain → `422` (validation `truck_id`/`driver_id`)
 - Tanpa token → `401` · role tanpa `appointment.write` → `403`
-- Terlalu sering (rate limit) → `429 Too Many Requests` (+ header `Retry-After`)
+- Terlalu sering → `429 Too Many Requests` (+ `Retry-After`)
 
-> **Rate limit (CLAUDE.md §Hardening).** Named limiter di `AppServiceProvider`:
-> `login` (5/mnt, kunci email+ip — anti brute-force), `api` (60/mnt per user/ip — batas
-> umum endpoint ber-auth), `booking` (10/mnt per user — lebih ketat, anti bot borong slot).
-> Nilai bisa di-set via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (lihat
-> `config/tas.php`). Saat uji manual berturut-turut, jangan kaget bila kena `429`.
+> **Selalu kirim `Accept: application/json`.** Tanpa header itu, request tanpa token ke endpoint
+> ber-auth menghasilkan **500** (`Route [login] not defined`), bukan 401 — bug P3 yang tercatat
+> terbuka di `HANDOVER.md` §Temuan D2′. SPA selalu mengirimnya.
+>
+> **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email+ip), `api` 60/mnt, `booking` 10/mnt per
+> user. Nilai via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`).
+
+### 10e. Test konkurensi (`tests/Concurrency/`)
+
+Testsuite **ketiga**, memakai `DatabaseTruncation` (bukan `RefreshDatabase`): RefreshDatabase
+membungkus tiap test dalam transaksi yang di-rollback, sehingga data yang dibuat test **tak pernah
+terlihat** oleh proses PHP lain — dan test ini justru menyalakan 4 proses PHP sungguhan
+(`symfony/process`) untuk memperebutkan satu slot terakhir. Butuh **MySQL**: SQLite tak menerbitkan
+`SELECT … FOR UPDATE` sama sekali.
+
+Isinya dua test, **keduanya wajib ada**:
+1. **Realistis** — 4 proses menyerbu bersamaan, tepat satu menang.
+2. **Deterministik** — memastikan `select … for update` benar-benar diterbitkan.
+
+Kenapa tak cukup yang realistis: saat lock dicabut, test #1 **tetap hijau** — `increment('booked_count')`
+tetap mengunci baris di UPDATE-nya dan `DB::transaction(attempts: 3)` mengulang closure yang kalah.
+Test #2-lah gerbang yang sesungguhnya. **Jangan hapus #2.**
 
 ---
 
 ## 11. Troubleshooting
 
-Error nyata yang kami temui di sesi ini + solusinya.
+### Docker & lingkungan
 
-### "could not find driver" saat migrate
-Driver SQLite belum aktif. → **Langkah 1** (aktifkan `pdo_sqlite` + `sqlite3`).
+| Gejala | Sebab paling mungkin | Tindakan |
+|--------|----------------------|----------|
+| `SQLSTATE[HY000] [2002]` connection refused | stack mati / belum `healthy` | `docker compose up -d --wait` |
+| `port is already allocated` saat `up` | port dipakai proses lain (laragon, Vite/`serve`/`reverb:start` native) | matikan yang bentrok, atau geser `*_PORT_HOST` di `.env` |
+| `Class "..." not found` di container setelah `git pull` | `composer.lock` berubah, `vendor/` container belum di-install | `docker compose run --rm --no-deps app composer install` (§3) |
+| App lambat, tiap request beberapa detik | `vendor/` volume hilang / kembali ke bind mount | cek `docker compose config` memuat volume `vendor`; lalu `composer install` di container |
+| Edit `.env` tak berefek | server web jalan `--no-reload` | recreate service (§3) |
+| Halaman kosong / aset SPA gagal dimuat | `public/hot` basi atau Vite yatim | §9a |
+| Realtime diam, `failed_jobs` berisi `Pusher error: Not found` | `REVERB_APP_*` kosong di `.env` | isi dari `.env.example`, recreate service (§7) |
+| Realtime diam tanpa failed job | Vite jalan dengan `.env` lama (`VITE_REVERB_*`), atau `reverb` mati | restart `npm run dev`; `docker compose ps reverb` |
+| Login lewat `:8000` sukses tapi data "hilang"/beda | yang terbuka adalah `composer dev` native (8001, SQLite) | lihat peringatan di §3 |
+| `Unknown database 'tas_testing'` | volume MySQL dibuat sebelum skrip init | `docker compose down -v && docker compose up -d` (**hapus data**) |
+| `Access denied for user 'root'` | password tak cocok | samakan `DB_ROOT_PASSWORD` (default `secret`) |
+| Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya |
+| `storage/logs/laravel.log` membingungkan | log container & native bercampur (bind mount) | tandai waktu, atau `docker compose logs` |
 
-### Horizon gagal install: "requires ext-pcntl"
-PHP Windows tak punya `ext-pcntl`. → install dengan
-`--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix`, jalankan
-**Horizon** di Docker. (Reverb tak terpengaruh — jalan native.)
+### PHP / PHPStan (masih berlaku, dari pembangunan foundation)
 
-### `reverb:install` menggantung / error prompt
-Installer-nya interaktif. → di lingkungan non-interaktif, publish config saja
-(`vendor:publish ... ReverbServiceProvider`). Realtime **sudah tersambung ujung-ke-ujung**
-(2026-07-25): guard channel `auth:sanctum` (`bootstrap/app.php`) + klien Echo (`echo.ts`).
-Menyalakan (**Windows native, TANPA Docker**): `reverb:start` + `BROADCAST_CONNECTION=reverb`
-+ worker `queue:listen` (lihat langkah 4c).
-
-### PHPStan: `Strict comparison ... will always evaluate to false` (enum)
-Larastan menebak kolom sebagai `string`. → tambah docblock `@property` di model,
-mis. `@property AppointmentStatus $status`.
-
-### PHPStan: `method.childReturnType` di factory `definition()`
-Docblock `@return array<string,mixed>` lebih lebar dari tipe induk. → **hapus**
-docblock itu (mewarisi tipe induk yang presisi).
-
-### PHPStan: `offsetAccess.notFound` "Offset '10' does not exist"
-PHP menormalkan kunci string angka (`'10'`) menjadi **int** `10`, sehingga array
-bercampur kunci string/int. → pakai **kunci integer konsisten** (lihat
-`DemoSeeder::windows()` yang di-key per jam `6..17`).
-
-### PHPStan: `argument.type` pada `Model::create(array_merge(...))`
-`create()` minta `array<model property,...>`; `array_merge` menghasilkan
-`array<string,mixed>`. → bangun model lalu `->forceFill($attrs)->save()`.
-
-### Test "menghapus" data dev
-`RefreshDatabase` jalan di DB file. → aktifkan `:memory:` di `phpunit.xml`
-(**Langkah 8c**).
-
-### Fatal: "Declaration of ...::data() must be compatible with Request::data()"
-FormRequest (turunan `Request`) sudah punya method `data()` dan `date()`. Method
-helper buatanmu yang bernama sama dengan signature beda → bentrok. → **ganti nama**
-(mis. `toData()`, `requestedDate()`).
-
-### `Cache::tags()` error "does not support tagging"
-Cache store `database`/`file` tidak mendukung tag. → pakai **key eksplisit** +
-`Cache::forget`, atau pindah ke Redis. Lihat `SlotRepository` & changelog `HANDOVER.md`.
+- **`Strict comparison ... will always evaluate to false` (enum)** — Larastan menebak kolom sebagai
+  `string`. Tambah docblock `@property AppointmentStatus $status` di model.
+- **`method.childReturnType` di factory `definition()`** — docblock `@return array<string,mixed>`
+  lebih lebar dari tipe induk. **Hapus** docblock itu.
+- **`offsetAccess.notFound` "Offset '10' does not exist"** — PHP menormalkan kunci string angka jadi
+  int. Pakai kunci integer konsisten (lihat `DemoSeeder::windows()`).
+- **`argument.type` pada `Model::create(array_merge(...))`** — bangun model lalu
+  `->forceFill($attrs)->save()`.
+- **Fatal "Declaration of ...::data() must be compatible with Request::data()"** — FormRequest sudah
+  punya `data()`/`date()`. Ganti nama helper (`toData()`, `requestedDate()`).
+- **`Cache::tags()` "does not support tagging"** — hanya store `database`/`file` (jalur native).
+  Proyek sengaja memakai key eksplisit + `Cache::forget` (`CLAUDE.md` §Cache).
 
 ---
 
-## 12. Checklist verifikasi akhir
+## 12. Checklist verifikasi
 
-Tandai semua sebelum menganggap foundation selesai:
+Setelah setup (§1) atau perubahan infrastruktur:
 
-- [ ] `php -r "print_r(PDO::getAvailableDrivers());"` memuat `sqlite`
-- [ ] `composer audit` → no advisories
-- [ ] `php artisan migrate:fresh --seed` → hijau
-- [ ] `composer analyse` → **No errors** (PHPStan level 8)
-- [ ] `composer lint` → Pint bersih
-- [ ] `composer test` → semua hijau
-- [ ] Login data demo bekerja (cek via tinker `->can(...)`)
-- [ ] `database/database.sqlite` tetap berisi data demo setelah `composer test`
-      (bukti `:memory:` aktif)
+- [ ] `docker compose ps` — 6 service `Up`, `mysql` & `redis` `healthy`
+- [ ] `docker compose exec app php artisan horizon:status` → running
+- [ ] `docker compose exec scheduler php artisan schedule:list` memuat `NoShowSweepJob`
+- [ ] `http://localhost:8000` tampil, login akun demo berhasil
+- [ ] `docker compose exec app composer test` → hijau; **DB dev `tas` masih berisi** setelahnya
+- [ ] `docker compose exec app composer analyse` → No errors · `composer lint` → bersih
+- [ ] `npm run test:js && npm run type-check && npm run build` → hijau
+- [ ] Booking di satu browser → sisa kuota berubah tanpa refresh di browser lain (realtime)
 
 ---
 
-## 13. Lampiran: peta file yang dihasilkan
+## 13. Peta file
 
 ```
 app/
-  Enums/            AppointmentStatus, MoveType, SlotWindowStatus,
+  Enums/            AppointmentStatus (state machine), MoveType, SlotWindowStatus,
                     GateTransactionType, TruckStatus
-  Models/           User(updated), Terminal, Gate, TransportCompany, Truck,
-                    SlotWindow, Appointment, Container, GateTransaction
-  Actions/          Book/Reschedule/Cancel/GateIn/GateOut/MarkNoShow/
-                    Open|CloseSlotWindow + Admin/ (CRUD terminal/gate/company/user)
-                    + Fleet/ (CRUD truk transporter)
-  Contracts/        Slot/Appointment/Gate/Fleet/Terminal/Company/User repo interfaces
-  Repositories/     impl Eloquent dari tiap interface (bound di AppServiceProvider)
-  Http/Controllers/Api/V1/  invokable controllers + Admin/ (20 controller CRUD)
-                    + Fleet/ (4 controller armada truk)
-  Exceptions/       SlotUnavailable, Duplicate*, OptimisticLock,
-                    InvalidAppointmentState, EntityInUse (409 cascade-delete guard),
-                    FleetOwnership + InactiveTruck + InvalidDriver
-                    (422 guard armada saat booking: milik siapa → layak dipakai?)
-  Providers/        AppServiceProvider (preventLazyLoading + repo bindings + rate limiters)
-database/
-  migrations/       8 migrasi domain + users(updated) + (publish: sanctum,
-                    permission, activitylog)
-  factories/        1 factory per model
-  seeders/          RolePermissionSeeder, DemoSeeder, DatabaseSeeder
-routes/
-  api.php           (dari install:api)
-  channels.php      (dari install:api)
-config/             permission.php, activitylog.php, reverb.php, sanctum.php ...
+  Models/           User, Terminal, Gate, TransportCompany, Truck, SlotWindow,
+                    Appointment, Container, GateTransaction
+  Actions/          Book/Reschedule/Cancel/GateIn/GateOut/MarkNoShow/Open|CloseSlotWindow
+                    + Admin/ (CRUD master data + role permission) + Fleet/ (CRUD truk)
+  Contracts/        interface repository (di-bind di AppServiceProvider)
+  Repositories/     impl Eloquent tiap interface
+  Http/Controllers/Api/V1/  controller invokable (+ Admin/, Fleet/)
+  Jobs/             NoShowSweepJob, AppointmentReminderJob, ProcessGateEventJob
+  Events/ Listeners/  event domain + broadcast (SlotAvailabilityChanged, GateQueueUpdated)
+  Exceptions/       409/422/403 domain (SlotUnavailable, Duplicate*, OptimisticLock, EntityInUse, ...)
+database/           migrations · factories · seeders (RolePermissionSeeder, DemoSeeder)
+routes/             api.php · channels.php · console.php (jadwal scheduler)
+resources/js/       SPA Vue (docs/FRONTEND.md)
 tests/
-  Pest.php          binding TestCase + RefreshDatabase
-  Unit/             AppointmentStatusTest
-  Feature/          37 file, dikelompokkan per area: Auth · Booking · Appointments ·
-                    Gate · Slots · Jobs · Reports · Reference · Admin · Fleet ·
-                    Realtime · Hardening (+ FoundationSeedTest)
-  js/               20 file Vitest (SPA — lihat docs/FRONTEND.md §5)
-phpstan.neon        level 8
-phpunit.xml         DB :memory: untuk test
-composer.json       scripts: test / analyse / fix / lint
+  Pest.php          trait DB per testsuite
+  TestCase.php      sinkron $_ENV → $_SERVER (§6)
+  Unit/ Feature/    per area: Auth · Booking · Appointments · Gate · Slots · Jobs · Reports ·
+                    Reference · Admin · Fleet · Realtime · Hardening
+  Concurrency/      ConcurrentBookingTest + bin/book-once.php (§10e)
+  js/               Vitest · e2e/  Playwright (§15)
+docker/
+  php/Dockerfile    PHP 8.3 CLI + ekstensi + OPcache dev + CMD serve --no-reload (§17)
+  mysql/init/       membuat tas_testing (§16)
+docker-compose.yml  6 service, env PHP bersama (anchor), volume data + vendor
+phpunit.xml         MySQL tas_testing + isolasi di-force (§6)
+.github/workflows/ci.yml   §14
 ```
-
----
-
-### Status & langkah berikutnya
-**Backend MVP API + SPA 4 persona + admin CRUD (termasuk edit permission role) + CRUD
-armada truk + riwayat gate-in/out sudah lengkap & hijau** (status hidup: `HANDOVER.md` —
-angka test di situ, bukan di sini, karena akan basi lagi tiap sesi). Backend: data layer
-→ booking (anti-race) → auth Sanctum + Policy → reschedule/cancel → gate-in/out → job
-no-show/reminder (+ tandai no-show manual) → realtime broadcast (+ seam TOS) → endpoint
-pendukung (me/today + utilisasi) → slot-window open/close → rate-limit hardening →
-master data CRUD admin (+ tab Role & Izin) → armada truk transporter → toleransi jendela
-gate-in → audit trail (Activity Log + endpoint) → riwayat gate-in/out lintas-status.
-Frontend: SPA Vue untuk transporter, driver, gate-officer, planner, + halaman admin,
-armada, riwayat gate. Penjelasan tiap slice: `docs/CODE-WALKTHROUGH.md` (§J–§Z backend)
-& `docs/FRONTEND.md` (SPA). **Sisa terbuka:** QR (satu-satunya janji kontrak tanpa kode
-dari audit ronde 4) — lihat `HANDOVER.md` §Langkah berikutnya.
-
-**CRUD sopir untuk transporter sengaja TIDAK dibangun** — sopir dibuat admin lewat Admin
-User CRUD. Alasan & kapan ditinjau ulang: [`adr/0006`](adr/0006-driver-management-admin-only.md).
-
-Gerbang kualitas terakhir: `composer test` → **194 pass (501 assertions)** ·
-`composer analyse` PHPStan lvl 8 ✅ · `npm run test:js` → **87 pass**. Semuanya kini juga
-berjalan otomatis tiap push — lihat §14.
-
-Langkah berikutnya (lihat `HANDOVER.md` → *Langkah berikutnya*): **verifikasi realtime
-di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCAST_CONNECTION=reverb`
-+ 2 browser); swap `GateEventGateway` ke TOS riil; polish UI (skeleton DONE, e2e ditunda — ADR-0005).
 
 ---
 
@@ -729,115 +505,72 @@ di browser** (server+klien sudah tersambung — `reverb:start` native + `BROADCA
 
 ### 14a. Untuk apa CI ini ada
 
-Sebelum 2026-07-25 repo tidak punya CI sama sekali (padahal `CLAUDE.md` mengklaim ada).
-Artinya 194 Pest + 87 Vitest **hanya jalan kalau ada yang ingat mengetik perintahnya**.
-Itu justru berbahaya di proyek yang dikerjakan lintas sesi & lintas perangkat: satu commit
-bisa hijau di laptop A dan merah di repo tanpa siapa pun tahu.
-
-CI menutup lubang itu. Perannya **satu kalimat**: tiap `git push` ke `main` dan tiap PR,
-seluruh gerbang kualitas dijalankan ulang di mesin bersih — supaya "hijau" berhenti
-bergantung pada disiplin & isi folder lokal seseorang.
-
-Yang **bukan** perannya: menggantikan test lokal. Loop TDD tetap di laptop (hitungan detik);
-CI adalah jaring pengaman terakhir, bukan tempat pertama kali mencoba.
+Tiap `git push` ke `main` dan tiap PR, seluruh gerbang kualitas dijalankan ulang di mesin bersih —
+supaya "hijau" berhenti bergantung pada disiplin & isi folder lokal seseorang. **Bukan** pengganti
+test lokal: loop TDD tetap di laptop; CI jaring pengaman terakhir.
 
 ### 14b. Apa yang dijalankan
 
-File: `.github/workflows/ci.yml`. Dua job **paralel** (gagal di satu tak menutupi info job lain):
+File: `.github/workflows/ci.yml`. Dua job **paralel**:
 
 | Job | Langkah | Perintah |
 |-----|---------|----------|
 | **backend** | format → analisis → test | `composer lint` · `composer analyse` · `composer test` |
 | **frontend** | test → tipe → bundel | `npm run test:js` · `npm run type-check` · `npm run build` |
 
-Perintahnya **sama persis dengan yang dipakai lokal**. Ini disengaja: kalau CI memakai
-rangkaian perintahnya sendiri, "hijau di CI" dan "hijau di laptop" berhenti berarti hal yang
-sama. Konsekuensinya — **menambah gerbang baru di lokal tanpa menambahkannya ke workflow
-membuat gerbang itu tak berlaku saat push.**
+Perintahnya **sama persis dengan lokal** — kalau CI memakai rangkaiannya sendiri, "hijau di CI" dan
+"hijau di laptop" berhenti berarti hal yang sama. Konsekuensinya: **gerbang baru di lokal wajib
+ikut ditambahkan ke workflow**, kalau tidak ia tak berlaku saat push.
 
-Empat keputusan di dalam workflow yang perlu diketahui:
-
-* **`if: ${{ !cancelled() }}`** pada langkah setelah yang pertama → satu push melaporkan
-  **semua** gerbang yang rusak, bukan berhenti di kegagalan pertama. Hemat siklus push-tunggu.
-* **Tanpa `--ignore-platform-req`.** Di Windows, `composer install` perlu flag itu karena
-  Horizon minta `ext-pcntl`/`ext-posix` (§3b). Di Linux keduanya ada, jadi CI memverifikasi
-  dependensi apa adanya — sekaligus mendeteksi bila ada yang selama ini lolos hanya berkat flag.
-* **Tanpa service container database.** `phpunit.xml` memaksa sqlite `:memory:`, jadi tak ada
-  MySQL/Postgres yang perlu dinyalakan. CI juga tak menyentuh `database/database.sqlite`.
-* **Versi dipatok menyamai mesin dev** (PHP 8.3, Node 22) supaya beda versi tak jadi sumber
-  "hijau lokal, merah di CI". Kalau mesin dev naik versi, naikkan juga di workflow.
+Keputusan di dalam workflow:
+* **Service container `mysql:8.4` + `redis:7-alpine`.** Test butuh MySQL (row lock sungguhan, §10e)
+  dan Redis (`RedisUniqueJobTest` — tanpa Redis ia dilewati, dan gerbang yang dilewati di CI sama
+  saja dengan tak ada). Port DB di CI 3306 lewat `env:` step Pest (§6).
+* **`if: ${{ !cancelled() }}`** pada langkah setelah yang pertama → satu push melaporkan **semua**
+  gerbang yang rusak.
+* **Tanpa `--ignore-platform-req`.** Runner Linux punya `pcntl`/`posix`, jadi CI memverifikasi
+  dependensi apa adanya — satu-satunya hal yang tak bisa diuji `composer install` di Windows.
+* **Versi dipatok** menyamai dev (PHP 8.3, Node 22). Naik di dev → naikkan juga di workflow.
+* CI **tidak** memakai Docker Compose; ia menjalankan PHP langsung dengan service container.
 
 ### 14c. Cara memakainya sehari-hari
-
-CI tidak perlu dinyalakan — GitHub membacanya otomatis begitu `.github/workflows/ci.yml` ada
-di branch. Tidak ada secret/token yang perlu dipasang (semua gerbang berjalan offline).
 
 ```bash
 git push                      # CI langsung jalan
 ```
 
-Melihat hasil: repo di GitHub → tab **Actions** → pilih run teratas. Centang hijau = semua
-gerbang lolos; silang merah = klik job yang merah, buka langkah yang merah, log-nya sama
-persis dengan output lokal.
+Hasil: repo di GitHub → tab **Actions** → run teratas. Repo ini **privat**, jadi REST API
+GitHub tak terbaca tanpa token dan `gh` tak terpasang di mesin dev — status CI dicek lewat tab
+Actions (atau `gh` / token bila kelak dipasang).
 
-**Cek status dari terminal — TANPA `gh`.** GitHub CLI (`gh`) memang paling nyaman
-(`gh run list`), tapi ia **tidak terpasang** di mesin dev ini. Itu bukan jalan buntu: repo ini
-**publik**, jadi REST API GitHub bisa dibaca tanpa token, tanpa autentikasi, tanpa paket
-tambahan. `curl` sudah ada bawaan Git for Windows; `jq` **tidak** ada, jadi resep di bawah
-memakai PHP yang jelas terpasang (perintah ini terverifikasi jalan di mesin dev, 2026-07-27):
+> **Satu run per PUSH, bukan per COMMIT.** Push 3 commit sekaligus → hanya **1** run, di commit
+> terakhir. Isi commit di tengah tetap teruji lewat keturunannya, tapi tak ada bukti hijau yang
+> menempel padanya sendiri — relevan bila kelak di-`revert`/`cherry-pick` sendirian.
 
-```bash
-curl -s "https://api.github.com/repos/caesarovera/truck-appointment-system/actions/runs?per_page=5" \
-  | php -r '$r=json_decode(file_get_contents("php://stdin"),true)["workflow_runs"]??[]; foreach($r as $x) printf("%-8s %-10s %s\n", substr($x["head_sha"],0,7), $x["conclusion"]??$x["status"], $x["display_title"]);'
-```
-
-```
-f6495a0  success    chore: registrasikan skill & agent Claude Code; untrack settings.loca…
-5976732  success    fix: tolak driver_id yang bukan ber-role driver (422) + ADR-0006 sopi…
-```
-
-`conclusion` kosong + `status: in_progress` = run masih berjalan. Untuk membedah run yang
-merah sampai level langkah, ambil `id`-nya lalu:
-`…/actions/runs/{id}/jobs` → tiap job punya array `steps` berisi `name` + `conclusion`,
-jadi ketahuan **langkah mana** yang gagal tanpa membuka browser.
-
-> **Satu run per PUSH, bukan per COMMIT.** GitHub menjalankan workflow di commit paling ujung
-> dari sebuah push. Push 3 commit sekaligus → hanya **1** run, di commit terakhir. Isi commit
-> di tengah tetap teruji (ia leluhur dari yang diuji), tapi tak ada bukti hijau yang menempel
-> padanya sendiri — relevan kalau suatu saat commit itu di-`revert`/`cherry-pick` sendirian.
-> Ingin tiap commit punya jejaknya sendiri? Push satu per satu.
-
-**Kalau CI merah, jangan menebak-nebak lewat push berulang.** Jalankan gerbang yang sama di
-lokal — outputnya identik karena perintahnya identik:
-
-```bash
-composer lint      # Pint: format. Perbaiki dengan `composer fix`
-composer analyse   # PHPStan lvl 8
-composer test      # Pest
-npm run test:js && npm run type-check && npm run build
-```
-
-Kegagalan yang khas dan artinya:
+**Kalau CI merah, jangan menebak lewat push berulang** — jalankan gerbang yang sama di lokal (§9b).
 
 | Gejala di CI | Biasanya karena |
 |--------------|-----------------|
-| `backend` merah di langkah **Pint** | lupa `composer fix` sebelum commit |
-| `backend` merah di **Install dependensi** | `composer.lock` tak sinkron dengan `composer.json` — commit lock-nya |
-| `frontend` merah di **Vitest** tapi hijau lokal | file test/aset baru belum di-commit (CI cuma punya yang ada di git) |
-| `frontend` merah di **Build** saja | error yang hanya muncul saat bundling — Vitest & vue-tsc memang tak menangkapnya |
-| Semua job merah tepat setelah ganti versi PHP/Node lokal | versi di workflow belum ikut dinaikkan (§14b) |
+| `backend` merah di **Pint** | lupa `composer fix` sebelum commit |
+| `backend` merah di **Install dependensi** | `composer.lock` tak sinkron dengan `composer.json` |
+| `backend` merah di **Pest**, hijau di container lokal | nilai env yang hanya ada di compose, atau test bergantung data dev — cek §6 |
+| `frontend` merah di **Vitest** tapi hijau lokal | file test/aset baru belum di-commit |
+| `frontend` merah di **Build** saja | error yang hanya muncul saat bundling |
+| Semua job merah setelah ganti versi PHP/Node lokal | versi di workflow belum ikut dinaikkan |
 
-> Alasan lengkap kenapa CI didahulukan dan kenapa **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.
+> Alasan CI didahulukan dan e2e ditunda: `docs/adr/0005-ci-github-actions.md`.
+
+---
 
 ## 15. E2E (Playwright) — lokal-only
 
-Prasyarat `ADR-0005` (`.env.e2e` + DB terpisah, `data-testid` di jalur happy-path) selesai
-2026-08-14, trigger "persiapan rilis". **Belum masuk CI** (biaya browser binary ~140 MB +
-waktu run tiap push) — keputusan sadar, sesi terpisah kalau nanti dibutuhkan sebelum rilis
-beneran.
+**Jalur native**, terpisah total dari Docker: `php artisan serve --env=e2e --port=8010` di Windows
+dengan SQLite `database/database.e2e.sqlite`. Tak bentrok dengan stack container (port & DB
+berbeda). **Belum masuk CI** (biaya browser ~140 MB + waktu run) — keputusan sadar.
 
 ### 15a. Setup sekali
 
+Butuh jalur native (§4: PHP + `composer install` di Windows).
 ```bash
 cp .env.e2e.example .env.e2e
 php artisan key:generate --env=e2e
@@ -850,282 +583,176 @@ npm run test:e2e:install      # unduh Chromium (~115 MB), sekali per mesin
 npm run test:e2e
 ```
 
-`globalSetup` (`tests/e2e/global-setup.ts`) otomatis: bikin file
-`database/database.e2e.sqlite` kalau belum ada, `npm run build` (asset produksi — bukan Vite
-dev server, `playwright.config.ts` cuma boot **1** proses: `php artisan serve --env=e2e`),
-lalu `migrate:fresh --seed --env=e2e`. **DB e2e terpisah total dari DB dev** (`database/database.sqlite`)
-— jalanin `test:e2e` kapan pun tak pernah menghapus data dev.
+`globalSetup` (`tests/e2e/global-setup.ts`) otomatis: bikin `database/database.e2e.sqlite` kalau
+belum ada, `npm run build` (aset produksi — bukan Vite dev server), lalu
+`migrate:fresh --seed --env=e2e`. **DB e2e terpisah dari semua DB lain** — `test:e2e` tak pernah
+menyentuh data dev.
 
 ### 15c. Cakupan saat ini
 
-5 spec (`tests/e2e/*.spec.ts`): `booking-happy-path` (login transporter → booking → sukses),
-`booking-errors` (kontainer duplikat di window sama → 409 tampil di UI), `gate-in-out`
-(planner buka window ad-hoc "sekarang ±" → transporter booking → gate-officer gate-in lalu
-gate-out), `reschedule-cancel` (2 test: pindah window, batalkan). **Bukan suite e2e penuh** —
-tak ada spec untuk admin/planner-utilization/no-show/QR (lihat `HANDOVER.md` §Langkah
-berikutnya #3). `data-testid` dipakai: `login-*` (`LoginPage.vue`), `booking-*`
-(`BookingForm.vue`), `slot-card`/`book-button`/`booking-success` (`SlotAvailabilityPage.vue`),
-`booking-row`/`reschedule-*`/`cancel-*`/`confirm-cancel` (`MyBookingsPage.vue`,
-`RescheduleDialog.vue`), `window-option` (`RescheduleDialog.vue`), `open-window`
-(`PlannerWindowsPage.vue`), `queue-row`/`gate-in`/`gate-in-confirm`/`gate-out`/
-`gate-out-confirm` (`GateDashboardPage.vue` — 2 klik sejak `ConfirmButton`, lihat
-`FRONTEND.md` §4). **Wajib `workers: 1`** di `playwright.config.ts` — backend cuma 1 proses
-`php artisan serve` + sqlite file-based, >1 worker paralel terbukti membuat request cukup
-lambat sampai lewat timeout (kontensi CPU/IO, bukan bug logic).
+5 spec (`tests/e2e/*.spec.ts`): `booking-happy-path`, `booking-errors` (kontainer duplikat → 409
+tampil di UI), `gate-in-out` (planner buka window "sekarang ±" → booking → gate-in → gate-out),
+`reschedule-cancel` (2 test). Belum ada spec untuk admin/utilisasi planner/no-show/QR. `data-testid`
+dipakai: `login-*` (`LoginPage.vue`), `booking-*` (`BookingForm.vue`),
+`slot-card`/`book-button`/`booking-success` (`SlotAvailabilityPage.vue`),
+`booking-row`/`reschedule-*`/`cancel-*`/`confirm-cancel` (`MyBookingsPage.vue`, `RescheduleDialog.vue`),
+`window-option` (`RescheduleDialog.vue`), `open-window` (`PlannerWindowsPage.vue`),
+`queue-row`/`gate-in`/`gate-in-confirm`/`gate-out`/`gate-out-confirm` (`GateDashboardPage.vue` — 2 klik
+sejak `ConfirmButton`). **Wajib `workers: 1`** — backend 1 proses `artisan serve` + SQLite file;
+>1 worker terbukti membuat request lewat timeout (kontensi, bukan bug logic).
 
-### Jebakan
+### 15d. Jebakan
 
-- **Lupa `touch` file sqlite** → migrate gagal "unable to open database file". `global-setup.ts`
-  sudah menangani ini otomatis; kalau menjalankan `artisan migrate` manual ke `.env.e2e` di
-  luar Playwright, buat filenya dulu.
-- **`.env.e2e` tanpa `APP_KEY`** → `global-setup.ts` gagal cepat dengan pesan jelas, bukan error
-  Laravel yang membingungkan.
-- **Konfigurasi Windows/git-bash:** `php artisan serve --env=e2e` memuat `.env.e2e` lewat 2
-  mekanisme sekaligus — flag `--env` (bikin `ServeCommand` mengawasi file itu utk auto-reload)
-  **dan** env var `APP_ENV=e2e` yang di-set `playwright.config.ts` (dipakai proses PHP yang
-  sungguhan di-spawn utk memilih file dotenv). Keduanya perlu ada; salah satu saja tidak cukup.
+- **`.env.e2e` tanpa `APP_KEY`** → `global-setup.ts` gagal cepat dengan pesan jelas.
+- **Dua mekanisme env sekaligus:** flag `--env=e2e` (membuat `ServeCommand` mengawasi `.env.e2e`)
+  **dan** env var `APP_ENV=e2e` di `playwright.config.ts` (dipakai proses PHP yang di-spawn). Keduanya
+  perlu; satu saja tidak cukup.
+- **`MAIL_MAILER=array`** di `.env.e2e`: dengan `QUEUE_CONNECTION=sync`, reminder dirender inline di
+  request booking; `log` cukup lambat untuk melewati timeout Playwright.
+- **Jam di helper wajib UTC** (`toISOString`), sama dengan `APP_TIMEZONE=UTC` backend — jam lokal
+  (UTC+7) membuat window "sekarang ±" meleset 7 jam.
 
 ---
 
-## 16. Docker: MySQL untuk test (slice D1)
-
-> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md) slice D1**.
-> Redis, Horizon, dan containerisasi app menyusul di slice berikutnya — belum ada di sini.
-
-### 16a. Kenapa test pindah dari SQLite ke MySQL
-
-Bukan kerapian. **SQLite tidak menerbitkan `SELECT … FOR UPDATE` sama sekali.** Artinya seluruh
-test yang seolah menguji anti-race selama ini berjalan di atas mesin yang tak punya row lock —
-dan memang terbukti: mencabut `->lockForUpdate()` dari `SlotRepository` tidak membuat satu test pun
-merah. Race condition adalah alasan proyek ini ada (`CLAUDE.md` §Hardening), jadi gerbangnya harus
-berjalan di mesin yang perilaku lock-nya sama dengan produksi.
-
-### 16b. Menyalakan
-
-```bash
-docker compose up -d        # sekali; container tetap hidup setelah reboot (restart: unless-stopped)
-docker compose ps           # STATUS harus "healthy" sebelum test dijalankan
-composer test               # sekarang menembak MySQL, bukan sqlite :memory:
-```
-
-Matikan dengan `docker compose down` (data aman di volume). `docker compose down -v` **menghapus
-data** dan memaksa skrip init jalan lagi — perlu kalau `docker/mysql/init/` diubah.
-
-### 16c. Port 3307, bukan 3306
-
-Mesin dev ini menjalankan laragon yang sudah memakai **3306**. Container karena itu dipetakan ke
-**3307** di `docker-compose.yml`, dan `phpunit.xml` memuat 3307 sebagai default.
-
-CI memakai 3306 (tak ada laragon di runner) lewat blok `env:` pada step Pest. Ini bekerja tanpa
-berkas konfigurasi kedua karena **PHPUnit tidak menimpa env var yang sudah ada** di environment
-(selama `<env>`-nya tanpa `force="true"`) — jadi siapa pun yang port-nya berbeda cukup meng-export
-`DB_PORT` sendiri.
-
-### 16d. Database yang terbentuk
+## 16. Docker: MySQL & database test
 
 | Database | Isi | Dibuat oleh |
 |----------|-----|-------------|
-| `tas` | data dev (dipakai app nanti di D4) | `MYSQL_DATABASE` di compose |
-| `tas_testing` | DB test saat dijalankan **tanpa** `--parallel` | `docker/mysql/init/01-databases.sql` |
-| `tas_testing_test_1..12` | satu DB **per proses** Pest `--parallel` | Laravel, otomatis saat runtime |
+| `tas` | data dev (app, Horizon, scheduler) | `MYSQL_DATABASE` di compose |
+| `tas_testing` | test tanpa `--parallel` | `docker/mysql/init/01-databases.sql` |
+| `tas_testing_test_1..N` | satu DB **per proses** Pest `--parallel` | Laravel, otomatis saat runtime |
 
-DB test sengaja **terpisah** dari DB dev: `RefreshDatabase` menjalankan `migrate:fresh` yang
-menghapus semua tabel. Kalau test menumpang DB dev, sekali `composer test` data demo hilang.
-
-Pembuatan DB per-proses butuh hak `CREATE DATABASE` — itulah sebabnya test terhubung sebagai
-`root`, bukan user aplikasi.
-
-### 16e. Test konkurensi (`tests/Concurrency/`)
-
-Testsuite **ketiga**, terpisah dari `Unit` dan `Feature` karena memakai trait DB yang berbeda:
-`DatabaseTruncation`, bukan `RefreshDatabase`. Alasannya mengikat: RefreshDatabase membungkus tiap
-test dalam transaksi yang di-rollback, sehingga data yang dibuat test **tak pernah terlihat** oleh
-proses PHP lain — dan test ini justru menyalakan 4 proses PHP sungguhan lewat `symfony/process`
-untuk memperebutkan satu slot terakhir.
-
-Isinya dua test, dan **keduanya wajib ada**:
-
-1. **Realistis** — 4 proses menyerbu bersamaan, tepat satu menang.
-2. **Deterministik** — memastikan `select … for update` benar-benar diterbitkan.
-
-Kenapa tidak cukup yang realistis saja: saat lock dicabut, test #1 **tetap hijau**, karena
-`increment('booked_count')` tetap mengunci baris di UPDATE-nya dan `DB::transaction(attempts: 3)`
-mengulang closure yang kalah. Sistem selamat lewat jalur yang tak dirancang untuk itu. Test #2-lah
-gerbang yang sesungguhnya. **Jangan hapus #2** dengan alasan #1 lebih realistis.
-
-### 16f. Kalau test gagal konek
-
-| Gejala | Sebab paling mungkin | Tindakan |
-|--------|----------------------|----------|
-| `SQLSTATE[HY000] [2002]` connection refused | container belum jalan / belum `healthy` | `docker compose up -d` lalu tunggu `docker compose ps` sehat |
-| `port is already allocated` saat `up` | ada MySQL lain di 3307 | ubah `DB_PORT_HOST` di `.env` atau matikan yang bentrok |
-| `Access denied for user 'root'` | password tak cocok dengan `docker-compose.yml` | samakan `DB_PASSWORD` (default `secret`) |
-| `Unknown database 'tas_testing'` | volume dibuat sebelum skrip init ada | `docker compose down -v && docker compose up -d` (**hapus data**) |
-| Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya — ia mencetak keluaran tiap anak |
+- **DB test terpisah dari DB dev** karena `RefreshDatabase` menjalankan `migrate:fresh`. Pemisahan ini
+  **baru benar-benar berlaku di container sejak 2026-09-14** (§6) — sebelumnya test di container
+  menembak `tas` dan meninggalkan schema `tas_test_N`. Kalau schema `tas_test_*` muncul lagi,
+  pengaman §6 bocor.
+- Test terhubung sebagai `root` karena pembuatan DB per-proses butuh hak `CREATE DATABASE`.
+- **Skrip init hanya jalan saat volume kosong.** Mengubah `docker/mysql/init/` menuntut
+  `docker compose down -v` (**hapus data**).
+- Healthcheck `mysqladmin ping` membuat `up --wait` & CI menunggu MySQL **siap melayani**, bukan
+  sekadar prosesnya hidup.
 
 ---
 
-## 17. Docker: app di container (slice D2′)
+## 17. Docker: app di container — kenapa bentuknya begini
 
-> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**.
-> Redis, Horizon, dan Reverb **belum** — menyusul di slice berikutnya.
+Setiap keputusan di bawah punya kegagalan nyata di belakangnya; jangan "dirapikan" tanpa
+membaca alasannya.
 
-### 17a. Kenapa app dimajukan mendahului Redis
+### 17a. Kode lewat bind mount, `vendor/` di volume Linux
 
-Rencana semula: Redis dulu (D2), containerisasi app belakangan (D4). Rencana itu **cacat** dan
-ketahuan saat D2 mulai dikerjakan: app dan seluruh test suite masih berjalan di **PHP native
-Windows**, dan PHP itu **tak punya klien Redis sama sekali**. Memenuhinya menuntut pemasangan DLL
-`php_redis` ke `php.ini` laragon — bisa (sudah diverifikasi: 6.3.0 ts-vs16-x64 termuat bersih),
-tapi mengubah PHP yang dipakai **semua** proyek di mesin itu, dan akan **terbuang** begitu app
-pindah ke container satu slice kemudian.
+`.:/var/www/html` di-bind mount → edit di editor Windows langsung terlihat tanpa rebuild. Tapi
+repo ada di NTFS, sehingga setiap `stat()` berkas dari container menyeberang ke Windows
+(milidetik, bukan mikrodetik). Satu request Laravel memuat **~925 berkas, 816 di antaranya
+`vendor/`**. Karena itu `vendor/` di-*mount* dari named volume `tas-vendor`, **hanya di dalam
+container** — `vendor/` di Windows tetap utuh untuk IDE/PHPStan/test native.
 
-Dengan app di container lebih dulu, klien Redis cukup `pecl install redis` di dalam image: satu
-baris, nol sentuhan ke mesin dev.
+Diukur dengan skrip yang sama (request API ber-token):
 
-### 17b. Menjalankan
+| Konfigurasi | Beruntun (median) | Setelah idle 15 dtk | Edit PHP terlihat |
+|---|---|---|---|
+| bind mount semua, OPcache CLI mati | 3,37 dtk (maks 8,4) | 3,38 dtk | langsung |
+| + `opcache.enable_cli=1` saja | 4,04 dtk | 3,59 dtk | langsung — **tidak membantu** |
+| + `validate_timestamps=0` (eksperimen) | 0,2 dtk | 0,2 dtk | **hanya setelah restart** — ditolak |
+| **+ `vendor/` di volume (dipakai)** | **0,12 dtk** | **0,68 dtk** | ≤2 dtk |
 
-```bash
-docker compose up -d              # mysql + app
-docker compose ps                 # app "Up", mysql "healthy"
-# aplikasi: http://localhost:8000
+Efek samping: `composer test` di container turun **68 → ±30 dtk**, kini lebih cepat dari native.
+Harganya **dua `composer install`** saat `composer.lock` berubah (§3). Keputusan D2′ yang dulu
+menolak volume vendor ("IDE & PHPStan jadi buta") keliru: host tetap punya `vendor/` sendiri.
+Repo **tidak** dipindah ke filesystem WSL2 (lebih cepat lagi, tapi mengubah lokasi proyek & alur IDE).
 
-docker compose exec app bash                    # masuk ke container
-docker compose exec app composer test           # gerbang, di dalam container
-docker compose exec app php artisan migrate:fresh --seed
-```
+### 17b. OPcache untuk CLI
 
-Build ulang image hanya perlu kalau `docker/php/Dockerfile` berubah:
-```bash
-docker compose build app && docker compose up -d
-```
+`php artisan serve` adalah SAPI **CLI**, dan default `opcache.enable_cli=0`. `docker/php/Dockerfile`
+menyalakannya dengan `validate_timestamps=1` (wajib untuk dev). **Khusus dev** — di produksi kode ada
+di dalam image dan `validate_timestamps=0` justru benar.
 
-### 17c. Apa yang ada di image
+### 17c. `php artisan serve --no-reload`
 
-| Ekstensi | Untuk apa |
-|----------|-----------|
-| `pdo_mysql` | DB (slice D1) |
-| `pcntl`, `posix` | **Horizon**. Justru inilah yang tak bisa dipenuhi PHP Windows native — salah satu alasan utama containerisasi ini ada |
-| `gd` | `endroid/qr-code` (PngWriter) untuk gambar QR gate-in |
-| `zip` | dipakai Composer |
-| `redis` | klien Redis, siap untuk slice berikutnya |
+Tanpa `--no-reload`, selama `.env` ada, `ServeCommand` menjalankan server web sebagai proses anak dan
+**membuang semua env var di luar whitelist** (demi auto-reload `.env`). Image tanpa `php.ini`
+(`variables_order=EGPCS`) → seluruh env compose ikut terbuang → server web membaca `.env` jalur
+native. **Akibat nyata sampai 2026-09-14:** app web di `:8000` melayani dari SQLite, job dari request
+web masuk tabel yang tak dibaca Horizon, `/broadcasting/auth` membalas 200 kosong — sementara CLI
+(artisan, Horizon, test) memakai MySQL/Redis. Harga flag: ubah `.env` butuh recreate service.
 
-### 17d. Kode masuk lewat bind mount, bukan COPY
+### 17d. Env disatukan lewat anchor
 
-`docker-compose.yml` mem-*bind mount* `.:/var/www/html`, jadi hasil edit di editor Windows
-langsung terlihat di container **tanpa rebuild**. Harganya: bind mount menembus NTFS, dan PHP
-membaca ribuan berkas kecil saat autoload.
+Env semua service PHP didefinisikan sekali (`x-php-env` di `docker-compose.yml`). Env yang berbeda
+antar service PHP adalah bug **diam**: worker dengan `QUEUE_CONNECTION` beda dari pendorong job tak
+pernah mengambilnya; publisher dengan `REVERB_HOST` beda tak pernah sampai. Catatan YAML: `<<:`
+menggabung **dangkal** — service yang menulis ulang `environment:`/`depends_on:` mengganti seluruh map.
 
-**Diukur, bukan ditebak** (`composer test`, 262 test, 12 proses paralel):
+### 17e. Isi image
 
-| Cara menjalankan | Durasi |
-|---|---|
-| PHP native Windows → MySQL container | 47 detik |
-| Di dalam container (bind mount NTFS) | 80 detik |
+`php:8.3-cli` + `pdo_mysql` (DB) · `pcntl`/`posix` (Horizon — alasan utama containerisasi) · `gd`
+(`endroid/qr-code`) · `zip` (Composer) · `redis` (pecl, klien `phpredis`) · OPcache dev · user non-root
+UID 1000 (juga pemilik `vendor/` agar volume kosong tak jadi milik root).
 
-Sekitar **1,7× lebih lambat**. Nyata, tapi jauh dari melumpuhkan — dan lebih murah daripada
-memindahkan repo ke filesystem WSL2 (yang mengubah lokasi proyek, jalur IDE, dan kebiasaan kerja).
+### 17f. Produksi: jangan salin setup ini
 
-`vendor/` **sengaja tidak** ditaruh di named volume walau itu akan lebih cepat: host akan
-kehilangan sumbernya, dan **IDE serta PHPStan di Windows ikut buta**.
-
-### 17e. Dua jalur, keduanya didukung
-
-| | Native Windows | Di dalam container |
+| | Dev (sekarang) | Produksi |
 |---|---|---|
-| Perintah | `composer test` | `docker compose exec app composer test` |
-| MySQL dihubungi lewat | `127.0.0.1:3307` (port host) | `mysql:3306` (nama service) |
-| Kecepatan | lebih cepat | ~1,7× lebih lambat |
-| Ekstensi `pcntl`/`redis` | **tidak ada** | ada |
+| Kode + vendor | bind mount + volume vendor | `COPY` + `composer install --no-dev --optimize-autoloader` **di image** |
+| Web server | `artisan serve` | nginx + php-fpm (atau FrankenPHP/Octane) |
+| OPcache | `validate_timestamps=1` | `validate_timestamps=0` (deploy = image baru) |
+| Cache Laravel | tidak | `config:cache` · `route:cache` · `event:cache` · `view:cache` |
+| `.env` | berkas bind mount | env var / secret platform |
+| Kunci Reverb | nilai dev di `.env.example` | acak, dari secret |
 
-Nilai DB di dalam container diberikan sebagai **env var** di `docker-compose.yml`, dan env var
-sungguhan menang atas `.env` (Laravel memuat dotenv secara *immutable*). Jadi tak ada berkas
-`.env` kedua yang harus dijaga.
-
-### 17f. Jebakan
-
-- **`php artisan serve`, bukan nginx + php-fpm.** Slice ini menerjemahkan setup yang sudah ada ke
-  container, bukan sekalian mengganti web server. nginx menyusul kalau memang dibutuhkan.
-- **Skrip init MySQL hanya jalan sekali**, saat volume masih kosong. Mengubah
-  `docker/mysql/init/` menuntut `docker compose down -v` (**hapus data**).
-- **`storage/logs/laravel.log` dibagi dengan host** lewat bind mount, jadi log dari kedua jalur
-  bercampur di satu berkas. Bukan bug, tapi bisa membingungkan saat menelusuri error.
+Volume di produksi hanya untuk data yang harus bertahan (MySQL, Redis), bukan kode. Belum ada
+produksi di proyek ini — backlog di `HANDOVER.md`.
 
 ---
 
-## 18. Docker: Redis + Horizon (slice D3′)
+## 18. Docker: Redis, Horizon, scheduler & Reverb
 
-> Ditambahkan 2026-09-12, **[ADR-0007](adr/0007-docker-redis-mysql-migration.md)**.
+### 18a. Redis & Horizon
 
-### 18a. Apa yang berubah
-
-| | Sebelum | Sesudah (di container) |
-|---|---|---|
-| Cache | driver `database` | **Redis** |
-| Session | driver `database` | **Redis** |
-| Queue | driver `database` | **Redis** |
-| Worker | `queue:listen` manual | **Horizon** (`docker compose up -d`) |
-
-**Horizon akhirnya benar-benar jalan** — pertama kali sepanjang proyek ini. Ia menuntut
-`ext-pcntl`, yang tak pernah ada di PHP Windows native. Cek:
+`app`, `horizon`, `scheduler`, `reverb` memakai `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` =
+`redis` (identik, §17d). Redis jalan dengan `appendonly yes`: antrian menyimpan **job** (termasuk
+reminder H-2 jam yang tertunda), dan tanpa persistensi `docker compose restart` membuangnya.
 
 ```bash
 docker compose exec app php artisan horizon:status     # -> Horizon is running
 ```
+Dashboard: `http://localhost:8000/horizon`.
 
-Dashboard-nya di `http://localhost:8000/horizon`.
+### 18b. Scheduler
 
-**Jalur native Windows TETAP driver `database`** — PHP native tak punya ekstensi redis. Ini
-disengaja: keduanya tetap hidup sampai jalur native dipensiunkan.
+`schedule:work` memanggil `schedule:run` tiap menit (pengganti cron di dev). Job yang dijadwalkan
+**didorong** ke Redis lalu **dieksekusi** Horizon — terverifikasi di log keduanya. **Satu instance
+saja**: dua scheduler = setiap sweep terkirim dua kali. Sebelum 2026-09-14 **tak ada yang pernah
+menjalankan scheduler** (tidak di container, tidak di `composer dev`), dan test tetap hijau karena
+memanggil job langsung.
 
-### 18b. Isolasi test: satu jebakan yang sempat menggigit
-
-Menyetel `CACHE_STORE`/`QUEUE_CONNECTION`/`SESSION_DRIVER` di `environment:` service `app`
-ternyata **menimpa isolasi `phpunit.xml`**: env var yang sudah ada di environment menang atas
-`<env>` yang tanpa `force="true"`. Akibatnya seluruh suite yang dijalankan **di dalam container**
-diam-diam berhenti memakai `sync`/`array` — job ter-antre alih-alih dieksekusi inline, dan test
-yang mengandalkan itu berubah makna **tanpa satu pun berwarna merah**.
-
-Ditutup dengan `force="true"` pada baris **isolasi** saja. Aturan yang berlaku sekarang:
-
-> Environment boleh menentukan **DI MANA** (host/port DB). Environment **tidak boleh** menentukan
-> **APAKAH** test terisolasi.
-
-`DB_*` sengaja **tanpa** `force` — justru itu yang wajib berbeda antara Windows (`127.0.0.1:3307`)
-dan container (`mysql:3306`). Test juga memakai **DB Redis terpisah** (`REDIS_DB=15`), sebab
-`RedisUniqueJobTest` meng-*flush* database itu; tanpa pemisahan ia akan menghapus cache & antrian
-dev yang berbagi container Redis yang sama.
-
-### 18c. Gerbang baru yang sebelumnya mustahil
-
-`tests/Feature/Hardening/RedisUniqueJobTest.php` menguji `ShouldBeUnique` lewat **perilaku**, bukan
-lewat string. Sebelum Redis, `QUEUE_CONNECTION=sync` melepas lock unique seketika, sehingga klaim
-`uniqueId()` = `{appointment}:{window}` hanya bisa dijaga dengan meng-assert string-nya
-(`CODE-WALKTHROUGH §O.3` jujur mencatat keterbatasan itu).
-
-Sekarang yang diuji adalah akibatnya: duplikat ditahan selama job masih pending, dan reminder hasil
-reschedule tetap lolos. **Mutasi dijalankan** — `uniqueId()` dikembalikan ke appointment id saja →
-2 dari 3 test **merah**.
-
-Test ini **dilewati** kalau Redis tak terjangkau (normal di native Windows). Karena itu service
-`redis` **wajib** ada di CI: gerbang yang dilewati di CI sama saja dengan tak ada.
-
-### 18d. Jebakan `PendingDispatch`
-
-`dispatch()` mengembalikan `PendingDispatch` yang baru benar-benar mendorong job saat objeknya
-**dihancurkan**. Menyimpannya ke variabel di dalam loop menunda push sampai variabel itu ditimpa:
-
-```php
-foreach ([1,2,3] as $i) { $r = dispatch($job); }   // SALAH: push tertunda 1 iterasi
-foreach ([1,2,3] as $i) { dispatch($job); }        // benar: langsung destruct -> push
+```bash
+docker compose exec scheduler php artisan schedule:list
 ```
 
-Gejalanya menyesatkan: ukuran antrian terbaca meleset satu langkah, dan mudah disalahartikan
-sebagai lock unique yang tak bekerja.
+### 18c. Reverb
 
-### 18e. Jebakan lain
+`reverb:start --host=0.0.0.0 --port=8080`, port `8080:8080`. PHP mem-publish ke `reverb:8080`; browser
+tersambung ke `localhost:8080` (§2). Terverifikasi end-to-end: booking lewat API → event
+`slot.availability.changed` di channel privat diterima klien di Windows; mutasi (reverb dimatikan /
+`REVERB_HOST=localhost` untuk PHP) → publish gagal.
 
-- **Worker dan pendorong job wajib satu store/connection.** Kalau `horizon` memakai
-  `QUEUE_CONNECTION` berbeda dari `app`, job tak pernah terambil — tanpa error, antrian cuma diam.
-  Keduanya disetel identik di `docker-compose.yml`.
-- **`redis:7-alpine` pakai `appendonly yes`.** Queue Redis menyimpan **job**; tanpa persistensi,
-  `docker compose restart` membuang seluruh antrian yang belum diproses.
+### 18d. `ShouldBeUnique` diuji lewat perilaku
+
+`tests/Feature/Hardening/RedisUniqueJobTest.php` menguji `ShouldBeUnique` di atas Redis nyata:
+duplikat ditahan selama job pending, reminder hasil reschedule (`uniqueId()` =
+`{appointment}:{window}`) tetap lolos. Mutasi `uniqueId()` → appointment id saja → 2 dari 3 test
+merah. Dilewati tanpa ekstensi `redis` atau tanpa Redis terjangkau (§4) — karena itu CI wajib punya
+service `redis`.
+
+### 18e. Jebakan
+
+- **`PendingDispatch` baru mendorong job saat dihancurkan.** Menyimpan `dispatch()` ke variabel di
+  dalam loop menunda push satu iterasi — ukuran antrian terbaca meleset dan mudah disangka lock
+  unique tak bekerja.
+  ```php
+  foreach ([1,2,3] as $i) { $r = dispatch($job); }   // SALAH: push tertunda 1 iterasi
+  foreach ([1,2,3] as $i) { dispatch($job); }        // benar
+  ```
+- **Broadcast gagal masuk `failed_jobs`, tidak hilang diam** — cek `php artisan queue:failed` saat
+  realtime tak jalan (§11).

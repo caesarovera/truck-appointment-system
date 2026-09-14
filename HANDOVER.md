@@ -13,6 +13,35 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-14` (kecepatan + clone kosong + D5′) · **[SELESAI] ADR-0007 tuntas.** Atas permintaan user:
+  push D6′, perbaiki kecepatan, lalu perbarui **semua** dokumen (perbaiki yang salah, hapus yang usang).
+  **(1) `98bf375` perf — request API 3,4 → 0,12 dtk.** Dugaan awal (OPcache CLI mati) **salah
+  sebagian**: `opcache.enable_cli=1` sendirian 4,0 dtk walau OPcache terbukti aktif (924 skrip, 8293
+  hit). Eksperimen `validate_timestamps=0` → 0,2 dtk membuktikan biayanya `stat()` ~925 berkas lewat
+  bind mount NTFS, 816 dari `vendor/`. Opsi yang ditimbang dengan angka: `validate_timestamps=0`
+  (ditolak — kode lama jalan diam-diam), `revalidate_freq=60`, WSL2, dan **`vendor/` di named volume**
+  (diukur di container percobaan dulu, lalu dipilih user). Hasil: 0,12 dtk beruntun, 0,68 dtk setelah
+  idle, edit PHP tetap ≤2 dtk, suite container 68 → **29 dtk** (kini lebih cepat dari native 36 dtk),
+  vendor Windows terbukti tak tersentuh (jumlah berkas/mtime/hash), set paket host = container (153,
+  versi sama). Membalik catatan D2′ "vendor sengaja tidak di volume". Harga: dua `composer install`.
+  **(2) `e3d3746` `.env.example` — kunci Reverb dev.** *Mulai cepat* yang baru **dijalankan dari clone
+  kosong** (stack terisolasi: project/container/volume/port terpisah, di-`!override`): dengan kunci
+  kosong setiap job broadcast gagal (`Pusher error: Not found`) sementara booking 201. Setelah fix:
+  clone → app ±1 menit, realtime domain end-to-end lulus (4,7 dtk), 265 test lulus. Stack verifikasi
+  dibongkar; hanya volume `tasfresh-*` yang dihapus.
+  **(3) D5′ dokumen.** `SETUP-GUIDE` ditulis ulang Docker-first (nomor topik §9–§18 dipertahankan agar
+  rujukan lama tak putus; panduan build era native dihapus); `README` (*Mulai cepat* terverifikasi),
+  `ONBOARDING`, `CLAUDE.md` (§Stack, §Cache, §Queue, §Perintah, §Urutan build usang dihapus, klarifikasi
+  kredensial dev), `CODE-WALKTHROUGH`, `DUMMY-DATA`, `FRONTEND`, ADR-0007 (catatan eksekusi + status),
+  komentar `ci.yml`. **`HANDOVER` 1.694 → ±1.020 baris:** jurnal sesi & changelog pra-Docker dihapus
+  (terverifikasi utuh di `git show pre-docker:HANDOVER.md`), §Jebakan/§Lingkungan ditulis ulang,
+  §Langkah berikutnya jadi tabel ADR-0007 selesai + Backlog B1–B6.
+  **Klaim dokumen yang ternyata salah (diuji, bukan dibaca):** repo "publik" (API 404 — privat);
+  contoh curl `driver_id: 6` (sopir company lain → 422; benar `5`); SPA di container memuat aset Vite
+  native (**benar**, terverifikasi 200). **Insiden kecil:** menghentikan `npm run dev` lewat task
+  runner meninggalkan Vite yatim (PID 37020) + `public/hot` basi — dihentikan per PID, dicatat sebagai
+  jebakan `SETUP-GUIDE §9a`.
+
 - `2026-09-14` (D6′ + 2 fix) · **[SELESAI] Scheduler + Reverb di container — dan dua klaim D2′/D3′
   ternyata SALAH; keduanya ditutup dengan bukti merah→hijau.** Keputusan user sesi ini: **Docker
   jadi jalur jalan utama, native cukup untuk `composer test`**; `composer dev` dibiarkan (native
@@ -52,7 +81,8 @@
   `force="true"`, dan **tidak menggigit** (`tas` tetap terhapus). Ketahuan karena uji merah
   **diulang setelah fix**, bukan diasumsikan; tanpa itu fix yang salah sudah ter-commit dengan pesan
   yang meyakinkan — persis kesalahan D3′ yang sedang dikoreksi.
-  **Temuan terbuka baru:** §Temuan D6′ (OPcache CLI mati → tiap request ~3 dtk).
+  **Temuan terbuka baru:** §Temuan D6′ (OPcache CLI mati → tiap request ~3 dtk) — **FIXED `98bf375`**
+  di sesi yang sama (penyebab sebenarnya `stat()` lewat bind mount, lihat entri di atas).
   **Data dev `tas` sesudah sesi:** hasil seed 2026-09-14 + 1 appointment `CANCELLED`
   (`D6VU0000001`, dari verifikasi domain).
   Docs: entri ini, §Temuan D6′, §MULAI SESI, §Langkah berikutnya, ADR-0007 §Catatan eksekusi,
@@ -168,123 +198,11 @@
 
 > # ═══ BATAS PRA-DOCKER ═══
 >
-> **Semua yang tercatat di bawah entri 2026-09-12 adalah keadaan stack PRA-DOCKER**: dev native
-> Windows, SQLite, queue/cache/session driver `database`. Keadaan itu **masih berlaku hari ini** —
-> belum ada satu pun yang diganti.
->
-> **Tag git: `pre-docker`** (commit terakhir era native). Untuk kembali ke keadaan itu persis:
-> `git checkout pre-docker`.
->
-> Migrasi ke **Docker penuh + Redis + MySQL** sudah **diputuskan & disetujui, belum dieksekusi** →
-> **[ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)**. Urutan slice-nya ada di
-> *Langkah berikutnya* di bawah. Setiap slice yang selesai **wajib** menambah entri baru di atas
-> batas ini, supaya "sebelum" dan "sesudah" tak pernah tercampur.
-
-- Update terakhir: `2026-09-12` · Sesi: **Audit prioritas + keputusan migrasi Docker/Redis/MySQL
-  (ADR-0007) + TEMUAN: test race-condition tidak menjaga `lockForUpdate()` sama sekali.**
-  **Tak ada kode aplikasi yang disentuh sesi ini** — murni analisis, keputusan, dan dokumen.
-  **(1) Audit sisa pekerjaan:** semua gerbang diverifikasi ulang sendiri & hijau (260 Pest/663
-  assert, PHPStan lvl 8, 111 Vitest, vue-tsc) — tak ada TODO/FIXME tertinggal di `app/`,
-  `resources/`, `routes/`. Sisa pekerjaan nyata: Redis/Horizon/MySQL (item #1), token abilities
-  sempit (ADR-0003), perluasan e2e, swap gateway TOS. **(2) Prioritas dipilih user = migrasi
-  infra**, lalu framing-nya diklarifikasi user jadi **pembelajaran**, bukan tenggat rilis — ini
-  mengubah bobot penilaian dan urutan eksekusi. **(3) Temuan utama sesi ini** (lihat §Temuan
-  2026-09-12 di bawah): klaim "race condition = inti proyek & sudah teruji" **diuji lewat mutasi**
-  dan **gagal** — `->lockForUpdate()` dihapus total dari `SlotRepository`, test
-  `it('never over-books the last slot')` **tetap PASS**. Sebabnya struktural: test memanggil
-  Action 2× **berurutan dalam satu proses**, dan eksekusi sekuensial tak pernah bisa membuktikan
-  lock. Perilaku 2 transporter menekan Booking di detik yang sama **belum pernah diuji sekali pun**.
-  Kode `lockForUpdate()` sendiri **benar** — yang bolong gerbangnya, bukan kodenya (kebalikan dari
-  4 temuan sekelas sebelumnya: `INACTIVE`, `driver_invalid_role`, toleransi gate-in, badge
-  "Berakhir" — di sana kodenya yang bolong). Mutasi langsung di-`git checkout`, working tree bersih.
-  **(4) Konsekuensi pada plan:** urutan plan awal (infra dulu, test-truth di tahap 6 dari 7)
-  **ditolak** — direvisi jadi **kebenaran dulu**: MySQL + test konkurensi sungguhan jadi slice #1.
-  **(5) 3 keputusan teknis dikunci bersama user** (detail + alasan di ADR-0007): Docker **penuh**
-  (app+Reverb+Horizon+Redis+MySQL — user menolak opsi hibrida yang saya rekomendasikan, alasannya
-  nilai belajar orkestrasi), klien Redis **`phpredis`** (bukan `predis` — hambatan DLL Windows hilang
-  begitu PHP pindah ke container Linux, **tak ada package Composer baru**), dan Pest+CI **ikut pindah**
-  ke MySQL/Redis nyata (tanpa ini temuan #3 tak bisa ditutup). **(6) Dokumen:** ADR-0007 (baru),
-  ADR-0005 (+catatan trigger "SQLite→MySQL" terpenuhi), `CLAUDE.md` §Stack + §Hardening/Race,
-  `ARCHITECTURE §7` (**klaim salah dikoreksi**), `CODE-WALKTHROUGH §J.1`, `SETUP-GUIDE` (banner
-  pra-Docker), `ONBOARDING` (banner), `README`, `HANDOVER` (batas + entri + temuan + langkah).
-- Sesi sebelumnya: `2026-08-14` (6) · Sesi: **Logo brand disatukan (`AppLogo.vue`) + favicon
-  tab browser diperbaiki (sebelumnya benar-benar tak ada — `favicon.ico` 0 byte).** Permintaan
-  langsung user ("tambahkan logo dan logo di tabnya"). Glyph jangkar (anchor) yang sebelumnya
-  diduplikasi manual **3x** (`AppNav.vue` + 2 tempat di `LoginPage.vue`, sedikit tak konsisten
-  stroke-width-nya) disatukan jadi `resources/js/components/AppLogo.vue` — 3 varian
-  (`nav`/`hero`/`compact`) mencerminkan 3 pemakaian yang sudah ada, bukan API generik baru.
-  **Favicon:** `public/favicon.ico` bawaan Laravel ternyata **0 byte** — placeholder yang tak
-  pernah diisi siapa pun sejak awal proyek. Percobaan pertama pakai `favicon.svg` (glyph sama,
-  di-hardcode hex karena di luar pipeline Tailwind) + `<link rel="icon" type="image/svg+xml">` —
-  server terbukti benar (dicek `curl`: 200, `Content-Type: image/svg+xml`), tapi **tak muncul
-  di tab browser user bahkan di incognito** (kemungkinan versi browser belum dukung favicon
-  SVG). Fix lebih tahan-banting: generate **PNG 32×32** + **ICO sungguhan** lewat GD (`ext-gd`,
-  sudah terpasang sejak slice QR) — `public/favicon-32.png` + isi ulang `public/favicon.ico`
-  (format ICO modern: `ICONDIR`+1 `ICONDIRENTRY` membungkus PNG, bukan BMP mentah — didukung
-  semua browser terkini). Ketiganya (svg/png/ico) didaftarkan bareng di `app.blade.php`,
-  browser pakai yang paling didukungnya. **Insiden kecil sesi ini:** untuk mematikan server uji
-  coba, sempat pakai `taskkill /F /IM php.exe` yang mematikan SEMUA proses PHP di mesin (termasuk
-  `composer dev` user yang sedang jalan) — dilaporkan ke user, tak diulangi (percobaan berikutnya
-  matikan proses spesifik lewat PID). **Terpisah, bukan bug:** error WebSocket
-  `ws://localhost:8080` di console — `VITE_REVERB_APP_KEY` di `.env` user terisi, jadi Echo
-  selalu mencoba konek, tapi `composer dev` (lihat `composer.json`) **tidak** menyalakan
-  `php artisan reverb:start`. Bukan regresi kode — dijelaskan ke user, bukan diperbaiki (di
-  luar scope "logo").  Verifikasi: `type-check` bersih, 111 Vitest, `npm run build` bersih,
-  file favicon dicek `curl` (Content-Type benar). Docs: `HANDOVER` saja (visual murni).
-- Sesi sebelumnya: `2026-08-14` (5) · Sesi: **Commit + push rebrand warna "kepelabuhanan
-  Indonesia" (harbor/signal/sand) — kerja yang sudah ada di working tree sejak sebelum sesi
-  ini mulai (lihat komentar `resources/css/app.css`: "Dipilih 2026-08-14 bareng user"), sengaja
-  ditahan 2 sesi sebelumnya karena belum diverifikasi/didokumentasikan, kini diverifikasi &
-  dicatat atas permintaan eksplisit user.** `resources/css/app.css` +3 skala warna custom
-  Tailwind v4 (`--color-harbor-*` navy dermaga, `--color-signal-*` oranye peti kemas,
-  `--color-sand-*` latar hangat pengganti `gray-50`) menggantikan `indigo`/`gray` default di
-  8 file FE (`AppLayout`, `AppNav`, `DashboardPage`, `DriverSchedulePage`, `GateHistoryPage`,
-  `LoginPage`, `MyUtilizationPage`, `SlotAvailabilityPage`). **`LoginPage.vue` bukan cuma ganti
-  warna** — didesain ulang jadi split-panel (kiri: hero navy dgn ilustrasi SVG kontainer/crane/
-  ombak + headline; kanan: form) — `data-testid` (`login-email`/`login-password`/`login-submit`/
-  `login-error`) **tak berubah**, jadi tak menyentuh `helpers.ts` e2e maupun test manapun.
-  Sisanya (`AppNav`, dst.) murni penggantian kelas warna, tanpa perubahan struktur/testid.
-  **Verifikasi sebelum commit:** `type-check` bersih, **111 Vitest** hijau, `npm run build`
-  bersih, **5/5 e2e** hijau (1 flaky run karena beban mesin transient — bukan regresi, rerun
-  bersih). Tak ada perubahan backend/kontrak/seeder.
-- Sesi sebelumnya: `2026-08-14` (4) · Sesi: **Debug 3 spec e2e yang gagal (dilaporkan sesi
-  sebelumnya) — semua kini hijau, 2 akar masalah lingkungan berbeda + 1 kontensi paralelisme,
-  bukan bug bisnis.** Permintaan langsung user ("debug 3 spec e2e yang gagal itu"). Isolasi lewat
-  `--workers=1` per file dulu menyingkap 2 penyebab nyata: **(1)** `.env.e2e` `MAIL_MAILER=log` +
-  `QUEUE_CONNECTION=sync` bikin `AppointmentReminderJob` (notifikasi H-2 jam) render+tulis HTML
-  penuh ke disk **inline di request booking** (sync mengabaikan `->delay()`) — cukup lambat untuk
-  melewati timeout default `expect()` Playwright (5dtk) walau backend-nya sendiri sukses (dibuktikan
-  dari `laravel.log`). **(2)** `tests/e2e/helpers.ts::hhmm()` pakai `toTimeString()` (jam lokal
-  mesin, UTC+7 di sini) alih-alih UTC seperti `today()` di file yang sama & `APP_TIMEZONE=UTC`
-  backend — window "sekarang ±" di `gate-in-out.spec.ts` meleset 7 jam, gate-in ditolak 409
-  `gate_in_too_early`. Setelah 2 fix itu, 4/5 test hijau; sisa 1 (`gate-in-out`) masih flaky di
-  mode paralel (4 worker default) — bukan error di log, murni backend 1-proses+sqlite kepayahan
-  dilayani beberapa spec bareng. `playwright.config.ts` +`workers: 1` menutupnya, diverifikasi 2×
-  run beruntun **5/5 lulus konsisten**, malah lebih cepat per test (kontensi hilang). **Kode yang
-  diubah:** `.env.e2e`+`.env.e2e.example` (`MAIL_MAILER=array`), `tests/e2e/helpers.ts` (`hhmm()`
-  UTC), `playwright.config.ts` (`workers: 1`) — **tak ada kode aplikasi yang disentuh**, murni
-  konfigurasi+tooling e2e. Docs: `SETUP-GUIDE §15c` (cakupan 5 spec + jebakan worker), entri ini,
-  §Jebakan (detail akar masalah). Backend/frontend gerbang lain tak dijalankan ulang (tak disentuh).
-- Sesi sebelumnya: `2026-08-14` (3) · Sesi: **Konfirmasi eksplisit + loading state (spinner) di semua tombol aksi lintas role — bukan slice fitur, polish UX atas permintaan langsung user ("tambahkan validasi di setiap button aksi di setiap role... tambahkan loading yang bagus").** Audit manual semua `@click`/`type="submit"` di 10 file FE menemukan 3 gap nyata: **(1) `AdminPage.vue`** — delete terminal/gate/company/user pakai `confirm()` native (tak konsisten dgn styling app) dan submit tambah/update di 4 tab **sama sekali tanpa loading state**; **(2) `GateDashboardPage.vue`** — Gate In/Gate Out (aksi fisik ireversibel di lapangan) langsung eksekusi tanpa konfirmasi apa pun; **(3) `PlannerWindowsPage.vue`** — "Tutup" window (menutup slot kuota aktif) langsung eksekusi tanpa konfirmasi. 2 komponen baru digunakan lintas halaman (bukan duplikasi manual, dikonfirmasi user lewat `AskUserQuestion` sebelum ditulis): `components/Spinner.vue` (SVG kecil, `aria-hidden`, dipakai di teks tombol "Memproses…") dan `components/ConfirmButton.vue` (tombol 2-langkah: klik → "Yakin?" + Ya/Batal via `v-model:open` dikontrol parent — pola generalisasi dari yang sudah manual di `MyTrucksPage`/`MyBookingsPage`). `MyTrucksPage`/`MyBookingsPage`/`RescheduleDialog`/`BookingForm` sudah punya confirm/pending sebelumnya — cuma ditambah ikon `Spinner` biar konsisten visual, tidak direstrukturisasi. **Efek pada test:** Gate In/Out & Tutup window sekarang 2 klik (buka konfirmasi → klik `-confirm`) — `tests/js/GateDashboardPage.test.ts`, `tests/js/PlannerWindowsPage.test.ts` disesuaikan (tambah 1 `trigger('click')`), `tests/js/AdminPage.test.ts` mock composable ditambah `isPending: ref(false)` di `create`/`update`/`remove` (sebelumnya cuma `mutateAsync`, template baru baca `.isPending.value` → crash tanpa ini), `tests/e2e/gate-in-out.spec.ts` (file **pre-existing tak tersentuh sesi manapun sebelumnya** — lihat §Jebakan soal status e2e) ikut disesuaikan klik `gate-in-confirm`/`gate-out-confirm`. **Tak ada perubahan backend/kontrak/seeder** — murni FE. Semua gerbang FE hijau: `npm run type-check` bersih, **111 Vitest** (angka sama — test yang ada disesuaikan, bukan ditambah), `npm run build` bersih. Backend tak disentuh (260 Pest tetap). Docs: entri ini saja (tak ada perubahan kontrak yang butuh `BUSINESS-FLOW`/`CLAUDE.md`).
-- Sesi sebelumnya: `2026-08-14` (2) · Sesi: **E2E Playwright dipasang (lokal-only) — mengeksekusi item #3 *Langkah berikutnya*, trigger `ADR-0005` "persiapan rilis".** User minta "automation testing di browser pakai Playwright"; diklarifikasi dulu (ini bukan e2e VS Playwright — Playwright cuma tool-nya) lalu dikonfirmasi 2 keputusan: alasan = persiapan rilis (bukan regresi nyata), scope = penuh (prasyarat + Playwright + 1 smoke test), **CI wiring TIDAK ikut** (lokal-only, biaya browser binary ~140MB belum sepadan). Prasyarat `ADR-0005` yang sebelumnya menggantung kini beres: `.env.e2e.example` (baru, `APP_ENV=e2e`, DB terpisah `database/database.e2e.sqlite` — otomatis ke-gitignore lewat pola `/database/*.sqlite` yang sudah ada, `.env.e2e` sendiri ditambah ke `.gitignore`), `data-testid` di `LoginPage.vue` (`login-email`/`login-password`/`login-submit`/`login-error`) & `BookingForm.vue` (`booking-truck`/`booking-driver`/`booking-container-no`/`booking-submit`/`booking-cancel`/`booking-error`) — dua halaman yang sebelumnya **0** testid, plus `booking-success` di `SlotAvailabilityPage.vue` (sudah punya `slot-card`/`book-button` sejak awal). `playwright.config.ts`: `webServer` boot **1** proses (`php artisan serve --env=e2e`, asset produksi via `npm run build` — bukan Vite dev server), `globalSetup` (`tests/e2e/global-setup.ts`) bikin file sqlite kalau belum ada (Laravel tak membuatnya sendiri — jebakan pertama yang ketemu: migrate gagal "unable to open database file" sebelum ini ditambah) + `npm run build` + `migrate:fresh --seed --env=e2e`. **Jebakan kedua:** `--env=e2e` di `artisan serve` cuma bikin `ServeCommand` mengawasi file `.env.e2e` (reload-on-change) — env var sungguhan yang dipakai proses PHP yang di-spawn butuh `APP_ENV=e2e` eksplisit di `env:` config Playwright (`ServeCommand::$passthroughVariables` meneruskan `APP_ENV` dari situ, bukan dari flag). 1 smoke test (`tests/e2e/booking-happy-path.spec.ts`): login `dispatcher@majulog.test` → `/slots` → Gate B tanggal besok (satu-satunya window yang dijamin belum "Berakhir" apa pun jam DB di-seed, lihat `DemoSeeder`) → booking → assert "Booking berhasil". **Terverifikasi jalan:** `npm run test:e2e` → 1 passed. Semua gerbang lain tetap hijau (260 Pest/663 assert, PHPStan lvl 8, Pint, 111 Vitest, vue-tsc) — perubahan FE cuma tambah atribut `data-testid`, tak mengubah logic. Docs: `docs/SETUP-GUIDE.md §15` (baru), `docs/adr/0005-ci-github-actions.md` (+catatan trigger terpenuhi). **package baru:** `@playwright/test` (dev, dikonfirmasi user) + binary Chromium (`npm run test:e2e:install`, ~115MB, di luar `node_modules`/git).
-- Sesi sebelumnya: `2026-08-14` (1) · Sesi: **QR gate-in dibangun — satu-satunya sisa temuan ronde 4 (P3), ditutup dengan "opsi B lebih besar": token ter-sign + endpoint verifikasi + endpoint gambar on-demand.** User eksplisit minta rencana anti-"server penuh" dari akumulasi gambar QR sebelum kode ditulis — jawabannya bukan "hapus berkala", tapi **jangan pernah simpan gambar sama sekali**: render utama di client (`AppointmentQrCode.vue`, lib `qrcode`, canvas, dari `qr_token`) + 1 endpoint backend opsional utk cetak/email (`endroid/qr-code`, PNG dibuat di memori per request, `Storage::put()` **nol kali** — dites eksplisit lewat `Storage::fake` + assert direktori tetap kosong). Backend: `AppointmentQrTokenService` (HMAC-SHA256 pakai `APP_KEY`, TTL = `slotWindow.endsAt() + gate_in.late_minutes` — reuse config yang sudah ada, selaras dgn batas gate-in itu sendiri), `InvalidQrTokenException` (403), `GET /appointments/qr/{token}` + `GET /appointments/qr/{token}/image` (otorisasi `Gate::authorize('view', ...)` manual — satu-satunya tempat di proyek ini yang tak lewat middleware `can:...,appointment`, karena id baru diketahui setelah token didekode), `AppointmentResource.qr_token` (whenLoaded slotWindow, pola sama `dwell_minutes`). 16 test Pest baru (244→**260 Pest/663 assert**), 7 Vitest baru (**111 Vitest**), PHPStan lvl 8 bersih, Pint bersih, vue-tsc bersih, build bersih. 2 package baru dikonfirmasi user sebelum ditambah: `endroid/qr-code` (`^5.0` — versi terbaru butuh php^8.4, mesin dev masih 8.3) + `qrcode`(npm)+`@types/qrcode`. Docs: `BUSINESS-FLOW §3.4/§3.5`, `SETUP-GUIDE §10d` (2 baris endpoint baru), `CODE-WALKTHROUGH §AA` (baru), `FRONTEND.md §4`+`§5`. 2 commit terpisah (backend lalu frontend).
-- Sesi sebelumnya: `2026-08-13` (6) · Sesi: **`DashboardPage` punya bug identik dgn `AppNav` (ronde 3 hari ini) — 4 kartu link masih gagal/kosong untuk admin, cuma AppNav yang dibetulkan sebelumnya.** Dilaporkan user setelah lihat "izin aktif" di Dashboard: "Booking Saya"/"Armada Truk"/"Jadwal Hari Ini"/"Dashboard Gate" tetap tampil ke admin walau backend-nya menolak/kosong (`company_id`/`terminal_id`/role `driver` tak ada). Fix: pola identik commit sebelumnya (`company_id != null` utk company-scoped, `terminal_id != null` utk gate, `hasRole('driver')` utk jadwal) diterapkan ke `DashboardPage.vue` juga — plus tambah kartu **"Riwayat Gate"** yang kelupaan saat fitur itu dibangun (ada di AppNav, tak ada di Dashboard). 4 test Vitest baru (`DashboardPage.test.ts` — **file test pertama untuk halaman ini**). 107 Vitest, vue-tsc, `npm run build` hijau (backend tak disentuh). **Pelajaran dicatat di `FRONTEND.md §6`:** ada 2 tempat (`AppNav` + `DashboardPage`) yang mesti gating identik dan tak ada mekanisme yang memaksa itu — kalau nanti nambah link baru, cek keduanya.
-- Sesi sebelumnya: `2026-08-13` (5) · **Fitur baru: tab "Role & Izin" di Master Data — admin bisa edit permission dari 5 role yang sudah ada (BUKAN bikin/hapus role baru).** User awalnya minta "role CRUD penuh" (bisa bikin role baru) — ditolak dulu, dijelaskan kenapa: `AppointmentPolicy` (jantung otorisasi row-level proyek ini) hardcode nama role untuk scoping (`hasRole('gate-officer') => atOfficerTerminal(...)`, dst), jadi role baru lewat CRUD murni akan selalu 403 di endpoint appointment walau permission-nya lengkap — perlu refactor Policy jadi data-driven (kolom `scope_type`) dulu, pekerjaan arsitektur terpisah. User setuju scope dipersempit ke editor permission untuk 5 role yang ada. Backend: `GET /admin/roles` + `PUT /admin/roles/{role}/permissions` (baru), permission `role.manage` (baru, admin-only otomatis), `RoleRepository` (sync=replace, `allPermissionNames()` pakai loop eksplisit karena PHPStan tak bisa buktikan `pluck()->all()` itu `list<string>`), `UpdateRolePermissionsAction` menolak role `admin` (422 `role_immutable`, **server-enforced** — bukan cuma UI, mencegah admin mengunci diri sendiri). Frontend: tab ke-5 `AdminPage.vue` — checkbox grid, role admin read-only. 7 test Pest baru + 4 test Vitest baru (**AdminPage baru pertama kali punya test Vitest sama sekali** — gap lama, dilaporkan tak ditutup penuh, cuma tab baru yang di-test). 244 Pest/640 assert, 103 Vitest, PHPStan lvl 8 (sempat merah: `pluck('name')->all()` bukan `list<string>` yang provable — diperbaiki loop eksplisit), Pint, vue-tsc, build — semua hijau. Docs: `BUSINESS-FLOW §1` (footnote⁵) , `CODE-WALKTHROUGH §V.6` (baru, jelaskan batasan arsitektur), `SETUP-GUIDE §10d`, `FRONTEND.md §4`.
-- Sesi sebelumnya: `2026-08-13` (4) · **Fitur baru (bukan bugfix): halaman "Riwayat Gate" untuk planner + gate-in/out muncul di "Booking Saya" transporter.** Dipicu pertanyaan user langsung ("gimana cara tahu truk yang sudah gate-in/out"): sebelumnya cuma bisa dilihat lewat menu Gate (gate-officer, hilang begitu `COMPLETED`) atau API audit trail mentah (tanpa UI). Backend: endpoint baru `GET /reports/gate-history?gate=&date=` (planner/admin, `hasAnyRole` — pola `UtilizationReportRequest`) + repo method `gateHistoryForGate()` (`whereHas('gateIn')`, cakupan lebih luas dari antrian gate-officer — termasuk yang sudah `COMPLETED`); `AppointmentRepository::forCompany()` (dipakai "Booking Saya") ikut eager-load `gateIn`/`gateOut` — **tanpa endpoint baru** untuk transporter; `AppointmentResource` +`company` (whenLoaded, planner lintas-company perlu tahu ini truk siapa). Frontend: halaman baru `GateHistoryPage.vue` (`/planner/gate-history`, link "Riwayat Gate" gated `slot.manage`), `MyBookingsPage` tampilkan Gate in/Gate out per card. 5 test Pest baru + 20 test Vitest baru/diperluas (237 Pest / **99 Vitest**). PHPStan sempat merah (nested-closure `where('gate_id', …)` di dalam `whereHas` — pola persis yang sudah dihindari `queueForTerminal`; diperbaiki jadi `whereRelation`, bukti bagus kenapa gerbang analyse dijalankan tiap slice). Docs: `BUSINESS-FLOW §1`+`§3.7`, `CODE-WALKTHROUGH §N.7` (baru), `SETUP-GUIDE §10d` (+ nambal drift lama: baris `no-show` yang lupa ditambahkan sesi sebelumnya), `FRONTEND.md §4`+`§6`.
-- Sesi sebelumnya: `2026-08-13` (3) · **Bug kedua dari sesi verifikasi manual: admin bisa buka 4 menu operasional (Booking Saya/Armada/Gate/Jadwal Hari Ini) yang semuanya gagal atau kosong.** `AppNav` menggate link cuma pakai `can(permission)`, dan admin punya SEMUA permission (`RolePermissionSeeder`) — tapi 3 endpoint di baliknya (`MyFleetController`/`MyAppointmentsController`/`GateQueueController`) `abort_if(company_id/terminal_id === null)` 403 karena admin **tak** punya identitas company/terminal. `/today` beda: backend-nya tak 403, cuma balikin list kosong (admin bukan `driver_id` appointment mana pun) — bukan error, tapi menu tak relevan. Fix: `AppNav` link `/bookings`/`/trucks` tambah cek `company_id != null` (pola sama dgn `/reports` yang sudah ada), `/gate` cek `terminal_id != null`, `/today` cek `hasRole('driver')`. 2 test Vitest baru (231→89 Vitest tetap sama filenya, `AppNav.test.ts` +2 → **91 Vitest**). Lihat *Sudah selesai*.
-- Sesi sebelumnya: `2026-08-13` (2) · **Bug ditemukan saat verifikasi realtime manual → fix: badge "Tersedia" & pesan error booking tak bedakan window yang sudah berakhir.** `SlotWindowResource` diam-diam tak pernah expose bahwa window `OPEN` bisa saja `window.end`-nya sudah lewat (`SlotWindow::hasEnded()` sudah ada sejak ronde 2, cuma dipakai `BookAppointmentAction`) — akibatnya FE `/slots` menampilkan badge **"Tersedia"** + tombol Booking untuk window yang **pasti** ditolak 409 server-side, dan pesan error-nya generik ("penuh atau ditutup") walau backend sudah kirim alasan spesifik. Fix: `SlotWindowResource` + `ended`, FE badge baru **"Berakhir"** (menang atas sisa kuota) + tombol Booking disembunyikan, `BookingForm` pakai `message` asli dari backend alih-alih teks hardcode. 2 test Pest + 3 test Vitest baru (229→**231 Pest**, +2 Vitest → **89 Vitest**). Lihat *Sudah selesai*.
-- Sesi sebelumnya: `2026-08-13` (1) · **2 temuan ronde 4 ditutup — `dwell_time` (P3) & no-show manual (P2).** `dwell_time`: `Appointment::dwellMinutes()` (dihitung dari relasi `gateIn`/`gateOut` yang sudah dimuat, bukan query baru) diekspos sebagai `AppointmentResource.dwell_minutes`. No-show manual: `POST /api/v1/appointments/{id}/no-show` (baru) — reuse `MarkNoShowAction` yang sudah ada (dipakai `NoShowSweepJob`), Policy `process` yang sama dgn gate-in/out (bukan ability baru), tanpa ubah state machine. 3 test Unit + 7 test Feature baru (223→229 Pest). **QR masih terbuka** — satu-satunya sisa temuan ronde 4, lihat *Senior review ronde 4* & *Langkah berikutnya*.
-- Sesi sebelumnya: `2026-08-02` · **Senior review ronde 4 (audit tasklist) + 4 temuan ditutup: toleransi jendela gate-in (P1), reminder saat reschedule (P1), test audit trail (P2), endpoint audit log (P2).** Audit menemukan 7 janji kontrak yang tak pernah dibangun; **2 P1 ditutup sesi itu**, masing-masing lewat test-dulu (bukti merah: **200 alih-alih 409**, lalu **0 reminder dijadwalkan + reminder basi tetap terkirim**). Semua gerbang dijalankan ulang & hijau (angka di bawah = hasil run nyata, bukan salinan).
-- Sesi sebelumnya: `2026-07-27` — **fix bug P1 `driver_invalid_role` (loop TDD) + ADR-0006 "sopir admin-only" + koreksi PRD §3.** Bug dari *Senior review ronde 3* ditutup lewat test-dulu: test merah dengan **201 alih-alih 422**, baru guard-nya dipasang.
-- Sesi sebelumnya: `2026-07-26` — **Senior review ronde 3**: audit kode + dokumen, semua gerbang diverifikasi sendiri; 1 bug (P1) + drift dokumen P2/P3 dibereskan. Temuan lengkap: *Senior review ronde 3* di bawah.
-- Sesi sebelumnya: `2026-07-25` — **CRUD armada truk transporter (`/me/trucks`) + fix penegakan status `INACTIVE`**. Slice fleet CRUD (yang sebelumnya menggantung uncommitted) ditutup: BE 3 Action + DTO + 2 FormRequest + 4 controller + repo, FE `MyTrucksPage`/`useTrucks`, route `/trucks`. **Bug ditemukan saat review & diperbaiki:** `TruckStatus::INACTIVE` tidak ditegakkan di mana pun — truk nonaktif tetap berhasil di-book (201).
-- Branch: `main` (repo di-init + push ke GitHub `caesarovera/truck-appointment-system`).
-- Build backend: `composer test` → ✅ **260 pass / 663 assert** · `composer analyse` → ✅ PHPStan lvl 8 (0 error) · `composer fix` → ✅ Pint bersih.
-- Build frontend: `npm run test:js` → ✅ **111 pass** · `npm run type-check` (vue-tsc) → ✅ · `npm run build` → ✅.
-- **CI TERVERIFIKASI hijau untuk sesi QR (2026-08-14).** Run [31733381087](https://github.com/caesarovera/truck-appointment-system/actions/runs/31733381087) @ `b18f6e4` ("ci: tambah ext-gd") — `main`, event `push`, **completed/success**, ~37 detik, kedua job + semua step lolos (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build). **Beda pola dari ronde 4:** 3 commit QR (`ee583e4`/`222d69a`/`6a9882a`) **tak punya run sendiri-sendiri** — dipush bareng `b18f6e4` dalam 1 push, jadi cuma head commit-nya yang dapat run, tapi run itu mencakup semua perubahan QR + fix ext-gd sekaligus.
-- **CI TERVERIFIKASI hijau — kedua commit ronde 4 punya run-nya SENDIRI** (di-push satu per satu, sesuai catatan §14c "1 run per PUSH, bukan per COMMIT"): run [30755579994](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755579994) @ `a7ae12b` (toleransi jendela gate-in) & run [30755628256](https://github.com/caesarovera/truck-appointment-system/actions/runs/30755628256) @ `3ea6dd4` (reminder saat reschedule) — **kedua job + SEMUA step** sukses di keduanya (backend Pint·PHPStan·Pest, frontend Vitest·vue-tsc·build), 0 step gagal. Karena masing-masing di-push sendiri, `a7ae12b` punya bukti hijau yang menempel padanya sendiri — bukan cuma "teruji lewat keturunannya". Itu baru berarti kalau kelak ia di-`revert`/`cherry-pick` sendirian. Sebelumnya: run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447) @ `f6495a0`. Yang paling berarti di tiap run: step **Install dependensi** backend hijau — itu `composer install` **tanpa** `--ignore-platform-req`, satu-satunya hal yang mesin dev Windows secara struktural **tak bisa** uji sendiri.
-- Paket FE baru: `qrcode` + `@types/qrcode` (dikonfirmasi user) · sebelumnya `laravel-echo@^2` + `pusher-js@^8`.
-- Paket BE baru: `endroid/qr-code:^5.0` (dikonfirmasi user; versi 6 butuh php^8.4, mesin dev 8.3 → `--ignore-platform-req=ext-pcntl,ext-posix` sama seperti Horizon, lihat §Jebakan).
+> Entri **di atas** = era Docker (ADR-0007, 2026-09-12 → sekarang). Jurnal sesi **sebelum** itu —
+> dev native Windows + SQLite, 2026-06-27 → 2026-09-12 — **sudah usang dan dihapus dari berkas
+> ini** (2026-09-14) supaya bacaan awal sesi tak menyeret keadaan yang tak lagi berlaku. Isinya
+> utuh di git: `git show pre-docker:HANDOVER.md`. Fitur dari era itu tetap tercatat di *Sudah
+> selesai*; keputusan & temuannya di *Senior review* dan `docs/adr/`.
 
 ## Sudah selesai
 - [x] **`AppLogo.vue` (1 sumber glyph, ganti 3x duplikat manual) + favicon tab browser
@@ -563,8 +481,9 @@
   tanpa menambahkannya ke workflow = gerbang itu tak berlaku saat push.** Detail keputusan lain:
   `if: !cancelled()` (satu push melaporkan SEMUA gerbang rusak, bukan berhenti di yang pertama);
   **tanpa `--ignore-platform-req`** (flag itu kebutuhan Windows karena Horizon minta `ext-pcntl`/
-  `ext-posix`; di Linux ada, jadi CI memverifikasi dependensi apa adanya); **tanpa service container
-  DB** (`phpunit.xml` memaksa sqlite `:memory:`); versi dipatok menyamai mesin dev (PHP 8.3, Node 22).
+  `ext-posix`; di Linux ada, jadi CI memverifikasi dependensi apa adanya); ~~tanpa service container
+  DB (`phpunit.xml` memaksa sqlite `:memory:`)~~ **[usang sejak D1/D3′: CI kini punya service
+  `mysql:8.4` + `redis:7`]**; versi dipatok menyamai mesin dev (PHP 8.3, Node 22).
   Cara pakai + tabel gejala→sebab saat CI merah: `docs/SETUP-GUIDE.md §14`. Alasan CI didahulukan
   & **e2e ditunda**: `docs/adr/0005-ci-github-actions.md`.
   **TERVERIFIKASI hijau** (run [30164709068](https://github.com/caesarovera/truck-appointment-system/actions/runs/30164709068),
@@ -639,7 +558,7 @@
 - [x] Paket wajib terpasang: Sanctum, Horizon, Reverb, Spatie Permission/ActivityLog/Data, Pest, Larastan. Config/migrasi sudah dipublish; `routes/api.php` + `channels.php` ter-wire (install:api).
 - [x] Skema + model (BUSINESS-FLOW §4): 8 migrasi domain + kolom `terminal_id`/`company_id` di users. Model + relasi + casts + 5 Enum (`AppointmentStatus` memuat state machine). Factory untuk semua model.
 - [x] RolePermissionSeeder + DemoSeeder jalan (`migrate:fresh --seed` hijau).
-- [x] Tooling: `phpstan.neon` (lvl 8), `tests/Pest.php` (RefreshDatabase di Feature), composer scripts `test/analyse/fix/lint`, `AppServiceProvider::preventLazyLoading`. phpunit pakai sqlite `:memory:` (dev db tidak ke-wipe).
+- [x] Tooling: `phpstan.neon` (lvl 8), `tests/Pest.php` (RefreshDatabase di Feature), composer scripts `test/analyse/fix/lint`, `AppServiceProvider::preventLazyLoading`. ~~phpunit pakai sqlite `:memory:`~~ **[usang: sejak D1 MySQL `tas_testing`, isolasi di-force + `tests/TestCase.php` — `SETUP-GUIDE §6`]**.
 - [x] **Data layer:** `SlotRepositoryInterface`/`AppointmentRepositoryInterface` + impl Eloquent, bound di `AppServiceProvider`.
 - [x] **BookAppointmentAction + test race condition:** `DB::transaction(attempts:3)` + `lockForUpdate` + cek penuh/tutup (409) + `containers.slot_window_id` + cek kepemilikan fleet. Event `AppointmentBooked` → listener invalidasi cache. 12 test (Action + endpoint).
 - [x] **Endpoint:** `GET /api/v1/slots/availability` (Cache::flexible) + `POST /api/v1/appointments` (auth:sanctum + middleware `idempotency`). FormRequest+DTO masuk, Resource keluar.
@@ -890,8 +809,8 @@
 
 ## Temuan D6′ 2026-09-14 — jalur container ternyata tak semuanya memakai container
 
-Ditemukan saat **verifikasi live** D6′, bukan saat membaca kode. Tiga pertama FIXED sesi yang sama
-(detail & bukti merah→hijau di entri §Status `2026-09-14`):
+Ditemukan saat **verifikasi live** D6′ dan saat menjalankan *Mulai cepat* dari clone kosong, bukan saat
+membaca kode. **Semua FIXED 2026-09-14** (detail & bukti merah→hijau di entri §Status `2026-09-14`):
 
 - **[FIXED `d186c4a`] Test di container menembak DB dev `tas`** + `force="true"` tak pernah berefek
   (`env()` membaca `$_SERVER`). Kelas bug ronde 5 lagi: **tak ada gerbang** — suite tetap hijau.
@@ -899,139 +818,85 @@ Ditemukan saat **verifikasi live** D6′, bukan saat membaca kode. Tiga pertama 
   compose. Klaim D2′/D3′ "app memakai MySQL/Redis" hanya benar untuk CLI.
 - **[FIXED `234db36`] Scheduler tak pernah dijalankan siapa pun** + **realtime putus di jalur
   container** (`REVERB_HOST=localhost`).
-- **[TERBUKA — P2] OPcache mati untuk SAPI CLI → tiap request ~3 detik.** `artisan serve` = SAPI CLI,
-  image tanpa `php.ini` → `opcache.enable_cli=0` → setiap request mengompilasi ulang framework lewat
-  bind mount NTFS. Diukur: `GET /up` 3,28 / 2,96 / 2,60 dtk; login ~8 dtk, booking ~10 dtk.
-  **Naik jadi P2 karena Docker kini jalur utama** — SPA akan terasa rusak, bukan sekadar lambat.
-  Kandidat fix (belum dicoba, **wajib diukur ulang**): `conf.d` di `Dockerfile` dengan
-  `opcache.enable_cli=1` + `opcache.validate_timestamps=1` + `opcache.revalidate_freq=0` (dev: edit
-  kode tetap langsung terlihat). Sengaja tak dikerjakan di D6′ — di luar scope yang disepakati.
+- **[FIXED `98bf375`] App di container lambat (median 3,4 dtk/request, lonjakan 8 dtk).** Penyebab
+  terbukti **bukan** kompilasi: `opcache.enable_cli=1` sendirian tak membantu (4,0 dtk) walau OPcache
+  aktif. Eksperimen `validate_timestamps=0` → 0,2 dtk membuktikan biayanya `stat()` ~925 berkas per
+  request lewat bind mount NTFS — 816 dari `vendor/`. Fix: `vendor/` di named volume + OPcache CLI →
+  **0,12 dtk**; suite container 68 → ±30 dtk. Tabel angka: `SETUP-GUIDE §17a`.
+- **[FIXED `e3d3746`] Clone baru: realtime mati diam-diam.** `.env.example` mengosongkan kunci Reverb →
+  setiap job broadcast gagal di Horizon (`Pusher error: Not found`) sementara booking tetap 201.
+  Ditemukan dengan **menjalankan** *Mulai cepat* dari clone kosong di stack terisolasi, bukan membacanya.
+- **[FIXED D5′] Klaim dokumen yang salah:** `SETUP-GUIDE §14c` "repo publik, cek CI via curl tanpa token"
+  (repo privat — API 404); contoh curl booking `driver_id: 6` (sopir company lain → 422); `README`
+  *Mulai cepat* rusak untuk clone baru; di `SETUP-GUIDE` versi lama: subbagian phpunit sqlite `:memory:`,
+  "CI tanpa service DB" (§14), dan "`force` menutup isolasi" (§18) — kini ditulis ulang.
 - **[CATATAN] Metode yang menemukan semuanya:** memeriksa **di mana data benar-benar mendarat**
   (token login di MySQL atau SQLite? schema test bernama apa?), bukan "apakah responsnya 200" atau
   "apakah test hijau". Kedua pertanyaan terakhir itulah yang dijawab D2′/D3′ — dan keduanya lolos
   sementara sistemnya salah.
 
 ## Sedang dikerjakan
-- (kosong) — **sesi 2026-09-14 selesai: D6′ + 2 fix + docs minimal.** 4 commit (3 kode + 1 docs),
-  **belum di-push** saat entri ini ditulis — CI untuk `tests/TestCase.php` baru belum terbukti.
-  **265 Pest** di container, **262 + 3 skip** native, Pint bersih.
+- (kosong) — **sesi 2026-09-14 selesai: ADR-0007 tuntas** (D6′ + perbaikan kecepatan + `.env.example`
+  + D5′ dokumen), semua di-commit & di-push. Gerbang: **265 Pest** di container (±30 dtk),
+  **262 + 3 skip** native, PHPStan lvl 8, Pint bersih; clone kosong → app jalan ±1 menit.
 
 ### ▶️ MULAI SESI BERIKUTNYA DARI SINI
 
-**1. Nyalakan infra dulu** — tanpa ini `composer test` gagal konek, bukan bug:
+**1. Nyalakan stack** (container juga hidup lagi sendiri setelah reboot):
 ```bash
-docker compose up -d          # mysql + redis + app + horizon + scheduler + reverb
-docker compose ps             # mysql & redis harus "healthy"
+docker compose up -d --wait   # mysql redis app horizon scheduler reverb
+npm run dev                   # bila menyentuh frontend — buka http://localhost:8000
 ```
-**Docker = jalur jalan utama** (keputusan user 2026-09-14): app `http://localhost:8000`,
-realtime `localhost:8080`, Horizon `/horizon`. **Jangan** nyalakan `composer dev`,
-`php artisan serve`, atau `php artisan reverb:start` native bersamaan (port 8000/8080 bentrok;
-`serve` diam-diam pindah ke 8001 dengan DB SQLite). Test: `docker compose exec app composer test`
-(265) atau `composer test` di Windows (262 + 3 skip) — keduanya kini benar-benar memakai
-`tas_testing`. DB dev `tas` kosong? `docker compose exec app php artisan migrate:fresh --seed`.
-Rinci (sebagian basi sampai D5′): `SETUP-GUIDE §16–§18`.
+DB dev kosong/basi → `docker compose exec app php artisan migrate:fresh --seed`. `composer.lock`
+berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer install`. Semua
+"setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
+`reverb:start` native bersamaan stack.
 
-**2. CI commit `8319cf6` (D3′) — CONFIRMED hijau oleh user 2026-09-14** (Pest passed; repo privat,
-`gh` tak terpasang di sesi manapun sejauh ini, jadi ini tetap lewat mata manusia, bukan dibaca
-agent). Sama seperti `4ea097b` (D1) & `3e1f0c2` (D2′) sebelumnya. Ini menutup risiko khusus run
-D3′ (service container `redis` + ekstensi `redis` baru pertama kali dieksekusi di runner) —
-service container Redis di GitHub Actions terbukti bekerja di runner bersih.
+**2. Yang perlu mata manusia:** CI untuk push sesi 2026-09-14 **belum diverifikasi** — repo privat,
+`gh` tak terpasang, tanpa token (REST API GitHub → 404). Cek tab Actions; yang paling berisiko:
+`tests/TestCase.php` baru dan komentar `ci.yml`. Riwayat: CI D1 (`4ea097b`), D2′ (`3e1f0c2`),
+D3′ (`8319cf6`) dikonfirmasi hijau oleh user.
 
-**CI untuk 4 commit sesi 2026-09-14 (`d186c4a`…) BELUM diverifikasi.** Yang paling perlu dilihat:
-`tests/TestCase.php` baru jalan di runner (seharusnya no-op di sana — env CI sudah sama).
+**3. Pekerjaan tersisa:** tak ada slice aktif — lihat *Backlog* (B1–B6), semuanya menunggu keputusan.
 
-**3. Pekerjaan tersisa, urut:**
-- **[P2, TERBUKA] OPcache CLI** — tiap request ~3 dtk di jalur utama. Lihat §Temuan D6′. Kecil,
-  tapi mengubah `Dockerfile` → minta OK dulu, lalu ukur sebelum/sesudah.
-- **D5′** — dokumen untuk Docker sebagai jalur utama. Scope-nya kini jelas (analisa 2026-09-14),
-  lihat §Langkah berikutnya D5′.
-- **[P3, TERBUKA]** bug 500-vs-401 — lihat §Temuan D2′. Sengaja tak diperbaiki (di luar scope),
-  menunggu keputusan user. Perbaikannya sebaris.
-- **Opsional, kini SAH secara teknis tapi sengaja belum:** refaktor `Cache::forget` →
-  `Cache::tags`. Jangan dikerjakan sebelum diputuskan terpisah — selama jalur native (driver
-  `database`, tak dukung tag) masih didukung, key eksplisit satu-satunya yang benar di kedua jalur.
+**4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
 
-**4. Catatan mesin:** container memakai `restart: unless-stopped`, jadi ia hidup lagi setelah
-reboot. Matikan dengan `docker compose down` (data aman di volume). Ada juga berkas sisa
-`php.ini.bak-pre-redis-20260912` di folder PHP laragon — salinan `php.ini` yang batal diubah,
-aman dihapus.
-- **CI TERVERIFIKASI HIJAU** untuk `4ea097b` (D1) & `3e1f0c2` (D2′) — dikonfirmasi user
-  2026-09-12 dengan melihat langsung tab Actions (repo privat + `gh` tak terpasang di sesi ini,
-  jadi agent tak bisa membacanya sendiri). Yang penting dari run D1: **service container MySQL +
-  pembuatan DB per-proses paralel benar-benar bekerja di runner bersih** — sebelumnya itu cuma
-  ditulis berdasarkan dokumentasi, belum pernah dieksekusi.
 
 ## Langkah berikutnya (urut)
-**Semua 4 persona UI + admin CRUD + realtime wiring + CRUD armada truk selesai** (transporter book/list/cancel/reschedule + kelola truk · driver jadwal · gate-officer antrian+gate-in/out · planner kelola window · admin terminal/gate/company/user · **realtime kuota+antrian live**).
+**Fitur MVP lengkap** (4 persona UI + admin CRUD + armada truk + riwayat gate + QR + realtime) **dan
+migrasi Docker (ADR-0007) tuntas.** Tak ada slice aktif — semua sisa di *Backlog* menunggu keputusan user.
 
-> **Urutan di bawah dirombak 2026-09-12** ([ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md)).
-> Prinsipnya sama seperti saat CI didahulukan atas e2e (ADR-0005), cuma diterapkan lebih tajam:
-> **kebenaran paling mahal dibayar paling dulu, kosmetik terakhir.** Draf plan pertama menaruh
-> migrasi test di tahap 6 dari 7 — itu menuntut 5 tahap setup dibayar sebelum pemilik proyek tahu
-> apakah jantung sistemnya aman. Ditolak setelah temuan mutasi (§Temuan 2026-09-12).
+### ✅ ADR-0007 — selesai 2026-09-14 (arsip ringkas; detail di §Status & ADR)
 
-### 🔜 AKTIF — slice ADR-0007 (migrasi Docker/Redis/MySQL)
+| Slice | Isi | Commit |
+|---|---|---|
+| D1 | MySQL + test konkurensi sungguhan (+ CI service `mysql`) | `4ea097b` |
+| D2′ | app di container (dimajukan mendahului Redis) | `3e1f0c2` |
+| D3′ + D4′ | Redis + Horizon + gerbang `ShouldBeUnique` berbasis perilaku (+ CI service `redis`) | `8319cf6` |
+| D6′ | scheduler + Reverb di container; fix isolasi test & `serve --no-reload` | `d186c4a` · `38258e7` · `234db36` |
+| — | kecepatan (`vendor/` volume + OPcache CLI); kunci Reverb dev di `.env.example` | `98bf375` · `e3d3746` |
+| D5′ | dokumen Docker-first; jurnal & panduan pra-Docker dihapus (utuh di tag `pre-docker`) | commit dokumen sesi 2026-09-14 |
 
-**D1. MySQL + test konkurensi sungguhan** — ✅ **SELESAI 2026-09-12** (detail di §Status)
-   Container **MySQL saja** (belum containerisasi app), arahkan Pest ke sana, lalu tulis test yang
-   benar-benar konkuren (proses paralel / request bersamaan) untuk `BookAppointmentAction`.
-   **Ditulis merah dulu**: harus GAGAL saat `->lockForUpdate()` dicabut, baru layak disebut penjaga.
-   Menutup §Temuan 2026-09-12 (P1). Butuh: `.env.testing`, skema per-proses paralel
-   (`tas_testing_test_{TEST_TOKEN}` lewat `ParallelTesting::setUpTestDatabase`), cek migrasi jalan di
-   MySQL (FK lebih ketat dari SQLite — lihat komentar di `create_users_table.php`).
+Prinsip sepanjang migrasi: **kebenaran paling mahal dibayar paling dulu, kosmetik terakhir** — dan
+setiap klaim "terverifikasi" diuji ulang dengan pertanyaan *data ini benar-benar mendarat di mana?*
+Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
 
-**D2′. Containerisasi app** — ✅ **SELESAI 2026-09-12** (dimajukan dari D4, lihat §Status)
-
-**D3′. Redis (cache/session/queue) + Horizon di container** — ✅ **SELESAI 2026-09-12** (termasuk service `redis` di CI, lihat §Status)
-   `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION` → `redis`, klien **`phpredis`** (pecl, di dalam
-   image — **bukan** package Composer baru). Horizon pertama kali benar-benar bisa jalan
-   (`ext-pcntl` tak ada di PHP Windows). **Wajib diverifikasi manual, bukan cuma test hijau:**
-   semantik `ShouldBeUnique` + `WithoutOverlapping` **berbeda** antara driver `database` (lama) dan
-   Redis — jalankan skenario double-dispatch dan pastikan job kedua benar-benar ditolak.
-
-**D4′. CI service containers** — ✅ **SELESAI** (MySQL di D1, Redis di D3′). Semula **MENYUSUT**: bagian MySQL sudah dikerjakan di D1
-   (kalau ditunda, CI pasti merah begitu `composer test` menuntut MySQL). Sisa D3 tinggal
-   **menambahkan service `redis:7`** ke `.github/workflows/ci.yml` bersamaan dengan D2.
-
-**D6′. Scheduler + Reverb ke container** — ✅ **SELESAI 2026-09-14** (detail di §Status). Semula
-   "opsional, sudah jalan native" — alasan itu **keliru** untuk jalur container (realtime terbukti
-   putus di sana), dan scheduler ternyata tak pernah jalan di mana pun. Dikerjakan **sebelum** D5′
-   atas keputusan user, supaya dokumen ditulis sekali atas keadaan yang sudah terbukti.
-
-**D5′. Dokumen untuk Docker sebagai jalur utama** ← *berikutnya*
-   Definisi lama (keputusan WSL2 & nasib `composer dev`) **sudah diputuskan**: WSL2 ditolak dengan
-   angka di D2′; `composer dev` **dibiarkan, diberi peringatan native-only** (user, 2026-09-14).
-   Banner pra-Docker **ditulis ulang, bukan dicabut** — tag `pre-docker` tetap ditunjuk.
-   Checklist hasil analisa 2026-09-14 (baris = temuan nyata, bukan tebakan):
-   - `README` *Mulai cepat* **rusak untuk clone baru**: `migrate:fresh --seed` native mengisi SQLite,
-     container `app` memakai MySQL `tas` kosong, `php artisan serve` diam-diam pindah ke 8001,
-     `composer install` tak disebut. Tulis ulang Docker-first.
-   - `CLAUDE.md`: §Urutan build #1 masih "Docker Compose **tidak** dipakai"; §Stack "migrasi sedang
-     berjalan"; §Perintah susun ulang Docker-first + `composer dev` native-only.
-   - `SETUP-GUIDE`: banner; prasyarat "Docker (opsional)"; **§8c & §14 salah** (sqlite `:memory:`,
-     "CI tanpa service container DB"); §16c (env tanpa force); §17b/§17e (klaim env container dipakai
-     server web — dulu salah); **§18 klaim `force` menutup isolasi — salah**; §4c/§11 Reverb native;
-     tambah scheduler + reverb container.
-   - `ONBOARDING`: banner; tabel "Kenapa test pakai SQLite `:memory:`" (:168); blok perintah harian.
-   - `CODE-WALKTHROUGH`: :556 (`phpunit.xml` `:memory:`), label "(test pakai SQLite)" di :263 & :1215.
-   - `DUMMY-DATA`: scheduler kini **benar-benar** menyapu data demo lampau jadi `NO_SHOW`; seed di
-     container.
-   - `HANDOVER` banner `BATAS PRA-DOCKER` masih "masih berlaku hari ini, belum dieksekusi".
-   - **Verifikasi D5′ = menjalankan *Mulai cepat* yang baru dari nol**, bukan membacanya.
-
-> **Opsional setelah D2 hijau (sengaja dipisah):** refaktor cache explicit-key `Cache::forget` →
-> `Cache::tags(['slot', "gate:{$gateId}"])`. Baru **boleh** setelah Redis nyata dipakai. Dipisah dari
-> migrasi supaya perubahan perilaku cache tak bercampur dengan perubahan infrastruktur dalam satu
-> commit yang sulit di-*revert* terpisah.
-
-### Backlog (tak terikat ADR-0007)
+### Backlog (semua menunggu keputusan user)
 
 **B1. Token abilities sempit** (ADR-0003) — tegakkan saat ada token ber-scope sempit. Belum ada
    konsumen nyata; mengerjakannya sekarang = menambah permukaan sebelum ada yang memakainya.
 **B2. Perluasan e2e** — belum ada spec untuk admin, utilisasi planner, no-show, QR. E2E juga masih
-   lokal-only (belum di CI). Keputusan biaya, bukan kelupaan — lihat item lama #3 di bawah.
+   lokal-only & jalur native (belum di CI). Keputusan biaya, bukan kelupaan (`SETUP-GUIDE §15`).
 **B3. Swap gateway TOS** (`LoggingGateEventGateway` → integrasi TOS sungguhan) — terikat spek API
-   eksternal yang belum ada di tangan. Bukan soal prioritas, tapi menunggu input dari luar proyek.
+   eksternal yang belum ada di tangan.
+**B4. [P3] Bug 500-vs-401** — request tanpa token **dan** tanpa `Accept: application/json` → 500
+   (`Route [login] not defined`). Perbaikan sebaris; detail §Temuan D2′.
+**B5. Refaktor `Cache::forget` → `Cache::tags`** — kini mungkin di semua jalur yang dipakai (Redis
+   untuk app, `array` untuk test; `CLAUDE.md` §Cache). Commit sendiri, butuh keputusan.
+**B6. Image produksi** — Dockerfile multi-stage terpisah: kode + `vendor --no-dev` di image,
+   nginx+php-fpm (atau FrankenPHP), `validate_timestamps=0`, `config/route/event/view:cache`, kunci
+   Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
+   Baru relevan saat ada target deploy.
 
 ### ✅ Riwayat item yang sudah selesai (arsip, jangan dikerjakan ulang)
 
@@ -1057,12 +922,19 @@ aman dihapus.
    di *Backlog* di atas supaya tak tercampur arsip.
 
 > **Catatan arsip:** item 4 di atas menyisakan "pindah ke Redis + Horizon + MySQL" sebagai pekerjaan
-> nyata. Sisa itu **bukan lagi menggantung** — ia kini terurai jadi slice **D1–D5** di atas dengan
-> alasan & biaya tertulis di [ADR-0007](docs/adr/0007-docker-redis-mysql-migration.md).
+> nyata. Sisa itu **sudah dituntaskan** lewat ADR-0007 (tabel di atas).
 
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-14` (D5′): **Semua dokumen disinkronkan ke Docker sebagai jalur utama; yang usang dihapus.**
+  Kode/infra sesi ini: `docker-compose.yml` + `docker/php/Dockerfile` (volume `vendor`, OPcache CLI),
+  `.env.example` (kunci Reverb dev). Docs: `docs/SETUP-GUIDE.md` (ditulis ulang), `README.md`,
+  `docs/ONBOARDING.md`, `CLAUDE.md`, `docs/CODE-WALKTHROUGH.md`, `docs/DUMMY-DATA.md`,
+  `docs/FRONTEND.md`, `docs/adr/0007` (catatan eksekusi + status), `.github/workflows/ci.yml`
+  (komentar), `HANDOVER.md` (jurnal & changelog pra-Docker dihapus, bagian hidup ditulis ulang).
+  Seeder: **tak ada**. Alasan: dokumen adalah satu-satunya yang menyeberangi sesi — klaim usang di
+  dalamnya persis yang menyesatkan sesi berikutnya; riwayat tetap utuh di tag `pre-docker`.
 - `2026-09-14` (D6′ + 2 fix): **Scheduler + Reverb di container; isolasi test & server web container
   diperbaiki.** Kode/infra: `docker-compose.yml` (service `scheduler`/`reverb`, env PHP via anchor),
   `docker/php/Dockerfile` (`serve --no-reload`), `phpunit.xml` (force `DB_DATABASE` + koreksi komentar
@@ -1130,552 +1002,47 @@ aman dihapus.
   Seeder: **tak ada perubahan**. Alasan: temuan mutasi (test race-condition tetap PASS tanpa
   `lockForUpdate()`) membalik urutan plan — kebenaran uji naik jadi slice #1 — dan batas pra/pasca
   Docker perlu ditandai eksplisit sebelum satu baris infra pun disentuh.
-- `2026-08-14` (6): **Logo `AppLogo.vue` (satukan 3x duplikat) + favicon nyata (svg+png+ico).**
-  Kode: `resources/js/components/AppLogo.vue` (baru), `AppNav.vue`/`LoginPage.vue` (pakai
-  `AppLogo`), `public/favicon.svg`+`public/favicon-32.png` (baru), `public/favicon.ico`
-  (diisi ulang — sebelumnya 0 byte), `resources/views/app.blade.php` (3 `<link rel="icon">`).
-  Test: tak ada test baru — type-check, 111 Vitest, build diverifikasi ulang; favicon dicek
-  `curl` (Content-Type benar per file). Docs: HANDOVER §Status/§Sudah selesai saja (visual
-  murni, tak ada perubahan kontrak). Seeder: tak ada. **Alasan:** permintaan langsung user.
-- `2026-08-14` (5): **Rebrand warna harbor/signal/sand — commit+push kerja yang sudah ada di
-  working tree.** Kode: `resources/css/app.css` (token warna baru), `AppLayout.vue`/`AppNav.vue`/
-  `DashboardPage.vue`/`DriverSchedulePage.vue`/`GateHistoryPage.vue`/`LoginPage.vue`
-  (+redesain split-panel, `data-testid` tak berubah)/`MyUtilizationPage.vue`/
-  `SlotAvailabilityPage.vue`. Test: tak ada test baru — diverifikasi ulang 111 Vitest,
-  type-check, build, 5/5 e2e sebelum commit. Docs: HANDOVER §Status/§Sudah selesai saja
-  (murni visual, tak ada perubahan kontrak). Seeder: tak ada. **Alasan:** permintaan langsung
-  user; kerja itu sendiri sudah ada 2 sesi sebelumnya tapi ditahan karena belum
-  diverifikasi/didokumentasikan.
-- `2026-08-14` (4): **Fix 3 spec e2e gagal — mail sync (bottleneck) + `hhmm()` timezone (bug) +
-  worker paralel (kontensi).** Kode: `.env.e2e`+`.env.e2e.example` (`MAIL_MAILER=array`),
-  `tests/e2e/helpers.ts` (`hhmm()` UTC bukan lokal), `playwright.config.ts` (`workers: 1`).
-  Test: `npm run test:e2e` 5/5 lulus, diverifikasi 2× run beruntun. Tak ada kode aplikasi
-  disentuh. Docs: `SETUP-GUIDE §15c`, HANDOVER §Status/§Sudah selesai/§Jebakan. Seeder: tak ada.
-  **Alasan:** permintaan langsung user menindaklanjuti temuan sesi sebelumnya.
-- `2026-08-14` (3): **Konfirmasi + loading state lintas role — polish UX, bukan slice/kontrak.**
-  Kode: `resources/js/components/ConfirmButton.vue` (baru), `resources/js/components/Spinner.vue`
-  (baru), `AdminPage.vue`/`GateDashboardPage.vue`/`PlannerWindowsPage.vue` (wiring `ConfirmButton`),
-  `MyTrucksPage.vue`/`MyBookingsPage.vue`/`RescheduleDialog.vue`/`BookingForm.vue` (+`Spinner`).
-  Test: `tests/js/GateDashboardPage.test.ts`, `tests/js/PlannerWindowsPage.test.ts` (klik confirm
-  tambahan), `tests/js/AdminPage.test.ts` (mock +`isPending`), `tests/e2e/gate-in-out.spec.ts`
-  (klik `-confirm` tambahan). 111 Vitest, vue-tsc, `npm run build` hijau; backend tak disentuh
-  (260 Pest tetap). Docs: HANDOVER §Status/§Sudah selesai saja — **tak ada perubahan kontrak**
-  (RBAC/state machine/API tak berubah), jadi `BUSINESS-FLOW.md`/`CLAUDE.md` tak perlu disentuh.
-  Seeder: tak ada. **Alasan:** permintaan eksplisit user, dipicu setelah menyadari beberapa aksi
-  destruktif (delete master data, gate-in/out, tutup window) bisa ke-trigger tanpa jeda konfirmasi.
-- `2026-08-14` (2): **E2E Playwright dipasang (lokal-only), prasyarat `ADR-0005` beres.**
-  Kode: `.env.e2e.example` (baru), `.gitignore` (+`.env.e2e`, +`/test-results`,
-  +`/playwright-report`, +`/blob-report`), `playwright.config.ts` (baru), `tests/e2e/`
-  (baru — `global-setup.ts` + `booking-happy-path.spec.ts`), `data-testid` di
-  `LoginPage.vue`/`BookingForm.vue`/`SlotAvailabilityPage.vue`, `package.json`
-  (+`@playwright/test`, +script `test:e2e`/`test:e2e:install`). Docs:
-  `docs/SETUP-GUIDE.md §15` (baru), `docs/adr/0005-ci-github-actions.md` (+catatan trigger
-  "persiapan rilis" terpenuhi). Detail: *Status* teratas.
-- `2026-08-13` (7): **Fix: `DashboardPage` — bug identik `AppNav` yang belum
-  tertangkap.** Kode: `resources/js/pages/DashboardPage.vue` (+guard identitas 4
-  link, +kartu Riwayat Gate). Test: `tests/js/DashboardPage.test.ts` (baru, 4 —
-  pertama kali halaman ini punya test). 107 Vitest, vue-tsc, `npm run build`
-  hijau (backend tak disentuh). Docs: `FRONTEND.md §6` (tabel + catatan 2-tempat).
-  Seeder: tak ada. **Alasan:** proyek ini punya 2 tempat navigasi (kartu Dashboard
-  + navbar `AppNav`) yang harus gating identik tapi tak ada mekanisme yang
-  memaksa itu — commit sebelumnya hari ini cuma membetulkan satu, user
-  menemukan yang kedua dari pemakaian nyata (bukan audit).
-- `2026-08-13` (6): **Fitur baru: tab "Role & Izin" (edit permission 5 role, bukan
-  CRUD role).** Kode: `RoleRepositoryInterface`+`RoleRepository`,
-  `UpdateRolePermissionsAction`, `ImmutableRoleException`, `ListRolesRequest`+
-  `UpdateRolePermissionsRequest`, `ListRolesController`+`UpdateRolePermissionsController`,
-  `RoleResource` (baru); `RolePermissionSeeder` (+permission `role.manage`);
-  `AppServiceProvider` (+binding); `routes/api.php` (+2 route);
-  `resources/js/{types/api.ts,api/admin.ts,composables/useAdmin.ts,pages/AdminPage.vue}`.
-  Test: `tests/Feature/Admin/RolePermissionsTest.php` (baru, 7),
-  `tests/js/AdminPage.test.ts` (baru, 4 — pertama kali AdminPage punya test
-  Vitest). 244 Pest/640 assert, 103 Vitest, PHPStan lvl 8, Pint, vue-tsc,
-  `npm run build` — semua hijau. Docs: `BUSINESS-FLOW §1` (footnote⁵),
-  `CODE-WALKTHROUGH §V.6` (baru — jelaskan kenapa CRUD role penuh butuh refactor
-  Policy dulu), `SETUP-GUIDE §10d`, `FRONTEND.md §4`, `HANDOVER`
-  §Status/§Sudah selesai. Seeder: `role.manage` ditambah ke `RolePermissionSeeder`
-  (admin dapat otomatis via `admin => $permissions`). **Alasan:** user minta
-  "add/edit data role" — diklarifikasi dulu (role CRUD penuh vs edit permission
-  role existing) karena beda arsitektur; role CRUD penuh butuh `AppointmentPolicy`
-  data-driven (`scope_type` per role) supaya role baru beneran bisa berperilaku
-  benar, bukan cuma tabel kosong yang selalu 403. User setuju scope dipersempit ke
-  editor permission, aman & tak menyentuh scoping Policy sama sekali.
-- `2026-08-13` (5): **Fitur baru: halaman "Riwayat Gate" (planner) + gate in/out di
-  "Booking Saya" (transporter).** Kode: `GateHistoryReportRequest`,
-  `GateHistoryReportController` (baru), `AppointmentRepositoryInterface`+
-  `AppointmentRepository` (+`gateHistoryForGate()`, `forCompany()` +eager-load
-  gateIn/gateOut), `AppointmentResource` (+`company`), `routes/api.php` (+1 route),
-  `resources/js/{types/api.ts,api/appointments.ts,composables/useGateHistory.ts,
-  pages/GateHistoryPage.vue,pages/MyBookingsPage.vue,components/AppNav.vue,
-  router/index.ts}`. Test: `tests/Feature/Reports/GateHistoryReportTest.php` (baru,
-  5), `MyAppointmentsTest` (+1), `tests/js/{GateHistoryPage,MyBookingsPage,
-  AppNav}.test.ts` (+20 gabungan). 237 Pest/619 assert, 99 Vitest, PHPStan lvl 8,
-  vue-tsc, `npm run build` semua hijau. Docs: `BUSINESS-FLOW §1`+`§3.7`,
-  `CODE-WALKTHROUGH §N.7` (baru), `SETUP-GUIDE §10d` (+`gate-history`, **+tambal
-  drift**: baris `no-show` manual yang lupa ditambahkan entri sebelumnya),
-  `FRONTEND.md §4`+`§6`, `HANDOVER` §Status/§Sudah selesai. Seeder: tak ada
-  (permission `report.read`/`slot.manage` sudah ada, dipakai apa adanya). **Alasan:**
-  user bertanya langsung "gimana cara tahu truk yang sudah gate-in/out" dan
-  jawabannya waktu itu "cuma lewat menu Gate (hilang begitu COMPLETED) atau API
-  mentah tanpa UI" — gap nyata, ditutup sesuai scope yang disepakati (reuse endpoint
-  transporter yang ada, endpoint baru cuma untuk planner yang belum punya jalan sama
-  sekali).
-- `2026-08-13` (4): **Fix: `AppNav` menampilkan 4 link operasional yang pasti gagal/kosong
-  untuk admin.** Dilaporkan langsung oleh user: login admin → klik Booking Saya/Armada/Gate
-  → 3 warning "Gagal memuat..."; Jadwal Hari Ini tampil tapi selalu kosong. Kode:
-  `AppNav.vue` (`/bookings`+`/trucks` cek `company_id != null`, `/gate` cek
-  `terminal_id != null`, `/today` cek `hasRole('driver')` — satu-satunya guard berbasis
-  role, dikomentari kenapa beda). Test: `tests/js/AppNav.test.ts` (+3: admin tak melihat
-  4 link sekaligus, driver asli tetap melihat Jadwal Hari Ini). 91 Vitest hijau, vue-tsc
-  bersih, `npm run build` sukses (backend tak disentuh — 231 Pest tetap). Docs: `HANDOVER`
-  §Status/§Sudah selesai, `docs/FRONTEND.md` (baris `AppNav` diperluas). **Alasan:**
-  admin (`RolePermissionSeeder`) sengaja punya semua permission, tapi 3 endpoint di balik
-  link itu 403 tanpa `company_id`/`terminal_id` (desain yang benar — admin bukan
-  transporter/gate-officer/driver) dan `AppNav` cuma gate per permission, tak pernah cek
-  identitas itu di 3 dari 4 link (`/reports` sudah lebih dulu benar).
-- `2026-08-13` (3): **Fix: badge "Tersedia" & pesan error booking tak bedakan window yang
-  sudah berakhir.** Ditemukan saat verifikasi realtime manual (bukan dari audit dokumen —
-  dari user benar-benar coba booking dan bingung kenapa ditolak). Kode:
-  `SlotWindowResource` (+`ended`), `SlotAvailabilityPage.vue` (badge "Berakhir" + tombol
-  Booking disembunyikan), `BookingForm.vue` (pakai `message` backend, bukan teks hardcode).
-  Test: `tests/Feature/Slots/SlotAvailabilityTest.php` (+2), `tests/js/SlotAvailabilityPage.test.ts`
-  (+1), `tests/js/BookingForm.test.ts` (1 diganti jadi 2 — pesan spesifik + fallback generik).
-  231 Pest / 89 Vitest hijau, PHPStan lvl 8 bersih, vue-tsc bersih, `npm run build` sukses.
-  Docs: `HANDOVER` §Status/§Sudah selesai/§Langkah berikutnya (item 2 realtime jadi SELESAI)/
-  §Jebakan (realtime terverifikasi + `DemoSeeder` basi dicatat terpisah). **Tidak** menyentuh
-  `BUSINESS-FLOW`/`CODE-WALKTHROUGH` — ini bugfix representasi (Resource/FE), bukan aturan
-  bisnis baru; `SlotWindow::hasEnded()` sendiri sudah didokumentasikan sejak ronde 2. Seeder:
-  tak ada. **Alasan:** `hasEnded()` ditegakkan `BookAppointmentAction` sejak lama tapi tak
-  pernah dicerminkan ke API/FE — window `OPEN` yang sudah lewat `window.end` tampak "Tersedia"
-  dan bisa diklik, tapi selalu 409 dengan pesan generik yang menyembunyikan sebab aslinya.
-- `2026-08-13` (2): **No-show manual gate-officer (ronde 4, P2) ditutup.** Kode:
-  `MarkNoShowController` (baru), route `POST appointments/{id}/no-show`
-  (`routes/api.php`) reuse ability `process` + middleware `idempotency` — **tak ada**
-  perubahan `MarkNoShowAction`/`AppointmentPolicy`. Test: `tests/Feature/Gate/MarkNoShowTest.php`
-  (baru, 6 test). Docs: `BUSINESS-FLOW §1` (matriks baris "Tandai no-show" + footnote²) & `§3.5`
-  (blockquote no-show diperluas), `CODE-WALKTHROUGH §N.6` (baru), `HANDOVER`
-  §Status/§Sudah selesai/§Senior review ronde 4 (temuan FIXED)/§Langkah berikutnya (item 1
-  dipersempit ke QR saja — satu-satunya sisa). Seeder: tak ada. **Alasan:** matriks §1 sudah
-  lama menjanjikan ✅ ke gate-officer tapi `MarkNoShowAction` cuma bisa dipanggil `NoShowSweepJob`
-  — petugas gate harus menunggu grace period lewat walau sudah tahu truk tak akan datang.
-- `2026-08-13` (1): **`dwell_time` (ronde 4, P3) ditutup.** Kode: `Appointment::dwellMinutes()`
-  (baru), `AppointmentResource` (+`dwell_minutes`). Test: `tests/Unit/AppointmentDwellTimeTest.php`
-  (baru, 3 test) + `GateOutTest` (+1 test). Docs: `BUSINESS-FLOW §3.6` (nama field diklarifikasi),
-  `CODE-WALKTHROUGH §N.5` (baru), `HANDOVER` §Status/§Sudah selesai/§Senior review ronde 4
-  (temuan dipecah, bagian `dwell_time` FIXED)/§Langkah berikutnya (item 1 dipersempit ke
-  no-show manual + QR). Seeder: tak ada — data sumbernya (`gate_transactions.processed_at`)
-  sudah ada sejak slice gate-in/out. **Alasan:** `§3.6` menjanjikan "`GateOutAction`... hitung
-  dwell_time" sejak awal tapi `grep -i dwell` di seluruh kode = 0 hit (temuan ronde 4); datanya
-  sudah tersedia jadi ini murni menutup gap ekspos, bukan fitur baru.
-- `2026-08-02` (4): **Endpoint audit trail per-appointment.** Kode: `AuditRepositoryInterface`,
-  `AuditRepository`, `AppointmentAuditRequest`, `ActivityResource`, `AppointmentAuditController`
-  (semua baru) + binding di `AppServiceProvider` + 1 route. Test:
-  `tests/Feature/Audit/AppointmentAuditEndpointTest.php` (baru, 7 test). Docs: `SETUP-GUIDE §10d`
-  (**baris endpoint baru** — tabel itu yang dipakai audit ronde 3 untuk mencocokkan route, jadi
-  ia harus ikut tumbuh), `BUSINESS-FLOW §3.7` (cara membacanya + kenapa dua lapis),
-  `CODE-WALKTHROUGH §Z` (baru) + TOC, `HANDOVER` §Status/§Sudah selesai/§ronde 4 (temuan jadi
-  FIXED)/§Langkah berikutnya. Seeder: **tak ada** — permission `audit.read` sudah lama ada, itu
-  justru inti temuannya. **Alasan:** matriks §1 menjanjikan "Lihat audit log" untuk admin/planner/
-  transporter tanpa satu pun rute yang mewujudkannya.
-- `2026-08-02` (3): **Test audit trail Activity Log.** Kode produksi: **tak ada** (murni menambal
-  gerbang). Test: `tests/Feature/Audit/ActivityLogTest.php` (baru, 7 test). Docs:
-  `BUSINESS-FLOW §3.7` (blockquote baru — **apa** yang direkam: log name, 3 kolom, entri `created`,
-  gate-in dua entri, semantik causer NULL, dan **batas cakupan**: ganti truk/sopir tak terekam),
-  `CODE-WALKTHROUGH §Y` (baru: tabel yang dikunci, jebakan test negatif, verifikasi mutasi) + TOC,
-  `HANDOVER` §Status/§Sudah selesai/§ronde 4 (temuan jadi FIXED)/§Langkah berikutnya (item 1
-  selesai, sisanya naik satu). Seeder: tak ada. **Alasan:** DoD mensyaratkan audit trail tapi nol
-  test menjaganya — dan `§3.7` menyebut Activity Log sebagai sumber kebenaran audit tanpa pernah
-  menyatakan apa yang sebenarnya direkam, jadi batas cakupannya tak bisa diketahui tanpa membaca
-  kode model.
-- `2026-08-02` (2): **Reminder ikut pindah saat reschedule.** Kode: `SchedulesAppointmentReminder`
-  (contract baru), `AppointmentBooked`/`AppointmentRescheduled` mengimplementasikannya,
-  `ScheduleAppointmentReminder` type-hint interface + pakai `startsAt()`, `AppointmentReminderJob`
-  (+`slotWindowId` di constructor, `uniqueId()` ber-window, guard basi di `handle()`),
-  `AppointmentReminderTest` (+5 test). Docs: `BUSINESS-FLOW §3.3` (**koreksi kata**: "reminder lama
-  dibatalkan" → "dinetralkan" — job antre tak bisa ditarik dari queue, jadi tak ada kode pembatalan
-  yang bisa dicari orang berikutnya), `CODE-WALKTHROUGH §O` (snippet job & listener diperbarui) +
-  **§O.3 baru** (interface listener, jebakan ShouldBeUnique, kenapa job menetralkan diri sendiri) +
-  **TOC** (entri §X yang tertinggal dari commit sebelumnya ikut ditambahkan), `HANDOVER`
-  §Status/§Sudah selesai/§ronde 4 (temuan jadi FIXED)/§Langkah berikutnya (item 1 selesai, sisanya
-  naik satu). Seeder: tak ada. **Alasan:** kontrak menjanjikan perilaku yang tak pernah ada
-  kodenya, dan sopir yang jadwalnya digeser tidak diingatkan sama sekali.
-- `2026-08-02`: **Toleransi jendela gate-in jadi nyata + audit tasklist ronde 4.** Kode:
-  `config/tas.php` (blok `gate_in` baru), `SlotWindow::startsAt()`, `GateInWindowException` (baru),
-  guard di `GateInAction`, `SlotWindowFactory::ongoing()` (baru), `GateInTest` (+7 test, jam
-  dibekukan `travelTo`). Docs: `BUSINESS-FLOW §2` (aturan transisi `CONFIRMED → ARRIVED` naik dari
-  "boleh ada toleransi" jadi aturan pasti + kode error) & `§3.5` (langkah 4 + 2 blockquote: urutan
-  guard, dan kenapa sweep tak cukup), `CODE-WALKTHROUGH §X` (baru), `SETUP-GUIDE §10d` (baris
-  gate-in dapat kode error), `HANDOVER` §Status/§Sudah selesai/§Senior review ronde 4 (baru)/
-  §Langkah berikutnya (**diurut ulang** — temuan kontrak-tanpa-kode naik di atas item infra).
-  Seeder: tak ada. **Alasan:** `PRD §4` & `BUSINESS-FLOW §2`/`§3.5` menjanjikan toleransi
-  early/late dari config sejak awal, tapi `GateInAction` tak pernah melihat jam dan `config/tas.php`
-  tak punya kuncinya — dokumen menjanjikan penegakan yang tak ada. Ronde 4 juga mencatat 6 temuan
-  lain yang **belum** dikerjakan supaya tak hilang lagi (reminder-reschedule, endpoint audit, test
-  Activity Log, no-show manual, QR/`dwell_time`). **Belum disentuh:** `.env.example` masih tak
-  memuat satu pun `TAS_*` (berlaku untuk kedelapan knob, bukan cuma yang baru) — utang lama,
-  sengaja tidak dilebarkan di slice ini.
-- `2026-07-27`: **Catat CI terverifikasi hijau + resep cek CI tanpa `gh`.** Kode: tak ada. Docs:
-  `HANDOVER` §Status (run [30228335447](https://github.com/caesarovera/truck-appointment-system/actions/runs/30228335447)
-  @ `f6495a0` — kedua job + semua step sukses) + §Jebakan (baris baru), `SETUP-GUIDE §14c`
-  (sub-bagian *cek status dari terminal tanpa `gh`* + peringatan **1 run per PUSH, bukan per
-  COMMIT**). Alasan: sesi ini sempat menyimpulkan "status CI tak bisa diverifikasi" hanya karena
-  `gh: command not found` — padahal repo publik, dan REST API GitHub terbaca tanpa token sama
-  sekali. Kesimpulan yang berhenti di rintangan pertama itu persis yang bikin klaim usang
-  bertahan lama; resepnya ditulis (dan **diuji jalan** di mesin dev, tanpa `jq` yang memang tak
-  ada) supaya sesi berikutnya tak mengulang kebuntuan yang sama. Nilai konkretnya: step
-  *Install dependensi* backend = `composer install` **tanpa** `--ignore-platform-req`, satu-satunya
-  gerbang yang mesin Windows tak bisa uji sendiri — kini terbukti hijau.
-- `2026-07-27`: **P4 hygiene — skill & agent Claude Code diregistrasi; `settings.local.json` di-untrack.**
-  Kode: **tak ada**. Struktur: `docs/SKILL.md` → `.claude/skills/slice/SKILL.md`,
-  `docs/security-reviewer.md` → `.claude/agents/security-reviewer.md` (`git mv`),
-  `docs/VIBE-CODING.md` **dihapus** (penunjuk yatim; tak ada satu pun dokumen merujuknya, dan isinya
-  menyatakan sendiri boleh dihapus). `.gitignore` +`.claude/settings.local.json` **(per-file)** dan
-  file itu di-`git rm --cached`. Docs: `README` peta dokumentasi +baris `.claude/skills` & `agents`,
-  `ONBOARDING` baris routing "Backend fitur baru" kini menunjuk skill `/slice` yang **benar-benar
-  ada**. Alasan: dua file itu punya frontmatter `name:`/`tools:` — mereka **definisi** skill/agent,
-  bukan bacaan; diparkir di `docs/` artinya nol efek. Sebaliknya `settings.local.json` adalah
-  override personal per-mesin (akhiran `.local`) yang tiap sesi bertambah entri izin one-off —
-  ia satu-satunya isi `.claude/` yang **tidak** boleh di-commit, sementara guide justru menyuruh
-  commit `.claude/` demi skill/agent lintas perangkat. Selama ini terbalik: yang personal ikut,
-  yang seharusnya dibagi malah tak ada. **Ikutan (isi keduanya juga usang):** `SKILL.md`
-  memerintahkan `composer test --parallel` — flag dobel, sebab `composer test` **sudah**
-  `pest --parallel` (kelas bug yang sama dengan §Perintah `CLAUDE.md` kemarin) + gerbang FE
-  ditambahkan; `security-reviewer` menyuruh audit "middleware scope tiap endpoint" padahal ADR-0003
-  **sengaja menunda** token abilities → agent akan melaporkan false positive di setiap endpoint,
-  kini diberi larangan eksplisit + rujukan ADR, ditambah item mass-assignment (ADR-0004) dan guard
-  armada booking (§W.4/§W.5). Tidak menyentuh `CLAUDE.md`/seeder/BE/FE/test.
-- `2026-07-27`: **Fix bug P1 `driver_invalid_role` + ADR-0006 (sopir admin-only) + KONTRAK PRD BERUBAH.**
-  *Kode BE:* `InvalidDriverException` **baru** (422 `driver_invalid_role`), guard ketiga di
-  `BookAppointmentAction::assertFleetBelongsToCompany()` — `->role('driver','api')->exists()`,
-  dipasang **setelah** cek kepemilikan (urutan sama dengan fix `INACTIVE`: kalau dibalik, beda
-  pesan error membocorkan keberadaan user company lain). Query scope dipilih alih-alih
-  `$driver->hasRole()` karena `hasRole()` lazy-load relasi `roles` sementara `preventLazyLoading`
-  aktif di non-prod — sekaligus memakai sumber kebenaran yang **sama persis** dengan
-  `FleetRepository::driversForCompany()`, jadi dropdown & penegakan mustahil beda pendapat.
-  *Test:* +3 (2 `Booking/BookAppointmentActionTest` incl. **urutan guard**, 1
-  `Booking/BookAppointmentEndpointTest` 422) → **194 Pest / 501 assert**. Vitest tetap **87**
-  (tak ada perubahan FE — pesan server lolos ke UI lewat fallback `data.message` di `BookingForm`,
-  pola yang sama dengan `truck_inactive`). *Infrastruktur test:* `UserFactory::driver()` **baru**
-  (assign role via `Role::findOrCreate('driver','api')` → jalan baik dengan maupun tanpa
-  `RolePermissionSeeder`); **3 helper booking lama membuat "sopir" tanpa role** — persis sebab
-  gap ini lolos sekian lama — kini memakai state itu (`bookingScenario`,
-  `transporterBookingContext`, `bookingRateLimitContext`; yang terakhir sempat merah dan itu
-  **bukti guard-nya menggigit**). *Docs:* `BUSINESS-FLOW §3.2` (langkah 4 + blok aturan baru) &
-  `§1` (baris matriks transporter), `CODE-WALKTHROUGH §W.5` **baru** (+§W.6 Test, penomoran
-  digeser), `SETUP-GUIDE` (tabel endpoint booking), hitungan test di README/ONBOARDING/
-  SETUP-GUIDE/HANDOVER → **194/501**. *Keputusan produk:* `adr/0006-driver-management-admin-only.md`
-  **baru** (+baris tabel `adr/README`) — **CRUD sopir tidak dibangun di MVP**, sopir dibuat admin
-  lewat Admin User CRUD; transporter tetap **melihat** sopirnya via `/me/fleet`. **`PRD §3`
-  dikoreksi** (baris IN transporter dipersempit ke "kelola truk + lihat sopir"; baris OUT baru
-  untuk CRUD sopir) — aturan PRD *"apa pun di luar IN tidak dikerjakan tanpa memperbarui PRD"*
-  berlaku dua arah: **mencoret** dari IN juga menuntut PRD diperbarui, bukan dibiarkan jadi janji
-  yang membusuk. Alasan keputusan: sopir = `User`, jadi self-service = **penerbitan akun login**
-  (permukaan privilege-escalation baru) sementara pola company-scoped CRUD-nya sudah tuntas
-  didemonstrasikan slice truk — risiko baru tanpa pola baru. Tidak menyentuh `CLAUDE.md`/seeder/
-  migrasi/FE.
-- `2026-07-26`: **KONTRAK BERUBAH — §Perintah `CLAUDE.md` dikoreksi + propagasi klaim Redis ke README.**
-  Ditemukan saat *Senior review ronde 3*: audit klaim `CLAUDE.md` (task #3) ditandai SELESAI padahal
-  koreksinya **berhenti di `CLAUDE.md` saja**. (1) `README §Stack` masih menulis `· Redis/Horizon ·`
-  polos sebagai stack terpakai — bertentangan dgn `CLAUDE.md §Stack` yang sudah dipisah target-vs-dev
-  di commit `4c652b7`. README adalah dokumen **#1 di urutan onboarding**, jadi pembaca baru justru kena
-  klaim yang salah lebih dulu. Kini README menyebut driver `database`/SQLite + menandai Redis/Horizon
-  sebagai *target* & menunjuk `CLAUDE.md §Stack`. (2) **§Perintah `CLAUDE.md` basi di 3 titik dan tak
-  pernah ikut terkoreksi:** `npm run dev | test | build` → script **`test` tidak ada** di `package.json`
-  (adanya `test:js`), jadi perintah di kontrak **gagal kalau dijalankan**; `npm run type-check` absen
-  padahal ia **gerbang CI** (§Stack kontrak ini sendiri mewajibkan gerbang baru ikut masuk workflow);
-  `php artisan horizon # queue worker (dev)` menyesatkan — Horizon butuh `ext-pcntl` yang tak ada di
-  mesin dev Windows (sudah dicatat di *Jebakan*), sementara perintah dev sebenarnya `composer dev`
-  justru tak tercantum. (3) **`CLAUDE.md` merujuk "skill `laravel-tdd`" yang tidak ada** — bukan di repo
-  (`.claude/` cuma berisi `settings.local.json`) maupun di environment; pointer menggantung di file yang
-  di-load **tiap sesi**. Rujukannya dihapus (langkah loop TDD-nya sudah ditulis lengkap tepat di bawahnya,
-  jadi tak ada informasi yang hilang). (4) `HANDOVER` rujukan silang basi: entri CRUD truk menunjuk
-  *Langkah berikutnya* `#3` untuk CRUD sopir, padahal kini item **`#4`** (`#3` = Redis/Docker) →
-  dibetulkan. Alasan sama dengan dua ronde sebelumnya: **kontrak yang memerintahkan perintah tak jalan
-  lebih berbahaya daripada status basi** — ia menghasilkan langkah salah, bukan sekadar info usang.
-  **Tidak menyentuh kode/seeder/test/migrasi** (murni dokumen). `tas-claude-code-guide.html` **sengaja
-  TIDAK diubah**: tabel skill-nya rekomendasi "aktifkan yang mana", bukan klaim isi repo — bukan drift.
-- `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` baris Redis ditandai TARGET + aturan cache diperbaiki.**
-  (1) §Stack: `Queue/Cache/Session: Redis 7 + Horizon` → dipisah jadi **target produksi** vs **dev
-  sekarang** (driver `database`, DB `sqlite`, `BROADCAST_CONNECTION=log`). Redis tetap tercatat sebagai
-  arah — penting, karena keputusan cache di bawah ini bersandar padanya.
-  (2) §Hardening → Cache: aturan lama menyuruh `Cache::tags(...)`, padahal `SlotRepository` justru
-  memakai **explicit-key `Cache::flexible` + `Cache::forget`** sejak `2026-06-27` karena store
-  `database` **tak mendukung tagging**. Jadi kontrak selama ini memerintahkan pola yang **akan rusak**
-  kalau benar-benar diikuti — lebih berbahaya daripada klaim status yang basi, sebab ini instruksi
-  yang menghasilkan kode salah. Kini aturannya berbunyi explicit-key, dengan izin refaktor ke
-  `Cache::tags` **setelah** pindah ke Redis. Alasan: penyimpangan itu sudah tercatat di changelog
-  `2026-06-27`, tapi tak pernah naik ke kontrak — persis pola "dokumen tahu, kontrak tidak" yang
-  membuat klaim CI & Docker luput. Tidak menyentuh kode/seeder/test (kode sudah benar sejak awal).
-- `2026-07-25`: **KONTRAK BERUBAH — `CLAUDE.md` §Stack baris infra dikoreksi.** Sebelumnya
-  `* Infra: Docker Compose · CI: GitHub Actions` — **dua-duanya tidak ada** saat itu. Kini dipecah
-  jadi dua baris jujur: (1) *Infra dev: **native, tanpa Docker** (PHP + SQLite); `docker-compose.yml`
-  **belum ada** — rencana, untuk paritas produksi (Redis/MySQL/Horizon)*, plus larangan eksplisit
-  menulis "sudah pakai Docker" sebelum file-nya benar-benar ada; (2) *CI: GitHub Actions* + pointer
-  ke `SETUP-GUIDE §14` + pengingat bahwa gerbang baru wajib ikut masuk workflow. §Urutan build
-  langkah 1 juga dihapus "Docker Compose"-nya. Ikutan: `SETUP-GUIDE` tabel prasyarat — baris Docker
-  masih menyebut Reverb butuh Docker, padahal 4 baris di bawahnya file yang sama sudah mengoreksinya
-  (Reverb jalan native); kini konsisten. Alasan: kontrak yang menyatakan sesuatu ada padahal tidak
-  adalah persis penyakit yang membuat CI luput selama ini — dokumen yang tak bisa dipercaya lebih
-  buruk daripada dokumen yang mengaku belum lengkap. **Masih tersisa & belum disentuh:** baris
-  `Queue/Cache/Session: Redis 7 + Horizon` (lihat *Langkah berikutnya* #3) — butuh keputusan pemilik
-  repo, bukan diputuskan sepihak. Tidak menyentuh seeder/kode.
-- `2026-07-25`: **CI GitHub Actions dipasang + ADR-0005 baru.** Kode: `.github/workflows/ci.yml`
-  **baru** (2 job paralel; perintahnya = skrip composer/npm yang sama dengan lokal). Docs:
-  `adr/0005-ci-github-actions.md` **baru** (+baris di `adr/README`), `SETUP-GUIDE §14` **baru**
-  (untuk apa · apa yang dijalankan · cara pakai + tabel gejala→sebab saat merah) + entri Daftar Isi,
-  `README` (badge CI + paragraf CI + doc-map SETUP-GUIDE menunjuk §14), `ONBOARDING` (baris routing
-  "CI merah setelah push" + catatan di perintah harian + peta dokumen). **CLAUDE.md sengaja TIDAK
-  diubah:** klaimnya "CI: GitHub Actions" justru baru sekarang jadi benar, jadi tak ada yang perlu
-  dikoreksi; menambahkan "CI hijau" ke Definition of Done = perubahan kontrak → butuh persetujuan
-  pemilik repo dulu. Alasan: gerbang kualitas yang hanya jalan kalau diingat manusia tidak menjaga
-  apa pun; klaim kontrak yang tidak benar adalah penyakitnya sendiri. Tidak menyentuh seeder/BE/FE.
-- `2026-07-25`: **Skeleton loading (polish UI bagian 1).** Kode: `components/SkeletonRows.vue`
-  **baru**; 11 titik loading di `AdminPage`(4)/`SlotAvailabilityPage`/`MyBookingsPage`/`MyTrucksPage`/
-  `DriverSchedulePage`/`GateDashboardPage`/`PlannerWindowsPage`/`MyUtilizationPage` +
-  `RescheduleDialog` beralih dari `<p>Memuat…</p>` ke komponen itu. Test: +3 Vitest
-  (`tests/js/SkeletonRows.test.ts`) → **87 Vitest**. Docs: `FRONTEND` (baris komponen di tabel §4 +
-  sub-bagian *Loading state* berisi alasan sr-only & kenapa `isFetching` dikecualikan),
-  `README`/`ONBOARDING`/`SETUP-GUIDE` (hitungan Vitest). Alasan: teks "Memuat…" bikin tinggi konten
-  melompat saat data masuk; label dipindah ke `sr-only` supaya pembaca layar tak kehilangan info
-  (dan test lama tetap hijau). Tidak menyentuh CLAUDE.md/BE/seeder.
-- `2026-07-25`: **CRUD armada truk (`/me/trucks`) + penegakan status `INACTIVE`.**
-  Kode BE: `Actions/Fleet/*` (3), `DataTransferObjects/Fleet/TruckData`, `Http/Requests/V1/Fleet/*` (2),
-  `Http/Controllers/Api/V1/Fleet/*` (4), `FleetRepository`+`FleetRepositoryInterface` (3 method CRUD +
-  param `?TruckStatus` di `trucksForCompany`), `EntityInUseException::truck()`, `Truck::appointments()`,
-  `routes/api.php` (4 route). Fix bug: `InactiveTruckException` **baru** (422 `truck_inactive`),
-  guard di `BookAppointmentAction`, `MyFleetController` → ACTIVE saja. Kode FE: `api/trucks.ts`,
-  `composables/useTrucks.ts`, `pages/MyTrucksPage.vue`, route `/trucks`, link `AppNav`+`DashboardPage`,
-  types `TruckStatus`/`TruckPayload`. Test: +13 Fleet, +3 penegakan INACTIVE, +2 file Vitest →
-  **191 Pest / 494 assert · 84 Vitest**. Docs: `BUSINESS-FLOW §3.2` (aturan status truk = kontrol
-  penjadwalan + urutan guard), `CODE-WALKTHROUGH §W` **baru** (+TOC), `SETUP-GUIDE` (5 baris tabel
-  endpoint + catatan 422 di booking + §13 peta file + hitungan test), `FRONTEND` (baris route
-  `/trucks`, catatan dropdown ACTIVE-saja, daftar rute, tabel nav), `ARCHITECTURE` (peta folder:
-  sub-folder `Fleet/` di 4 lapisan), `adr/0001` (catatan: kini **2** area fitur ber-sub-folder —
-  masih di bawah ambang tinjau-ulang ≥3, syarat "tim bertambah" juga belum), `README`/`ONBOARDING`
-  (hitungan test + baris routing "CRUD ber-scope company sendiri" → §W).
-  Alasan: menutup task #3 "CRUD truk/sopir" (bagian truk) yang menggantung uncommitted; status truk
-  yang tak ditegakkan itu **bug nyata** — endpoint hapus menyuruh pakai INACTIVE padahal INACTIVE
-  tak menghentikan apa pun. Tidak menyentuh CLAUDE.md/seeder/migrasi. **Sopir belum** (lihat
-  *Langkah berikutnya* #4 — keputusan produk soal pembuatan akun user).
-- `2026-07-25`: **Audit staleness dokumen + kode (pasca realtime).**
-  *Docs:* selaraskan hitungan test current-state ke **174 Pest / 74 Vitest** (README, ONBOARDING,
-  SETUP-GUIDE — entri changelog historis TIDAK diubah, itu snapshot masa lalu); hapus klaim usang
-  "Git belum di-init" (repo sudah push) & "Realtime Echo masih belum disambung" (FRONTEND §4);
-  `CODE-WALKTHROUGH §P.5` baru (guard `/broadcasting/auth`). *Kode:* `.env.example` +REVERB_*/
-  VITE_REVERB_* (placeholder kosong — bukan secret; fresh clone tahu var realtime ada); **hapus
-  scaffold mati** `resources/js/app.js` + `bootstrap.js` + `resources/views/welcome.blade.php`
-  (catch-all `web.php` selalu render `app.blade.php`→`app.ts`; welcome tak ter-route & satu-satunya
-  pemuat app.js→bootstrap.js). Efek samping bagus: CSS produksi turun ~41→~21 kB (Tailwind tak lagi
-  pindai kelas di welcome). *Temuan penting:* `->withExceptions(fn)` kosong di `bootstrap/app.php`
-  **BUKAN dead code** — menghapusnya bikin `BindingResolutionException` (registrasi handler exception
-  di sana); dikembalikan + diberi komentar kenapa wajib tetap. Tidak menyentuh CLAUDE.md/seeder/BE-logic.
-- `2026-07-25`: **Wiring realtime (Reverb + Echo) + koreksi klaim "Reverb butuh Docker".**
-  Kode: `bootstrap/app.php` (guard `/broadcasting/auth` → `auth:sanctum` via `withBroadcasting`),
-  FE baru `echo.ts`/`composables/useRealtime.ts` + wiring 2 halaman + `app.ts`, paket `laravel-echo`+
-  `pusher-js`. Test: +5 Pest (`Realtime/BroadcastAuthTest`), +7 Vitest (`useRealtime.test`) →
-  **174 Pest / 74 Vitest**. Docs: `HANDOVER` (status, Sudah selesai, Jebakan **dikoreksi** — Reverb
-  jalan Windows native, hanya Horizon butuh pcntl), `SETUP-GUIDE`/`ONBOARDING` (koreksi Reverb≠Docker),
-  `FRONTEND.md` (§ realtime: echo.ts + useRealtime). Alasan: menutup tasklist realtime; klaim lama
-  "Reverb butuh Docker" salah (composer.json Reverb tak minta ekstensi) & menghambat dev tak perlu.
-  Tidak menyentuh CLAUDE.md/seeder. channels.php TIDAK diubah (callback RBAC sudah benar).
-- `2026-07-08`: **History git ditulis ulang (24 commit) + `docs/GIT-HISTORY-REWRITE.md` baru.**
-  Trailer `Co-Authored-By: Claude ...` → `Co-Authored-By: Overa Caesar` di seluruh history
-  (`git filter-branch --msg-filter` + force-push; SHA semua commit berubah — clone lain
-  harus `git fetch && git reset --hard origin/main`, JANGAN pull). Baris `Claude-Session:`
-  sengaja dipertahankan (jejak audit). Prosedur lengkap + jebakan nyata (unstaged changes,
-  SHA lama masih resolvable, lease `--force-with-lease` basi pasca filter-branch)
-  didokumentasikan sebagai panduan manual di `docs/GIT-HISTORY-REWRITE.md`; README doc-map
-  ikut diupdate. Alasan: atribusi commit milik pemilik repo; panduan ditulis supaya bisa
-  diulang tanpa AI. Commit BERIKUTNYA wajib pakai trailer baru.
-- `2026-07-08`: **Nav/layout bersama FE (`AppNav`+`AppLayout` parent route).** Kode:
-  2 komponen baru, `router/index.ts` restrukturisasi nested (meta `requiresAuth` di parent),
-  Dashboard disederhanakan, link "← Dashboard" dihapus dari 6 halaman. Docs: `FRONTEND.md`
-  (§2 router+layout, catatan layout di §5), hitungan Vitest → **67**. Alasan: navigasi
-  lintas-halaman tanpa bolak-balik Dashboard; satu sumber daftar link (anti-drift saat
-  nambah halaman); meta di parent = halaman baru otomatis terlindungi guard. Tidak
-  menyentuh CLAUDE.md/BE.
-- `2026-07-08`: **Halaman FE `/reports` (Laporan Perusahaan, transporter).** Kode:
-  `fetchMyUtilization` (api/slots.ts), `useMyUtilization` (key terpisah `['my-utilization']`),
-  `MyUtilizationPage.vue`, route `/reports`, link Dashboard gated `report.read` + `company_id`.
-  Docs: `FRONTEND.md` (tabel route), hitungan Vitest → **63**. Alasan: melengkapi slice BE
-  utilisasi company-scoped jadi fitur utuh; gating link pakai company_id (bukan role) supaya
-  konsisten dgn aturan 403 server; query key dipisah dari planner agar cache dua scope tak
-  saling menimpa. Tidak menyentuh CLAUDE.md/seeder/BE.
-- `2026-07-08`: **Endpoint `GET /me/reports/utilization` (transporter, company-scoped).**
-  Kode: `SlotRepositoryInterface`/`SlotRepository::utilization(+?int $companyId)`,
-  `MyUtilizationReportController`/`Request` baru, route. Docs: `BUSINESS-FLOW §3.7`
-  (baris transporter), `SETUP-GUIDE` (tabel endpoint), `CODE-WALKTHROUGH §Q.2` (closure
-  `$scoped`), hitungan test → **169 Pest / 452 assert**. Alasan: matriks RBAC §1 sudah
-  lama menjanjikan "company sendiri" untuk transporter tapi endpoint-nya belum ada;
-  scoping di level subquery (bukan filter di controller) supaya kebocoran angka company
-  lain mustahil secara struktural. Tidak menyentuh CLAUDE.md/seeder.
-- `2026-07-07`: **Sanctum token TTL (12 jam) + prune harian.** Kode: `config/sanctum.php`
-  (`expiration` env-tunable, sebelumnya `null`), `routes/console.php` (+`sanctum:prune-expired
-  --hours=24` daily). Docs: `CODE-WALKTHROUGH §K` (bullet TTL), hitungan test → **165 Pest /
-  439 assert**. Alasan: token abadi = blast-radius kebocoran tak terbatas; 12 jam ≈ 1 shift
-  kerja gate/planner jadi re-login harian wajar; TTL juga jadi jaring pengaman selagi token
-  abilities ditunda (ADR-0003). Grace prune 24 jam untuk jejak investigasi. Tidak menyentuh
-  CLAUDE.md/seeder.
-- `2026-07-07`: **Guard "window sudah berakhir" (409) + default `SlotWindowFactory` → besok.**
-  Kode: `SlotWindow::endsAt()/hasEnded()`, `SlotUnavailableException::expired()`, guard di
-  `Book/RescheduleAppointmentAction`, `dueForNoShow` reuse `endsAt()`. Factory default
-  `date=besok`: window berjam-acak dengan `date=hari-ini` bisa sudah berakhir saat suite
-  jalan sore/malam → flaky; test yang butuh hari-ini/masa-lalu memang sudah set eksplisit.
-  Docs: `BUSINESS-FLOW §3.2b/§3.3` (aturan tolak), `CODE-WALKTHROUGH §J` (guard expired),
-  hitungan test → **161 Pest / 434 assert**. Alasan: tutup backlog ronde 2 — booking yang
-  langsung jadi NO_SHOW ≤5 menit itu jebakan UX; keputusan produk: window berjalan tetap
-  boleh di-book. Tidak menyentuh CLAUDE.md/seeder.
-- `2026-07-07`: **Senior review ronde 2 → ADR-0004 baru + DemoSeeder pakai `forceFill`.**
-  Kode: `IdempotencyKey` (key kini scope `method|path` — fix replay lintas endpoint),
-  `Appointment`/`SlotWindow` (`$fillable` diperketat), `AppServiceProvider`
-  (`preventSilentlyDiscardingAttributes` non-prod), `DemoSeeder` (`forceFill` = bypass Action
-  yang disengaja & eksplisit; perilaku seed TIDAK berubah, `migrate:fresh --seed` diverifikasi).
-  Docs: `docs/adr/0004-guard-state-quota-columns.md` baru (+ tabel `docs/adr/README.md`),
-  `CODE-WALKTHROUGH` (format key idempotency), hitungan test diselaraskan ke **158 Pest /
-  57 Vitest** di README/ONBOARDING/SETUP-GUIDE/HANDOVER. Alasan: menutup temuan #4 ronde 1
-  (kontrak §JANGAN kini ditegakkan framework, bukan konvensi) + bug idempotency nyata.
-  Tidak menyentuh CLAUDE.md.
-- `2026-06-28`: **`docs/ARCHITECTURE.md` + log `docs/adr/` baru (P0 dari senior review arsitektur).**
-  ARCHITECTURE.md: pola (Layered = ADR + Action/Command + Repository + Ports&Adapters +
-  Event-driven), peta folder aktual, aturan aliran dependensi, trace request booking
-  antar-lapisan, ports & adapters, mirror frontend, trade-off. `docs/adr/` (format
-  Status·Context·Decision·Consequences·Kapan ditinjau ulang): 0001 package-by-layer (+ trigger
-  tinjau ulang: ≥3 sub-folder lintas lapisan & tim bertambah), 0002 repository-interface
-  (Ports&Adapters), 0003 defer-token-abilities (angkat keputusan dari Senior review jadi ADR).
-  README + ONBOARDING doc-map diupdate. Tujuan: cegah architecture drift di proyek multi-sesi.
-  Tidak menyentuh CLAUDE.md. **Sisa rekomendasi senior:** P1 `$guarded` kolom status/version/
-  company_id (ranjau mass-assignment) — lewat loop TDD, belum dikerjakan.
-- `2026-06-28`: **`docs/ONBOARDING.md` baru** — panduan developer baru/junior (peta mental
-  3-lapis + analogi restoran, glosarium domain & teknis, prasyarat skill, rencana minggu
-  pertama, tahapan baca + self-check, bedah golden path booking, resep baca slice, loop TDD,
-  cheat-sheet jebakan, perintah harian, routing per tugas, latihan, FAQ). `README` diupdate:
-  onboarding menunjuk ke ONBOARDING.md + masuk peta dokumentasi. Tidak menyentuh CLAUDE.md.
-- `2026-06-28`: **Admin CRUD + dokumentasi diselaraskan** (commit `0507d86` + sesi docs).
-  Kode: lihat *Sudah selesai* → Admin CRUD. Docs yang diupdate agar konsisten jadi handbook:
-  `PRD §3` (admin master-data CRUD → IN scope), `BUSINESS-FLOW §1` (permission `*.manage`
-  admin-only + baris matriks CRUD master data), `SETUP-GUIDE §10d` (tabel 20 endpoint
-  `/admin/*` + §13 peta file + status akhir 152/57), `CODE-WALKTHROUGH` (§V baru: admin CRUD,
-  `EntityInUseException`, password/role sync, jebakan PHPStan route-binding), `FRONTEND §4`
-  (AdminPage 4-tab + `useAdmin`/`useAdminRefs`), `README` (onboarding order + status + 152/57),
-  `HANDOVER` (status + langkah berikutnya). Hitungan test diselaraskan ke **152 Pest / 57
-  Vitest** (sebelumnya tercatat 118 di HANDOVER). Tidak menyentuh CLAUDE.md (kontrak tetap).
-- `2026-06-28`: **Dokumentasi frontend dibuat** → `docs/FRONTEND.md` baru (arsitektur SPA,
-  pola TanStack Query, tiap halaman/komponen + *kenapa*, pola test). `CODE-WALKTHROUGH.md`:
-  TOC diperbaiki (tambah S/T yang sempat hilang) + §U baru (read endpoints persona:
-  `/me/appointments` & `/gate/queue`) + pointer ke FRONTEND. `README.md`: doc-map +
-  stack frontend + langkah jalankan SPA. `SETUP-GUIDE.md §9a`: pointer FRONTEND.
-  Alasan: SPA (≈30 file) sebelumnya tak terdokumentasi; CODE-WALKTHROUGH eksplisit
-  backend-only. Tidak menyentuh CLAUDE.md/PRD/BUSINESS-FLOW/DUMMY-DATA (domain tak berubah).
-- `2026-06-27`: DemoSeeder.windows() key diubah dari string '06'..'17' → **integer** 6..17.
-  Alasan: PHP menormalkan kunci string angka ('10') jadi int → array kunci campuran bikin
-  PHPStan lvl 8 `offsetAccess.notFound`. Tidak ada perubahan kontrak/docs.
-- `2026-06-27`: `containers.slot_window_id` (nullable) **ditambah** untuk menegakkan unik
-  `(slot_window_id, container_no)` per appointment aktif (cancel/no-show → NULL melepas slot).
-  Belum tercermin di BUSINESS-FLOW §4 ERD — **TODO** sinkronkan saat slice booking.
-- `2026-06-28`: `phpunit.xml` set `BROADCAST_CONNECTION=null` agar event `ShouldBroadcast`
-  (Slot/GateQueue) tidak menembak driver `log` (.env) saat test. Bukan perubahan kontrak.
-- `2026-06-28`: Tambah `config/tas.php` (`no_show_grace_minutes`=30, `reminder_lead_minutes`=120),
-  sumber nilai untuk `NoShowSweepJob` & `ScheduleAppointmentReminder`. Bukan perubahan kontrak/
-  docs; nilai bisa di-override via env `TAS_NO_SHOW_GRACE_MINUTES`/`TAS_REMINDER_LEAD_MINUTES`.
-- `2026-06-28`: Tambah `config/tas.php` → `rate_limits` (login=5, api=60, booking=10) + named limiter
-  di `AppServiceProvider::configureRateLimiters()` + `throttle:*` di `routes/api.php`. Menutup kontrak
-  CLAUDE.md §Hardening (rate limit). Override env `TAS_RL_LOGIN`/`TAS_RL_API`/`TAS_RL_BOOKING`. Bukan
-  perubahan kontrak (justru memenuhinya); SETUP-GUIDE §10d ditandai respons 429.
-- `2026-06-28`: Token abilities Sanctum **sengaja TIDAK ditegakkan** lewat middleware (lihat *Senior
-  review*). Keputusan, bukan utang diam-diam: enforcement redundan selama login hanya cetak token
-  full-scope. Tak ada perubahan kode rute selain throttle.
-- `2026-06-28`: Backlog hardening (3 item) → `config/tas.php` tambah `no_show_chunk_size`=500,
-  `idempotency.lock_seconds`=60, `idempotency.ttl_hours`=24 (env `TAS_NO_SHOW_CHUNK_SIZE`/
-  `TAS_IDEMPOTENCY_LOCK_SECONDS`/`TAS_IDEMPOTENCY_TTL_HOURS`). `cancel` terima `version` opsional
-  (backward compatible). Bukan perubahan kontrak. CODE-WALKTHROUGH §S.5 ditambah; SETUP-GUIDE
-  endpoint cancel ditandai body opsional `version`.
-- `2026-06-27`: Cache ketersediaan slot pakai **explicit-key `Cache::flexible` + `Cache::forget`**
-  (di `SlotRepository`), BUKAN `Cache::tags` seperti contoh CLAUDE.md. Alasan: cache dev
-  (`CACHE_STORE=database`) tidak mendukung tagging; explicit-key jalan di semua store. Saat
-  pindah ke Redis, boleh refaktor ke tags. Bukan perubahan kontrak, hanya implementasi.
+- **Entri changelog sebelum 2026-09-12 (era pra-Docker) dihapus 2026-09-14** — riwayat, bukan
+  keadaan. Utuh di `git show pre-docker:HANDOVER.md` (juga `git log -- docs/ CLAUDE.md`).
 
 ## Jebakan / catatan
-- **3 spec e2e yang gagal (ditemukan sesi sebelumnya) — DIPERBAIKI (2026-08-14), 2 akar masalah
-  berbeda, tak satu pun bug bisnis.** (1) **Mail synchronous jadi bottleneck:** `.env.e2e` pakai
-  `QUEUE_CONNECTION=sync`, jadi `AppointmentReminderJob` (dijadwalkan `ScheduleAppointmentReminder`
-  tiap booking) berjalan **inline di request** — `->delay()` diabaikan driver sync. Dengan
-  `MAIL_MAILER=log`, tiap booking merender+menulis **seluruh HTML notifikasi** ke disk secara
-  sinkron, cukup lambat untuk membuat request booking lewat batas `expect().toBeVisible()` default
-  Playwright (5dtk) — backend-nya sebenarnya **sukses** (kebukti dari `laravel.log`: booking code
-  & broadcast event tercatat), cuma responsnya kepayahan sampai ke browser. Fix: `MAIL_MAILER=array`
-  di `.env.e2e`+`.env.e2e.example` (in-memory, bukan render+tulis disk) — 3 dari 4 test yang tadinya
-  gagal langsung hijau. (2) **`hhmm()` di `tests/e2e/helpers.ts` pakai jam LOKAL, bukan UTC:**
-  `d.toTimeString()` mengembalikan jam sistem (mesin dev ini = UTC+7), sementara `today()` di file
-  yang sama sudah benar pakai `toISOString()` (UTC) dan backend `APP_TIMEZONE=UTC` — window "now ±"
-  yang dihitung `gate-in-out.spec.ts` jadi meleset **7 jam** dari `now()` sungguhan di server, gate-in
-  ditolak 409 `gate_in_too_early` (`config/tas.php`). Fix: `hhmm()` pakai `toISOString().slice(11,16)`
-  (UTC), konsisten dgn `today()`. **(3) Bukan bug — kontensi paralelisme:** dengan >1 worker
-  (default Playwright ambil dari jumlah core), backend (1 proses `php artisan serve` + sqlite
-  file-based) kepayahan melayani beberapa spec bareng → timeout intermiten meski tak ada 1 pun
-  error di `laravel.log`. `playwright.config.ts` +`workers: 1` — diverifikasi **2× run beruntun,
-  5/5 lulus konsisten** (turun dari flaky 2-4/5 sebelumnya), durasi per test malah lebih cepat
-  (kontensi CPU/IO hilang). **Rebrand warna (indigo→harbor/signal) masih uncommitted, sengaja tak
-  disentuh** — di luar scope "debug e2e" sesi ini, lihat `resources/css/app.css`. Docs:
-  `SETUP-GUIDE §15c` (cakupan+jebakan worker diupdate), entri *Status*/*Changelog* di bawah.
-- **Git:** repo sudah di-init & push ke GitHub `caesarovera/truck-appointment-system` (branch `main`).
-  Konvensi commit: 1 slice = 1 commit; atribusi `Co-Authored-By: Overa Caesar` (bukan Claude) —
-  lihat `docs/GIT-HISTORY-REWRITE.md`.
-- **KOREKSI (2026-07-25): hanya HORIZON butuh `ext-pcntl`/`ext-posix`, BUKAN Reverb.** Dulu dicatat
-  "Horizon/Reverb butuh pcntl → Docker" — salah untuk Reverb. `laravel/reverb` composer.json cuma minta
-  `php ^8.2` + paket PHP murni (react/socket, ratchet, pusher-php-server). **Terbukti: `php artisan
-  reverb:start` bind port 8080 di Windows native.** Untuk dev, queue cukup `queue:listen` (tanpa pcntl);
-  Horizon hanya dashboard pemantau. Jadi **realtime TIDAK butuh Docker**. Docker tetap relevan nanti
-  utk paritas produksi (Redis `Cache::tags`, Horizon, MySQL) — sesi tersendiri. `composer install` di
-  Windows tetap perlu `--ignore-platform-req` selama Horizon terpasang.
-- **Realtime: TERVERIFIKASI end-to-end di browser (2026-08-13).** `ShouldBroadcast` event + listener +
-  channel auth (`auth:sanctum`) + klien Echo (`echo.ts`/`useRealtime`) — booking di satu browser
-  (`dispatcher@majulog.test`) memicu sisa kuota berubah **tanpa refresh** di browser lain
-  (`dispatcher@sinarkargo.test`), dikonfirmasi manual oleh user. Cara menyalakan: (1)
-  `BROADCAST_CONNECTION=reverb` di `.env` (default dev tetap `log` — jangan lupa `php artisan
-  config:clear` setelah ganti, config di-cache); (2) `php artisan reverb:start` (native) + `composer dev`
-  (queue:listen jalan — **`ShouldBroadcast` ke queue dulu, tanpa worker event DIAM tanpa error**);
-  (3) buka SPA di 2 profil/browser beda, login 2 akun transporter beda, gate+tanggal sama. **Reverb
-  sempat exit sendiri (code 0, tanpa error)** saat `migrate:fresh` dijalankan bersamaan — restart manual
-  `php artisan reverb:start` kalau kejadian lagi; penyebab pastinya belum ditelusuri (mungkin re-lock
-  file DB atau proses ter-drop bersama `migrate:fresh` di Windows). Push TOS masih
-  `LoggingGateEventGateway` (placeholder) — swap binding saat ada TOS riil.
-- **`DemoSeeder` pakai `Carbon::today()` — data demo basi kalau DB tak di-seed ulang.** Ditemukan
-  2026-08-13 saat verifikasi realtime: window contoh dibuat relatif ke tanggal **saat `--seed`
-  dijalankan**, bukan tanggal absolut. DB yang di-seed sebulan lalu (mis. 2026-07-06) tidak akan
-  punya window untuk hari ini — `/slots` tampak kosong padahal bukan bug. **Bukan bug kode** (ini
-  memang perilaku `Carbon::today()` yang disengaja — factory lain di proyek ini, mis.
-  `SlotWindowFactory`, punya alasan serupa untuk pakai tanggal relatif), tapi jebakan operasional:
-  kalau demo/testing manual terasa aneh ("kok slot-nya kosong terus"), jalankan
-  `php artisan migrate:fresh --seed` dulu **sebelum** curiga ke kode.
-- **Cek status CI tanpa `gh` — `gh` TIDAK terpasang di mesin dev ini** (sudah dicek: tak ada di
-  PATH PowerShell maupun 3 lokasi instalasi umum). Itu **bukan** alasan untuk bilang "status CI tak
-  bisa diverifikasi": repo ini **publik**, jadi REST API GitHub terbaca tanpa token/autentikasi.
-  `curl` ada bawaan Git for Windows, `jq` **tidak** ada → pakai resep berbasis PHP di
-  `docs/SETUP-GUIDE.md §14c` (terverifikasi jalan 2026-07-27). Dicatat karena sesi ini sempat
-  berhenti di rintangan pertama (`gh: command not found`) dan menyimpulkan terlalu cepat —
-  padahal pintu lain terbuka. **Ingat juga:** GitHub bikin **1 run per PUSH, bukan per COMMIT**
-  (push 3 commit sekaligus → 1 run di commit terakhir), jadi commit `3025eb4` tak punya run
-  sendiri walau isinya tetap teruji lewat keturunannya.
-- **php.ini diubah** (mesin dev): `pdo_sqlite` + `sqlite3` di-enable (tadinya disabled) agar
-  `.env` sqlite jalan. Driver DB lain yang aktif hanya mysql.
-- **Frontend versi di-pin ke vite 6.** Proyek pakai `vite@^6` (kompat `laravel-vite-plugin@1.2`).
-  Karena itu `vue-router@^4` (bukan 5, yang menuntut vite 7/8) & `@vitejs/plugin-vue@^5`.
-  `npm install` paket baru: cek peer vs vite 6 dulu. TS 6 men-deprecate `baseUrl` → `tsconfig`
-  pakai `paths` relatif tanpa `baseUrl`.
-- Akun demo & password: lihat `docs/DUMMY-DATA.md` (semua `password`).
-- Tests pakai sqlite `:memory:` (phpunit.xml) — aman, tidak menyentuh `database/database.sqlite`.
-- Akun demo & password: lihat `docs/DUMMY-DATA.md`.
+
+> Jebakan **infrastruktur & lingkungan** (Docker, isolasi test, `vendor/` volume, `--no-reload`,
+> Reverb dua alamat, `public/hot` basi, kunci Reverb) kini terkumpul di **`SETUP-GUIDE` §3, §6, §11,
+> §17, §18** — satu tempat, bukan tersebar di jurnal. Di sini hanya yang bersifat proses/proyek.
+> Jebakan era native (SQLite, `queue:listen`, Reverb native, `php.ini` laragon) sudah usang dan dihapus
+> (utuh di `git show pre-docker:HANDOVER.md`).
+
+- **"Hijau" bukan bukti.** Tiga kali di proyek ini klaim "terverifikasi" gugur: race condition (test
+  sekuensial tetap hijau tanpa lock), isolasi test di container (hijau sambil menulis ke DB dev), app di
+  container (200 padahal membaca SQLite). Dua pertanyaan wajib sebelum menulis "terverifikasi":
+  **(a)** *apakah test ini MERAH kalau fitur yang dijaganya dirusak?* — rusak beneran, jalankan;
+  **(b)** *data ini benar-benar mendarat di mana?* Dan **ulangi uji merah setelah fix** — fix pertama
+  isolasi test (cuma `force="true"`) terlihat meyakinkan dan tidak menggigit.
+- **Git:** 1 slice = 1 commit; atribusi `Co-Authored-By: Overa Caesar` (bukan Claude) — lihat
+  `docs/GIT-HISTORY-REWRITE.md`. GitHub membuat **1 run CI per PUSH, bukan per commit**.
+- **Repo privat, `gh` tak terpasang** → status CI hanya bisa dilihat user di tab Actions (REST API
+  tanpa token → 404). Jangan menulis "CI hijau" tanpa konfirmasi user.
+- **`DemoSeeder` relatif ke tanggal seed** dan **scheduler menyapu data demo lampau jadi `NO_SHOW`**
+  — "slot kosong / status berubah sendiri" biasanya bukan bug; seed ulang dulu (`DUMMY-DATA.md`).
+- **Mematikan proses di Windows: pakai PID, bukan nama.** `taskkill /IM php.exe` pernah mematikan
+  semua proses PHP user; menghentikan pembungkus `npm run dev` pernah meninggalkan Vite yatim +
+  `public/hot` basi. Cek port (`Get-NetTCPConnection`) setelah menghentikan server.
+- **Frontend versi di-pin ke vite 6** (kompat `laravel-vite-plugin@1.2`) → `vue-router@^4`,
+  `@vitejs/plugin-vue@^5`. `npm install` paket baru: cek peer vs vite 6 dulu. TS 6 men-deprecate
+  `baseUrl` → `tsconfig` pakai `paths` relatif.
+- **Akun demo & password:** `docs/DUMMY-DATA.md` (semua `password`).
 
 ## Lingkungan (dev)
-> Setup manual langkah-demi-langkah + troubleshooting: `docs/SETUP-GUIDE.md`.
-> Penjelasan detail tiap kode yang sudah dibuat: `docs/CODE-WALKTHROUGH.md`.
+> Menjalankan & mengoperasikan: `docs/SETUP-GUIDE.md` (§1 dari clone, §3 sehari-hari).
+> Penjelasan kode: `docs/CODE-WALKTHROUGH.md` (backend) · `docs/FRONTEND.md` (SPA).
 ```bash
-php artisan migrate:fresh --seed
-php artisan horizon        # queue (jalan di Docker/Linux — butuh ext-pcntl)
-php artisan reverb:start   # websocket
-composer test && composer analyse
-# Frontend (SPA Vue di resources/js):
-npm run dev               # Vite dev server (+ php artisan serve untuk shell)
+docker compose up -d --wait                                # mysql redis app horizon scheduler reverb
+docker compose exec app php artisan migrate:fresh --seed   # data demo
+docker compose exec app composer test && docker compose exec app composer analyse
+docker compose run --rm --no-deps app composer install     # setelah composer.lock berubah
+# Frontend (SPA Vue di resources/js), native:
+npm run dev               # Vite HMR — app tetap dibuka di http://localhost:8000
 npm run test:js           # Vitest
 npm run type-check        # vue-tsc --noEmit
 npm run build             # bundel produksi → public/build
