@@ -852,10 +852,11 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 "setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
 `reverb:start` native bersamaan stack.
 
-**2. Yang perlu mata manusia:** CI untuk push sesi 2026-09-14 **belum diverifikasi** — repo privat,
-`gh` tak terpasang, tanpa token (REST API GitHub → 404). Cek tab Actions; yang paling berisiko:
-`tests/TestCase.php` baru dan komentar `ci.yml`. Riwayat: CI D1 (`4ea097b`), D2′ (`3e1f0c2`),
-D3′ (`8319cf6`) dikonfirmasi hijau oleh user.
+**2. CI `4f5d6ad` — CONFIRMED hijau oleh user 2026-09-14.** Run di commit teratas itu mencakup
+seluruh perubahan sesi 2026-09-14 (`d186c4a`…`4f5d6ad`), termasuk `tests/TestCase.php` baru di runner
+dan komentar `ci.yml` — keduanya terbukti tak merusak CI. (Run terpisah di `8c39bcc` tak dicek
+sendiri; isinya teruji lewat keturunannya.) Repo privat + `gh` tak terpasang → status CI selalu lewat
+konfirmasi user. Riwayat: D1 (`4ea097b`), D2′ (`3e1f0c2`), D3′ (`8319cf6`) juga dikonfirmasi user.
 
 **3. Pekerjaan tersisa:** tak ada slice aktif — lihat *Backlog* (B1–B6), semuanya menunggu keputusan.
 
