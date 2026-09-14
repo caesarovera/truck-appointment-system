@@ -32,6 +32,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y --auto-remove \
     && rm -rf /var/lib/apt/lists/*
 
+# OPcache untuk SAPI CLI. `php artisan serve` (server web service `app`) ADALAH SAPI CLI,
+# dan default-nya opcache.enable_cli=0.
+# PERINGATAN — baris ini SENDIRIAN TIDAK MEMPERCEPAT (diukur: median 3,4 → 4,0 dtk). Biaya
+# sebenarnya bukan kompilasi tapi stat() ~925 berkas per request lewat bind mount NTFS, dan
+# validate_timestamps=1 tetap men-stat semuanya. Yang membuatnya efektif: vendor/ (88% berkas
+# itu) di named volume Linux — lihat docker-compose.yml. Keduanya bersama: 0,13 dtk beruntun,
+# 0,64 dtk setelah idle.
+# validate_timestamps=1 ditulis eksplisit karena WAJIB untuk dev: edit kode tetap terlihat
+# tanpa restart (paling lambat revalidate_freq = 2 dtk, default). Mematikannya memang lebih
+# cepat, tapi kode lama lalu jalan DIAM-DIAM sampai restart. JANGAN salin ke produksi — di
+# sana kode ada di dalam image dan validate_timestamps=0 justru benar.
+# Berkas conf.d, bukan php.ini: php.ini akan ikut menentukan variables_order, dan perilaku
+# env var container sudah cukup rapuh (lihat catatan --no-reload di CMD).
+# Proses panjang (horizon) tetap butuh `php artisan horizon:terminate` setelah edit kode —
+# itu sifat worker, bukan OPcache, dan sudah berlaku sebelum baris ini ada.
+RUN { \
+        echo 'opcache.enable_cli=1'; \
+        echo 'opcache.validate_timestamps=1'; \
+    } > /usr/local/etc/php/conf.d/zz-opcache-dev.ini
+
 # Composer diambil dari image resminya — lebih ringkas dan ter-pin ketimbang
 # mengunduh installer lalu memverifikasi hash sendiri.
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -42,7 +62,13 @@ WORKDIR /var/www/html
 # container (cache Laravel, hasil composer) tidak muncul sebagai milik root di
 # bind mount. Di Docker Desktop Windows kepemilikan memang di-abstraksi, tapi
 # baris ini membuat image tetap benar kalau kelak jalan di Linux/WSL2 langsung.
-RUN useradd -u 1000 -m -s /bin/bash app && chown -R app:app /var/www/html
+#
+# mkdir vendor: di docker-compose.yml, vendor/ adalah named volume (lihat komentarnya). Volume
+# kosong mewarisi kepemilikan direktori dari IMAGE saat pertama dipasang; tanpa baris ini
+# direktori itu dibuat milik root dan `composer install` sebagai user `app` gagal menulis.
+RUN useradd -u 1000 -m -s /bin/bash app \
+    && mkdir -p /var/www/html/vendor \
+    && chown -R app:app /var/www/html
 USER app
 
 # Perintah default (dipakai service `app`; service lain meng-override `command:`).

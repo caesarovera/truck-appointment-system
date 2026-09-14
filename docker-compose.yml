@@ -13,6 +13,10 @@
 # terbuang begitu app pindah ke container. Memindahkan app lebih dulu membuat `pecl install
 # redis` di dalam image cukup, tanpa menyentuh mesin dev sama sekali.
 #
+# Sekali setelah clone, dan SETIAP composer.lock berubah (composer require / git pull):
+#            docker compose run --rm --no-deps app composer install
+#            (vendor/ container ada di volume sendiri — lihat x-php. `composer install` di
+#            Windows TETAP perlu untuk IDE/PHPStan/test native; keduanya terpisah.)
 # Jalankan:  docker compose up -d
 # Cek sehat: docker compose ps          (mysql & redis: STATUS harus "healthy")
 # Masuk app: docker compose exec app bash
@@ -82,11 +86,23 @@ x-php: &php
     dockerfile: docker/php/Dockerfile
   restart: unless-stopped
   # Kode masuk lewat bind mount, BUKAN COPY ke image: edit di editor langsung terlihat tanpa
-  # rebuild. Konsekuensinya di Windows, bind mount menembus NTFS dan I/O PHP (autoload ribuan
-  # berkas kecil) jadi lebih lambat — diukur, bukan ditebak; angkanya ada di
-  # docs/SETUP-GUIDE.md §17.
+  # rebuild. Konsekuensinya di Windows, bind mount menembus NTFS dan setiap stat() berkas
+  # menyeberang ke Windows (milidetik, bukan mikrodetik).
   volumes:
     - .:/var/www/html
+    # vendor/ di named volume Linux, MENIMPA vendor/ dari bind mount (hanya di dalam container —
+    # vendor/ di Windows tetap utuh untuk IDE/PHPStan/test native).
+    # KENAPA: satu request Laravel memuat ~925 berkas, 816 di antaranya vendor/. OPcache dengan
+    # validate_timestamps=1 men-stat semuanya lewat bind mount → median 3,4 dtk per request API.
+    # Dengan vendor/ di sini: 0,13 dtk beruntun, 0,64 dtk setelah idle; kode app (~106 berkas)
+    # tetap lewat bind mount, jadi edit tetap terlihat ≤2 dtk. Diukur, bukan ditebak.
+    # HARGA: dua `composer install` (Windows + `docker compose run --rm --no-deps app composer
+    # install`) setiap composer.lock berubah. Lupa yang container → error "Class not found"
+    # yang keras, bukan salah diam.
+    # Ini MEMBALIK keputusan D2′ (ADR-0007) yang menolak volume vendor karena "IDE & PHPStan di
+    # host jadi buta" — alasan itu hanya benar kalau host tak punya vendor/ sendiri.
+    # KHUSUS DEV. Di produksi kode + vendor dipanggang ke image, tanpa volume untuk kode.
+    - vendor:/var/www/html/vendor
   environment: *php-env
   depends_on: *php-depends
 
@@ -192,3 +208,7 @@ volumes:
     name: tas-mysql-data
   redis-data:
     name: tas-redis-data
+  # vendor/ milik container (lihat x-php). Aman dihapus kapan saja (`docker volume rm
+  # tas-vendor`) — isinya bisa dibuat ulang dengan `composer install`, beda dengan data MySQL.
+  vendor:
+    name: tas-vendor
