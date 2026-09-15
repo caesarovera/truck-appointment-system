@@ -900,7 +900,8 @@ juga dikonfirmasi user. **Sejak 2026-09-16 `gh` terpasang & login (akun `caesaro
 
 **3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (`ad620e0`…
 `ee99cac`, sudah di-push; CI merah di `ee99cac` lalu diperbaiki — lihat entri Status teratas).
-Kandidat berikutnya: **B8** (kecil, gerbang test) → B7. Sisanya di *Backlog* menunggu keputusan.
+B8 selesai 2026-09-16. Kandidat berikutnya: **B7** (alerting job gagal). Sisanya di *Backlog* menunggu
+keputusan. Status CI terbaru: `gh run list --branch main --limit 1`.
 
 **4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
 
@@ -949,7 +950,15 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    `ProcessGateEventJob`, `NoShowSweepJob`, `AppointmentReminderJob` kosong ("di-wire saat observability
    slice" — slice itu tak pernah dijadwalkan). Kegagalan tetap tercatat di `failed_jobs`/Horizon, tapi
    tak ada yang diberi tahu. Belum mendesak tanpa produksi.
-**B8. [kecil] Gerbang invalidasi cache/broadcast per event** (2026-09-15, **dijalankan**) — mutasi:
+**~~B8~~ — SELESAI 2026-09-16.** Dipilih test **perilaku**, bukan `instanceof`: cek interface tak
+   menangkap Action yang lupa memicu event. `tests/Feature/Slots/SlotAvailabilityFreshnessTest.php`
+   (4 test: booking/cancel/no-show/reschedule lintas 2 gate) memanggil Action sungguhan, lalu memeriksa
+   sisa kuota yang dibaca **lewat cache** dan payload broadcast. Tujuh mutasi, semuanya menggigit tepat:
+   lepas interface ×4 event → test event itu merah; hapus `AppointmentCancelled::dispatch` dari Action →
+   merah; `forgetAvailability` no-op → 4 merah (assertion cache); listener broadcast no-op → 4 merah
+   (assertion broadcast). Temuan sampingan: `SlotAvailabilityBroadcastTest` memicu event **manual**,
+   jadi tak pernah membuktikan Action memicu event — kini tertutup oleh test ini. Catatan asal:
+**B8 (asal). [kecil] Gerbang invalidasi cache/broadcast per event** (2026-09-15, **dijalankan**) — mutasi:
    lepas `implements AffectsSlotAvailability` dari `AppointmentCancelled` → **273 test tetap hijau**.
    Yang terjaga hanya: listener itu sendiri (via test buka/tutup window) dan event booking (tak langsung,
    via `SlotAvailabilityBroadcastTest`). Cancel/reschedule/no-show tak punya gerbang → sisa kuota basi

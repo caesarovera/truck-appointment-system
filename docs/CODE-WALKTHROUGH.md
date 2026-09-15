@@ -693,6 +693,9 @@ transporter poll bersamaan, DB tidak diserbu (cuma satu yang refresh).
 > Catatan implementasi: kita pakai key eksplisit + `Cache::forget`, bukan `Cache::tags`. Alasan
 > awalnya store `database` tak mendukung tag; setelah Redis hidup, B5 (2026-09-15) memutuskan tetap
 > tanpa tag karena hanya ada satu keluarga kunci — lihat `CLAUDE.md §Cache`.
+> Gerbangnya: `tests/Feature/Slots/SlotAvailabilityFreshnessTest.php` — booking/cancel/no-show/
+> reschedule lewat Action sungguhan harus membuat sisa kuota yang dibaca dari cache segar dan
+> ter-broadcast. Test yang memicu event manual tak cukup: ia lolos walau Action lupa `dispatch`.
 
 ### J.2 DTO — `BookAppointmentData`
 
