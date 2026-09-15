@@ -135,7 +135,7 @@ docker compose down                       # matikan (data TETAP di volume)
 | Kode job/listener yang dijalankan Horizon | `docker compose exec app php artisan horizon:terminate` | worker proses panjang memegang kode lama di memori. Output **"No processes to terminate" itu normal**: master Horizon ada di container lain, tapi perintah ini tetap menyetel sinyal restart di Redis yang membuat worker memuat kode baru (terbukti 2026-09-16). Ubah `config/horizon.php` → `docker compose restart horizon` |
 | `composer.lock` (`composer require`, `git pull`) | `docker compose run --rm --no-deps app composer install` **dan** (bila memakai §4) `composer install` di Windows | ada **dua** `vendor/` (§17); lupa yang container → error keras `Class not found` |
 | `.env` | `docker compose up -d --force-recreate app horizon scheduler reverb` | server web jalan dengan `--no-reload` (§17) |
-| `docker/php/Dockerfile` | `docker compose build && docker compose up -d` | image dibangun ulang |
+| `docker/php/Dockerfile` | `docker compose build && docker compose up -d` | image `tas-php:dev` dibangun ulang (hanya lewat `app`, §17g); versi lama jadi `<none>` → `docker image prune -f --filter label=com.docker.compose.project=tas` |
 | `docker/mysql/init/` | `docker compose down -v && docker compose up -d` (**HAPUS DATA**) | skrip init hanya jalan saat volume kosong |
 | `package.json` / `package-lock.json` | `npm install` | frontend native |
 
@@ -735,6 +735,51 @@ UID 1000 (juga pemilik `vendor/` agar volume kosong tak jadi milik root).
 
 Volume di produksi hanya untuk data yang harus bertahan (MySQL, Redis), bukan kode. Belum ada
 produksi di proyek ini — backlog di `HANDOVER.md`.
+
+### 17g. Satu image untuk empat service PHP — dan cara membaca ukuran image
+
+**Gejala (2026-09-16).** Docker Desktop → *Images* menampilkan **17 baris PHP @671 MB** (`tas-app`,
+`tas-horizon`, `tas-reverb`, `tas-scheduler`, `tasfresh-*` ×4, `<none>` ×9) — sekilas ±11 GB.
+
+**Pelajaran 1 — kolom *Size* menghitung layer bersama berkali-kali.** Ukuran yang benar-benar dipakai
+dibaca dari `docker system df` (total & *reclaimable*) dan `docker system df -v` kolom **UNIQUE SIZE**.
+Ke-17 image itu UNIQUE **0 B** / SHARED 671,5 MB → di disk hanya **sekali**. Menghapus semuanya:
+`Total reclaimed space: 0B`. Ruang yang sungguh bisa dibebaskan (±1,8 GB) justru milik proyek lain.
+
+**Pelajaran 2 — asal tiap baris:**
+
+| Baris | Asal |
+|---|---|
+| `tas-app` / `tas-horizon` / `tas-reverb` / `tas-scheduler` | `build:` di anchor bersama **tanpa** `image:` → Compose memberi tag `<proyek>-<service>` per service |
+| `tasfresh-*` | uji clone kosong `docker compose -p tasfresh` — nama proyek lain = set image lain; stack dibongkar tapi image tak ikut dihapus |
+| `<none>` | tiap build ulang, tag pindah ke image baru dan yang lama jadi *dangling* — ×4 per build |
+| Image "in use" padahal tak ada yang jalan | container yang sudah **mati** (`docker ps -a`) tetap memegang image-nya |
+
+**Pelajaran 3 — menambah `image:` saja TIDAK cukup.** Dengan `image: tas-php:dev` di anchor, Compose
+v5.5.1 tetap membangun **4×** (label `com.docker.compose.service` berbeda → 4 image ID) dan keempatnya
+menulis tag yang sama; pemenangnya build terakhir, 3 lainnya jadi `<none>` di setiap build. Terbukti
+dari log: 4× `naming to docker.io/library/tas-php:dev` → **1×** setelah perbaikan di bawah.
+
+**Bentuk sekarang:** anchor `x-php` berisi `image: tas-php:dev` + `pull_policy: never`; **hanya `app`**
+yang punya `build:`. Diuji dari nol (`down` tanpa `-v`, hapus semua tag PHP, `up -d --wait`): 1 build,
+0 error pull, 6 service sehat, volume & data dev utuh, 285 test lulus.
+
+- `pull_policy: never` — service tanpa `build:` tak mencari image lokal ini di Docker Hub. Akibatnya
+  `docker compose up -d horizon` **sendirian** sebelum image pernah dibangun gagal
+  `No such image: tas-php:dev` (terbukti). Jalankan `docker compose up -d` (semua) atau `docker compose build` dulu.
+- Proyek compose lain (`-p …`) kini **berbagi** tag `tas-php:dev`: build di proyek uji menimpa tag dev
+  (isinya sama selama Dockerfile sama).
+
+**Membersihkan tanpa menyentuh proyek lain:**
+```bash
+docker system df -v                                                      # UNIQUE SIZE = yang benar-benar kembali
+docker image prune -f --filter label=com.docker.compose.project=tas      # <none> milik TAS saja
+docker images --filter label=com.docker.compose.project=tasfresh        # sisa proyek uji, lalu docker image rm
+docker builder prune                                                     # build cache (opsional)
+```
+`docker image prune` **tanpa** filter menyapu *semua* image dangling di mesin, termasuk milik proyek lain.
+Jebakan kecil: `docker images -q <id>` membaca argumen sebagai **nama repositori**, bukan ID — cek
+keberadaan ID dengan `docker images --all --format '{{.ID}}' | grep <id>`.
 
 ---
 

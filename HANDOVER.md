@@ -13,6 +13,20 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-16` (image Docker menumpuk) · **[SELESAI] A + B, pelajaran dicatat di `SETUP-GUIDE §17g`.**
+  User melihat 17 baris image PHP @671 MB di Docker Desktop. **Diagnosis [dijalankan]:** `docker system
+  df -v` → ke-17 image UNIQUE **0 B** (layer sama, dipakai sekali di disk); asalnya tag per service
+  (`build:` di anchor tanpa `image:`), sisa uji `tasfresh-*`, dan `<none>` dari dua build ulang. Ruang
+  yang sungguh bisa dibebaskan (±1,8 GB) milik proyek lain → tak disentuh (keputusan user).
+  **A:** hapus 4 `tasfresh-*` + 9 `<none>` berlabel `tas` (prune ber-filter label; `<none>` milik
+  task-management & `postgres:17-alpine` baru tetap) → image 28 → 15, *reclaimed 0B* sesuai prediksi.
+  **B:** `x-php` → `image: tas-php:dev` + `pull_policy: never`, `build:` hanya di `app`. **Dugaan pertama
+  gugur saat diuji:** `image:` di anchor saja → Compose v5.5.1 tetap build 4× ke tag yang sama (4 image
+  ID, 3 jadi `<none>` tiap build). Sesudah perbaikan: 1 build. Jalur dari nol (`down` tanpa `-v`, hapus
+  semua tag PHP, `up -d --wait`): 1 build, 0 error pull, 6 service sehat, data dev utuh, 285 Pest.
+  Kasus tepi terbukti di proyek uji terpisah: `up -d horizon` sendirian tanpa image → `No such image`
+  (tanpa pull). Hasil: image PHP TAS **17 → 1**, total image 28 → 12.
+
 - `2026-09-16` (audit menyeluruh atas permintaan user) · **[SELESAI] 10 perbaikan, masing-masing commit
   sendiri, CI hijau.** Audit memeriksa: runtime stack, gerbang di semua jalur (container 281, native
   278+3, Vitest 111, vue-tsc, build, e2e 5/5), kontrak layer, keamanan (kode, dependensi, infra), dan
@@ -1222,6 +1236,10 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
   `npm install vitest@^X --save-dev --legacy-peer-deps`, lalu bandingkan lockfile (paket hilang = 0).
 - **Exception domain baru yang punya `render()` wajib `implements ShouldntReport`** — kalau lupa,
   `DomainExceptionReportingTest` merah. Tanpa itu tiap penolakan 4xx menulis ERROR + stack trace.
+- **Ukuran image di Docker Desktop menyesatkan.** Kolom *Size* menghitung layer bersama di setiap
+  baris; yang benar `docker system df -v` (UNIQUE SIZE). Keempat service PHP memakai **satu** image
+  `tas-php:dev` yang hanya dibangun `app` — jangan kembalikan `build:` ke anchor `x-php` (4 build, 4 tag,
+  `<none>` menumpuk). Bersihkan dengan filter label, bukan `docker image prune` polos (`SETUP-GUIDE §17g`).
 - **Port container hanya `127.0.0.1`.** App tak bisa dibuka dari perangkat lain di jaringan; jangan
   "perbaiki" dengan membuka ulang `mysql`/`redis` ke semua antarmuka (`SETUP-GUIDE §2`).
 - **`DemoSeeder` relatif ke tanggal seed** dan **scheduler menyapu data demo lampau jadi `NO_SHOW`**

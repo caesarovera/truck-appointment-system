@@ -84,9 +84,14 @@ x-php-depends: &php-depends
     condition: service_healthy
 
 x-php: &php
-  build:
-    context: .
-    dockerfile: docker/php/Dockerfile
+  # Satu image untuk keempat service PHP, DIBANGUN HANYA OLEH `app` (lihat `build:` di sana).
+  # Dulu `build:` ada di anchor ini → Compose membangun 4× (label service berbeda = 4 image ID),
+  # memberi tag per service, dan tiap build ulang meninggalkan 4 image <none> — Docker Desktop
+  # menampilkan 17 baris @671 MB padahal ukuran uniknya 0 B. Menambah `image:` saja TIDAK cukup:
+  # terbukti Compose v5 tetap build 4× ke tag yang sama. SETUP-GUIDE §17g.
+  # pull_policy never: jangan pernah mencari `tas-php:dev` di Docker Hub (image lokal).
+  image: tas-php:dev
+  pull_policy: never
   restart: unless-stopped
   # Kode masuk lewat bind mount, BUKAN COPY ke image: edit di editor langsung terlihat tanpa
   # rebuild. Konsekuensinya di Windows, bind mount menembus NTFS dan setiap stat() berkas
@@ -166,6 +171,10 @@ services:
 
   app:
     <<: *php
+    # Satu-satunya service yang membangun `tas-php:dev`; horizon/scheduler/reverb memakai hasilnya.
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
     container_name: tas-app
     # Perintah default dari Dockerfile: `php artisan serve --host=0.0.0.0 --port=8000`.
     ports:
