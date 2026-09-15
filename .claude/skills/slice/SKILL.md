@@ -42,10 +42,17 @@ Bangun fitur "$ARGUMENTS" secara berurutan dan uji tiap langkah.
 ## Setelah selesai
 
 ```bash
-composer test        # pest --parallel (flag sudah di dalam script — jangan tambah lagi)
-composer analyse     # PHPStan level 8, bersih
-composer fix         # Pint
+docker compose exec app composer test      # pest --parallel (flag sudah di script — jangan tambah)
+docker compose exec app composer analyse   # PHPStan level 8, bersih
+docker compose exec app composer fix       # Pint
 ```
+
+(Jalur native Windows `composer test` juga sah — lihat `CLAUDE.md` §Stack.)
+
+Bukti, bukan sekadar hijau:
+- **Test penjaga harus menggigit** — rusak kode yang dijaganya, pastikan test yang tepat merah, pulihkan.
+- Test yang merender view `@vite` harus lulus **tanpa** `public/build/` (job Backend CI tak build frontend).
+- Setelah push: `gh run watch <run-id> --exit-status` sampai hijau.
 
 Kalau slice-nya menyentuh SPA, gerbang frontend ikut wajib — CI menjalankan
 ketiganya juga (`.github/workflows/ci.yml`):

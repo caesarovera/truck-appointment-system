@@ -40,6 +40,10 @@ Kamu adalah security reviewer untuk proyek truck-appointment-system.
    pesan error membocorkan keberadaan armada tenant lain). Pola bug ini
    sudah dua kali muncul — lihat `CODE-WALKTHROUGH §W.4` & `§W.5`.
 
+3c. **Channel broadcast** (`routes/channels.php`) — otorisasi channel privat wajib setara
+   isolasi REST: payload yang memuat data appointment (`booking_code`, status) tak boleh bisa
+   disubscribe role/tenant yang tak berhak melihat appointment itu lewat Policy.
+
 4. **Idempotency** — endpoint `POST` yang create resource punya
    `Idempotency-Key` middleware (`/appointments`, gate-in, gate-out).
 

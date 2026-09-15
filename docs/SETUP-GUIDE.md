@@ -74,7 +74,7 @@ Buka **`http://localhost:8000`**, login `dispatcher@majulog.test` / `password`.
 
 Pastikan semuanya sehat:
 ```bash
-docker compose exec app composer test          # 265 passed (±30 dtk)
+docker compose exec app composer test          # semua passed, 0 skipped (2026-09-16: 281, ±30 dtk)
 docker compose exec app php artisan horizon:status   # Horizon is running
 ```
 
@@ -147,7 +147,7 @@ tetap menyala** karena test memakai MySQL container.
 
 ```bash
 composer install --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
-composer test        # MySQL lewat 127.0.0.1:3307 → 262 passed + 3 skipped (±36 dtk)
+composer test        # MySQL lewat 127.0.0.1:3307 → passed + 3 skipped Redis (2026-09-16: 278 + 3, ±50 dtk)
 composer analyse     # PHPStan lvl 8
 composer fix         # Pint
 ```
@@ -260,7 +260,7 @@ Urutan **fix → analyse → test** (Definition of Done `CLAUDE.md`):
 ```bash
 docker compose exec app composer fix       # Pint
 docker compose exec app composer analyse   # PHPStan lvl 8
-docker compose exec app composer test      # Pest (265)
+docker compose exec app composer test      # Pest
 npm run test:js && npm run type-check && npm run build
 ```
 
@@ -543,9 +543,17 @@ Keputusan di dalam workflow:
 git push                      # CI langsung jalan
 ```
 
-Hasil: repo di GitHub → tab **Actions** → run teratas. Repo ini **privat**, jadi REST API
-GitHub tak terbaca tanpa token dan `gh` tak terpasang di mesin dev — status CI dicek lewat tab
-Actions (atau `gh` / token bila kelak dipasang).
+Hasil: repo di GitHub → tab **Actions** → run teratas. Repo ini **privat** (REST API tanpa token →
+404), jadi dari terminal pakai **`gh`** (terpasang & login di mesin dev sejak 2026-09-16):
+
+```bash
+gh run list --branch main --limit 3          # status run terbaru
+gh run watch <run-id> --exit-status          # tunggu sampai selesai; exit ≠ 0 bila merah
+gh run view <run-id> --log-failed            # log step yang gagal saja
+```
+
+Shell yang dibuka sebelum `gh` dipasang belum mengenal PATH-nya → buka terminal baru atau pakai
+`"C:\Program Files\GitHub CLI\gh.exe"`.
 
 > **Satu run per PUSH, bukan per COMMIT.** Push 3 commit sekaligus → hanya **1** run, di commit
 > terakhir. Isi commit di tengah tetap teruji lewat keturunannya, tapi tak ada bukti hijau yang
@@ -558,6 +566,7 @@ Actions (atau `gh` / token bila kelak dipasang).
 | `backend` merah di **Pint** | lupa `composer fix` sebelum commit |
 | `backend` merah di **Install dependensi** | `composer.lock` tak sinkron dengan `composer.json` |
 | `backend` merah di **Pest**, hijau di container lokal | nilai env yang hanya ada di compose, atau test bergantung data dev — cek §6 |
+| `backend` merah di **Pest**: `Vite manifest not found` | test merender view `@vite`, padahal job Backend tak menjalankan `npm run build` (lokal lolos karena `public/build/` ada) → `withoutVite()` |
 | `frontend` merah di **Vitest** tapi hijau lokal | file test/aset baru belum di-commit |
 | `frontend` merah di **Build** saja | error yang hanya muncul saat bundling |
 | Semua job merah setelah ganti versi PHP/Node lokal | versi di workflow belum ikut dinaikkan |
