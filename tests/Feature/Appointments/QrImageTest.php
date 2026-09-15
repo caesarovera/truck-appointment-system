@@ -33,9 +33,11 @@ it('streams a PNG for a valid QR token without ever touching storage', function 
 
     Sanctum::actingAs($officer);
 
-    getJson('/api/v1/appointments/qr/'.$token.'/image')
+    $response = getJson('/api/v1/appointments/qr/'.$token.'/image')
         ->assertOk()
         ->assertHeader('Content-Type', 'image/png');
+
+    expect(substr((string) $response->getContent(), 0, 8))->toBe("\x89PNG\r\n\x1a\n");
 
     Storage::disk('local')->assertDirectoryEmpty('/');
 });

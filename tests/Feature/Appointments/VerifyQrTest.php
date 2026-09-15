@@ -48,7 +48,9 @@ it('lets a gate officer at the matching terminal verify a valid QR token', funct
 
     getJson('/api/v1/appointments/qr/'.$token)
         ->assertOk()
-        ->assertJsonPath('data.id', $appointment->id);
+        ->assertJsonPath('data.id', $appointment->id)
+        // Relasi dimuat (whenLoaded) — gate officer butuh truk & sopir untuk mencocokkan kendaraan.
+        ->assertJsonStructure(['data' => ['truck', 'driver', 'company', 'slot_window', 'containers', 'qr_token']]);
 });
 
 it('forbids a gate officer at a different terminal even with a valid token (403)', function (): void {

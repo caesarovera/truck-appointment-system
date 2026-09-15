@@ -22,7 +22,11 @@ it('issues a token with role-based abilities on valid credentials', function ():
 
     $response->assertCreated()
         ->assertJsonStructure(['token', 'token_type', 'user' => ['id', 'roles', 'permissions']])
+        ->assertJsonPath('token_type', 'Bearer')
         ->assertJsonPath('user.roles', ['planner']);
+
+    // SPA (stores/auth.ts) membaca bentuk FLAT ini — pembungkus `data` akan merusak login.
+    expect(array_keys($response->json()))->toBe(['token', 'token_type', 'user']);
 
     // Token abilities mencerminkan permission role (scope per role).
     $token = PersonalAccessToken::query()->firstOrFail();

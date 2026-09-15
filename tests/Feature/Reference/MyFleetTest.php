@@ -32,11 +32,14 @@ it('returns only the transporter own company trucks and drivers', function (): v
     $dispatcher->assignRole('transporter');
     Sanctum::actingAs($dispatcher);
 
-    getJson('/api/v1/me/fleet')
+    $response = getJson('/api/v1/me/fleet')
         ->assertOk()
         ->assertJsonCount(2, 'data.trucks')
         ->assertJsonCount(2, 'data.drivers')
         ->assertJsonStructure(['data' => ['trucks' => [['id', 'plate_no', 'status']], 'drivers' => [['id', 'name']]]]);
+
+    expect(array_keys($response->json()))->toBe(['data'])
+        ->and(array_keys($response->json('data')))->toBe(['trucks', 'drivers']);
 });
 
 it('omits INACTIVE trucks (this feeds the booking form dropdown)', function (): void {

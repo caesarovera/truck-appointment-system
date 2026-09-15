@@ -41,7 +41,8 @@ it('revokes the current token on logout', function (): void {
 
     withHeaders(['Authorization' => "Bearer {$token}"])
         ->postJson('/api/v1/logout')
-        ->assertOk();
+        ->assertOk()
+        ->assertExactJson(['message' => 'Logged out.']);
 
     // Bukti pencabutan: baris token hilang dari DB (tiap request nyata = proses baru
     // yang akan gagal resolve token ini).
