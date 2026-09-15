@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -19,7 +20,7 @@ use RuntimeException;
  * role bisa dicabut selagi form booking terbuka, dan klien API mana pun bisa
  * mengirim id user sembarang se-company.
  */
-final class InvalidDriverException extends RuntimeException
+final class InvalidDriverException extends RuntimeException implements ShouldntReport
 {
     public function render(Request $request): JsonResponse
     {

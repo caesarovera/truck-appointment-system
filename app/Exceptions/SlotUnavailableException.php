@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -12,7 +13,7 @@ use RuntimeException;
  * Window penuh atau ditutup saat booking → 409 Conflict.
  * Laravel otomatis memakai method render() ini untuk membentuk response.
  */
-final class SlotUnavailableException extends RuntimeException
+final class SlotUnavailableException extends RuntimeException implements ShouldntReport
 {
     public static function full(): self
     {

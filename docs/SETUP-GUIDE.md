@@ -401,9 +401,15 @@ header `Idempotent-Replayed: true`, dan **tidak** ada appointment baru:
 > **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email+ip), `api` 60/mnt, `booking` 10/mnt per
 > user. Nilai via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`).
 >
-> **Alarm job gagal permanen:** selalu log `CRITICAL` "Queue job gagal permanen" di `laravel.log`.
+> **Alarm job gagal permanen:** selalu log `CRITICAL` "Queue job gagal permanen" di log harian
+> `storage/logs/laravel-YYYY-MM-DD.log` (container; tanggal UTC).
 > Email hanya bila `TAS_ALERT_MAIL` diisi (maks. 1 per jenis job per `TAS_ALERT_THROTTLE_MINUTES`,
-> default 15). Di dev `MAIL_MAILER=log`, jadi emailnya pun mendarat di `laravel.log`.
+> default 15). Di dev `MAIL_MAILER=log`, jadi emailnya pun mendarat di log itu.
+>
+> **Penolakan bisnis tidak dicatat.** Exception domain yang membalas 4xx (kuota penuh, versi basi,
+> token QR kedaluwarsa, …) mengimplementasikan `ShouldntReport` — sebelumnya tiap penolakan menulis
+> ERROR + stack trace. Exception domain baru ber-`render()` wajib ikut; `DomainExceptionReportingTest`
+> merah bila lupa.
 
 ### 10e. Test konkurensi (`tests/Concurrency/`)
 
@@ -441,7 +447,7 @@ Test #2-lah gerbang yang sesungguhnya. **Jangan hapus #2.**
 | `Unknown database 'tas_testing'` | volume MySQL dibuat sebelum skrip init | `docker compose down -v && docker compose up -d` (**hapus data**) |
 | `Access denied for user 'root'` | password tak cocok | samakan `DB_ROOT_PASSWORD` (default `secret`) |
 | Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya |
-| `storage/logs/laravel.log` membingungkan | log container & native bercampur (bind mount) | tandai waktu, atau `docker compose logs` |
+| Log membingungkan | container menulis log harian `laravel-YYYY-MM-DD.log` (`LOG_STACK=daily` di compose, 14 hari); jalur native tetap `laravel.log` (`.env`) — keduanya di folder bind mount yang sama | lihat file sesuai jalur, atau `docker compose logs` |
 
 ### PHP / PHPStan (masih berlaku, dari pembangunan foundation)
 

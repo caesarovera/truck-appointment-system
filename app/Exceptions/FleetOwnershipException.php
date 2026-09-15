@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -12,7 +13,7 @@ use RuntimeException;
  * Truk/sopir yang dipilih bukan milik company si transporter → 422.
  * Pertahanan domain agar isolasi antar-company tidak bocor lewat booking.
  */
-final class FleetOwnershipException extends RuntimeException
+final class FleetOwnershipException extends RuntimeException implements ShouldntReport
 {
     public function render(Request $request): JsonResponse
     {

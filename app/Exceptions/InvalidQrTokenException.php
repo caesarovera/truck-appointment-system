@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -15,7 +16,7 @@ use RuntimeException;
  * input HTTP-nya. Laravel otomatis memakai render() ini untuk membentuk
  * response, sama seperti SlotUnavailableException.
  */
-final class InvalidQrTokenException extends RuntimeException
+final class InvalidQrTokenException extends RuntimeException implements ShouldntReport
 {
     public static function malformed(): self
     {

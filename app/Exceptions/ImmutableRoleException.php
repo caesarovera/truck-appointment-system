@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * mengunci diri sendiri keluar sistem (hapus `role.manage`/`user.manage` dari
  * role sendiri = tak ada jalan balik tanpa akses DB langsung).
  */
-final class ImmutableRoleException extends RuntimeException
+final class ImmutableRoleException extends RuntimeException implements ShouldntReport
 {
     public static function admin(): self
     {

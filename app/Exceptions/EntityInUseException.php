@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
 
-final class EntityInUseException extends RuntimeException
+final class EntityInUseException extends RuntimeException implements ShouldntReport
 {
     public static function terminal(): self
     {

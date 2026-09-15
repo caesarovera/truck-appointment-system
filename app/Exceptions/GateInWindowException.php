@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -15,7 +16,7 @@ use RuntimeException;
  * sah (CONFIRMED), yang salah cuma waktunya. Petugas gate perlu tahu bedanya —
  * "belum waktunya, suruh tunggu" ≠ "appointment ini memang tak bisa masuk".
  */
-final class GateInWindowException extends RuntimeException
+final class GateInWindowException extends RuntimeException implements ShouldntReport
 {
     private function __construct(string $message, private readonly string $errorCode)
     {

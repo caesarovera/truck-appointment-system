@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -15,7 +16,7 @@ use RuntimeException;
  * tidak sah pada saat booking. Dipisah karena sebabnya berbeda bagi transporter —
  * "bukan milik Anda" vs "aktifkan dulu truknya".
  */
-final class InactiveTruckException extends RuntimeException
+final class InactiveTruckException extends RuntimeException implements ShouldntReport
 {
     public function render(Request $request): JsonResponse
     {

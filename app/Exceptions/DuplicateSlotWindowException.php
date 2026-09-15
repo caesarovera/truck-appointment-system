@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * di slot_windows) → 409. Pertahanan terakhir bila dua planner membuka window
  * yang sama bersamaan.
  */
-final class DuplicateSlotWindowException extends RuntimeException
+final class DuplicateSlotWindowException extends RuntimeException implements ShouldntReport
 {
     public function render(Request $request): JsonResponse
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * (slot_window_id, container_no)) → 409. Ini pertahanan terakhir bila idempotency
  * di lapisan HTTP terlewat (mis. double-tap mobile).
  */
-final class DuplicateBookingException extends RuntimeException
+final class DuplicateBookingException extends RuntimeException implements ShouldntReport
 {
     public function render(Request $request): JsonResponse
     {
