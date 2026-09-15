@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
-use Illuminate\Http\JsonResponse;
+use App\Actions\Auth\LogoutAction;
+use App\Http\Resources\V1\MessageResource;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Laravel\Sanctum\PersonalAccessToken;
 
 final class LogoutController
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, LogoutAction $action): MessageResource
     {
-        $token = $request->user()?->currentAccessToken();
+        /** @var User $user */
+        $user = $request->user();
+        $action->execute($user);
 
-        // Hanya token nyata yang bisa dicabut (TransientToken dari actingAs tidak).
-        if ($token instanceof PersonalAccessToken) {
-            $token->delete();
-        }
-
-        return response()->json(['message' => 'Logged out.']);
+        return MessageResource::make('Logged out.');
     }
 }

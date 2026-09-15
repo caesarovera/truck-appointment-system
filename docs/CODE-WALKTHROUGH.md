@@ -869,15 +869,19 @@ it('never over-books the last slot', function (): void {
 
 Tiga endpoint: `POST /login`, `POST /logout`, `GET /me`.
 
-**Login** — verifikasi manual lalu terbitkan token:
+**Login** — `LoginController` → `LoginRequest::toData()` → `LoginAction` → `LoginResource` (201):
 ```php
-$user = User::query()->where('email', $request->string('email')->toString())->first();
-if ($user === null || ! Hash::check($request->string('password')->toString(), $user->password)) {
+// app/Actions/Auth/LoginAction.php
+$user = $this->users->findByEmail($data->email);                 // UserRepository, bukan query di controller
+if ($user === null || ! Hash::check($data->password, $user->password)) {
     throw ValidationException::withMessages(['email' => [__('auth.failed')]]);  // 422 generik
 }
 $abilities = $user->getAllPermissions()->pluck('name')->all();
-$token = $user->createToken($request->deviceName(), $abilities)->plainTextToken;
+return new IssuedToken($user, $user->createToken($data->deviceName, $abilities)->plainTextToken);
 ```
+- **`LoginResource::$wrap = null`** — respons tetap flat `{token, token_type, user}` karena SPA
+  (`stores/auth.ts`) membacanya begitu; `LoginTest` mengunci kunci level atasnya persis.
+  (Sampai 2026-09-16 logika ini ada di controller — dipindah saat audit kontrak layer.)
 - **Pesan error generik** (`auth.failed` di field `email`) — jangan beri tahu apakah
   email terdaftar atau password salah (cegah enumerasi akun).
 - **`Hash::check(plain, $user->password)`** membandingkan password polos dengan hash
@@ -892,9 +896,10 @@ $token = $user->createToken($request->deviceName(), $abilities)->plainTextToken;
   (`routes/console.php`; grace 24 jam agar masih bisa ditelusuri saat investigasi).
   Test: `tests/Feature/Hardening/TokenExpirationTest.php`.
 
-**Logout** — cabut token yang sedang dipakai:
+**Logout** — `LogoutAction` mencabut token yang sedang dipakai, respons lewat `MessageResource`:
 ```php
-$token = $request->user()?->currentAccessToken();
+/** @var PersonalAccessToken|TransientToken|null $token */   // docblock Sanctum terlalu sempit
+$token = $user->currentAccessToken();
 if ($token instanceof PersonalAccessToken) {
     $token->delete();
 }
@@ -2179,8 +2184,8 @@ ter-sign", tapi nol implementasi (`grep -i qr` = 0 hit). Dua keputusan desain du
    - **Render utama (opsi A):** `AppointmentQrCode.vue` (FE) — canvas digambar client-side dari
      `qr_token` pakai lib `qrcode`. Backend tak pernah dikirimi/mengirim gambar untuk jalur ini.
    - **Endpoint gambar (opsi B, cetak/email):** `GET /appointments/qr/{token}/image` — PNG
-     dibuat `endroid/qr-code` **di memori per request**, langsung di-`response()`-kan, **tidak
-     pernah** `Storage::put()`. QrImageTest mengetes ini secara eksplisit: `Storage::fake('local')`
+     dibuat `AppointmentQrTokenService::renderPng()` (`endroid/qr-code`, `PngWriter` eksplisit)
+     **di memori per request**, langsung di-`response()`-kan, **tidak pernah** `Storage::put()`. QrImageTest mengetes ini secara eksplisit: `Storage::fake('local')`
      lalu assert direktori tetap kosong setelah request sukses — bukan cuma percaya komentar.
 
 **Kenapa TTL token = `slotWindow.endsAt() + gate_in.late_minutes`** (config yang **sudah ada**,
@@ -2192,9 +2197,10 @@ dan penolakan gate-in menggambarkan **satu** aturan, bukan dua yang harus dijaga
 **Otorisasi manual, satu-satunya di proyek ini.** Semua endpoint appointment lain memakai
 `->middleware('can:view,appointment')` — route-model-binding otomatis resolve `{appointment}`
 dari URL. Token QR tak bisa begitu: id-nya baru diketahui **setelah** didekode di dalam
-controller. `VerifyAppointmentQrController`/`AppointmentQrImageController` karena itu memanggil
-`Gate::authorize('view', $appointment)` langsung — Policy & aturan isolasinya (company/terminal/
-driver) identik dengan `ShowAppointmentController`, cuma titik pemanggilannya beda.
+controller. Kedua controller QR memanggil `ResolveQrAppointmentAction` (verifikasi token →
+`AppointmentRepository::findForQr`, relasi ter-eager-load), lalu `Gate::authorize('view',
+$appointment)` langsung — Policy & aturan isolasinya (company/terminal/driver) identik dengan
+`ShowAppointmentController`, cuma titik pemanggilannya beda.
 
 **Route `qr/{token}[/image]` didaftarkan SEBELUM `appointments/{appointment}`** di
 `routes/api.php` — segmen statis `qr` harus menang lebih dulu, kalau tidak Laravel akan mencoba

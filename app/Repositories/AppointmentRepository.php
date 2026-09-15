@@ -155,6 +155,13 @@ final class AppointmentRepository implements AppointmentRepositoryInterface
             ->get();
     }
 
+    public function findForQr(int $appointmentId): Appointment
+    {
+        return Appointment::query()
+            ->with(['truck', 'driver', 'company', 'slotWindow', 'containers'])
+            ->findOrFail($appointmentId);
+    }
+
     public function queueForTerminal(int $terminalId, string $date): Collection
     {
         // Urutan kronologis diserahkan ke klien (lihat dashboard gate), konsisten

@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Exceptions\InvalidQrTokenException;
 use App\Models\Appointment;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Support\Carbon;
 use RuntimeException;
 
@@ -82,6 +84,16 @@ final class AppointmentQrTokenService
         }
 
         return (int) $appointmentId;
+    }
+
+    /**
+     * PNG dibuat di memori per request, TIDAK PERNAH disimpan ke storage: kontennya token itu
+     * sendiri, jadi gambar yang tercetak ikut basi saat token kedaluwarsa — tak ada yang perlu
+     * dibersihkan.
+     */
+    public function renderPng(string $token): string
+    {
+        return Builder::create()->writer(new PngWriter)->data($token)->build()->getString();
     }
 
     private function sign(string $payload): string

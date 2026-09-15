@@ -7,16 +7,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Contracts\FleetRepositoryInterface;
 use App\Enums\TruckStatus;
 use App\Http\Requests\V1\FleetRequest;
-use App\Http\Resources\V1\DriverResource;
-use App\Http\Resources\V1\TruckResource;
-use Illuminate\Http\JsonResponse;
+use App\Http\Resources\V1\FleetResource;
 use Symfony\Component\HttpFoundation\Response;
 
 final class MyFleetController
 {
     public function __construct(private readonly FleetRepositoryInterface $fleet) {}
 
-    public function __invoke(FleetRequest $request): JsonResponse
+    public function __invoke(FleetRequest $request): FleetResource
     {
         // Otorisasi: fleet.manage (FormRequest::authorize).
         $user = $request->user();
@@ -26,14 +24,12 @@ final class MyFleetController
         $companyId = $user->company_id;
         abort_if($companyId === null, Response::HTTP_FORBIDDEN);
 
-        return response()->json([
+        return FleetResource::make([
             // Hanya truk ACTIVE: endpoint ini mengisi dropdown form booking, dan
             // truk INACTIVE ditolak BookAppointmentAction (422 truck_inactive).
             // Halaman kelola armada pakai `GET /me/trucks` yang menampilkan semua.
-            'data' => [
-                'trucks' => TruckResource::collection($this->fleet->trucksForCompany($companyId, TruckStatus::ACTIVE)),
-                'drivers' => DriverResource::collection($this->fleet->driversForCompany($companyId)),
-            ],
+            'trucks' => $this->fleet->trucksForCompany($companyId, TruckStatus::ACTIVE),
+            'drivers' => $this->fleet->driversForCompany($companyId),
         ]);
     }
 }

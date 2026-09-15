@@ -74,6 +74,12 @@ interface AppointmentRepositoryInterface
     public function forCompany(int $companyId, ?string $status): Collection;
 
     /**
+     * Appointment hasil dekode token QR, dengan relasi yang ditampilkan AppointmentResource
+     * (termasuk slotWindow untuk qr_token). 404 bila appointment sudah tak ada.
+     */
+    public function findForQr(int $appointmentId): Appointment;
+
+    /**
      * Antrian gate-officer: appointment CONFIRMED (siap gate-in) & IN_PROGRESS
      * (siap gate-out) di terminal tertentu pada $date. Relasi + jejak gate
      * di-eager-load (anti N+1), urut jam.
