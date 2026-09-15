@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use function Pest\Laravel\get;
 use function Pest\Laravel\post;
+use function Pest\Laravel\withoutVite;
 
 /*
  * API wajib membalas JSON walau klien tak mengirim `Accept: application/json`
@@ -37,6 +38,9 @@ it('answers an unauthenticated broadcasting auth with 401 JSON', function (): vo
 });
 
 it('still serves the SPA shell as HTML for web routes', function (): void {
+    // Job Backend di CI tak menjalankan `npm run build` → tanpa ini @vite gagal (manifest tak ada).
+    withoutVite();
+
     get('/bookings')
         ->assertOk()
         ->assertHeader('Content-Type', 'text/html; charset=UTF-8');

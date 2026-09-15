@@ -31,7 +31,12 @@
   **Terbaca, belum dikerjakan:** N3 `failed()` kosong di 3 job → **B7**; B1 dapat alasan tunda baru;
   B3 dapat catatan desain push ganda. **Sekali terjadi:** satu `composer test` di container macet
   >300 dtk (dibunuh batas proses Composer, output kosong); kode yang sama lulus 33 dtk saat diulang —
-  penyebab tak diketahui, catat bila terulang. **CI untuk commit sesi ini: belum dicek** (belum di-push).
+  penyebab tak diketahui, catat bila terulang.
+  **CI (dicek sendiri via `gh`, 2026-09-16): MERAH di `ee99cac`** — 1 dari 273: test baru "SPA tetap
+  HTML" di `ApiJsonErrorsTest` gagal `Vite manifest not found`, karena job Backend tak menjalankan
+  `npm run build`; lokal lolos hanya karena `public/build/` (gitignored) kebetulan ada. Direproduksi
+  lokal dengan memindahkan manifest, diperbaiki dengan `withoutVite()`. **Pelajaran: test yang merender
+  view ber-`@vite` harus lulus tanpa `public/build/`** — cara cek: pindahkan manifest, jalankan test.
 
 - `2026-09-14` (kecepatan + clone kosong + D5′) · **[SELESAI] ADR-0007 tuntas.** Atas permintaan user:
   push D6′, perbaiki kecepatan, lalu perbarui **semua** dokumen (perbaiki yang salah, hapus yang usang).
@@ -818,8 +823,11 @@
   `redirectGuestsTo(fn () => null)` — `shouldRenderJsonWhen` saja **tidak** menutup 401, karena
   middleware `Authenticate` mengevaluasi `route('login')` bawaan framework *sebelum* exception
   dilempar (terbukti: setelah baris pertama saja, 2 test 401 tetap merah). Dijaga
-  `tests/Feature/Hardening/ApiJsonErrorsTest.php` (5 test, termasuk SPA tetap HTML); mutasi membuang
-  `shouldRenderJsonWhen` → 4 merah. Catatan asli dipertahankan di bawah.
+  `tests/Feature/Hardening/ApiJsonErrorsTest.php`: 4 test penjaga (mutasi membuang
+  `shouldRenderJsonWhen` → 4 merah). Test ke-5 "SPA tetap HTML" **hanya smoke test catch-all, bukan
+  penjaga B4**: mutasi callback jadi selalu `true` tak membuatnya merah, karena `shouldRenderJsonWhen`
+  hanya memengaruhi rendering *exception* dan halaman SPA 200 tak melempar apa pun (dicek 2026-09-16).
+  Catatan asli dipertahankan di bawah.
 - **[asal — P3] `Route [login] not defined` → 500.** Request **tak terautentikasi** ke endpoint
   ber-`auth:sanctum` **tanpa** header `Accept: application/json` membuat Laravel mencoba
   me-*redirect* ke route bernama `login`, yang **tidak ada** di app API-only ini
@@ -884,12 +892,15 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 **2. CI `4f5d6ad` — CONFIRMED hijau oleh user 2026-09-14.** Run di commit teratas itu mencakup
 seluruh perubahan sesi 2026-09-14 (`d186c4a`…`4f5d6ad`), termasuk `tests/TestCase.php` baru di runner
 dan komentar `ci.yml` — keduanya terbukti tak merusak CI. (Run terpisah di `8c39bcc` tak dicek
-sendiri; isinya teruji lewat keturunannya.) Repo privat + `gh` tak terpasang → status CI selalu lewat
-konfirmasi user. Riwayat: D1 (`4ea097b`), D2′ (`3e1f0c2`), D3′ (`8319cf6`) juga dikonfirmasi user.
+sendiri; isinya teruji lewat keturunannya.) Riwayat: D1 (`4ea097b`), D2′ (`3e1f0c2`), D3′ (`8319cf6`)
+juga dikonfirmasi user. **Sejak 2026-09-16 `gh` terpasang & login (akun `caesarovera`, scope `repo`)
+→ agen cek CI sendiri:** `gh run list --branch main`, `gh run watch <id> --exit-status`,
+`gh run view <id> --log-failed`. Shell yang dibuka sebelum instalasi belum mengenal PATH-nya → pakai
+`"C:\Program Files\GitHub CLI\gh.exe"` atau buka terminal baru.
 
-**3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (commit
-`ad620e0`…, **belum di-push, CI belum dicek**). Kandidat berikutnya: **B8** (kecil, gerbang test) →
-B7. Sisanya di *Backlog* menunggu keputusan.
+**3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (`ad620e0`…
+`ee99cac`, sudah di-push; CI merah di `ee99cac` lalu diperbaiki — lihat entri Status teratas).
+Kandidat berikutnya: **B8** (kecil, gerbang test) → B7. Sisanya di *Backlog* menunggu keputusan.
 
 **4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
 
