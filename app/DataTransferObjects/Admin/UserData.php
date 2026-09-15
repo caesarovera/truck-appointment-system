@@ -16,4 +16,9 @@ final class UserData extends Data
         public ?int $terminalId = null,
         public ?int $companyId = null,
     ) {}
+
+    public function changesPassword(): bool
+    {
+        return $this->password !== null && $this->password !== '';
+    }
 }

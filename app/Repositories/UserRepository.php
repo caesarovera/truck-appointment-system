@@ -53,14 +53,21 @@ final class UserRepository implements UserRepositoryInterface
             'company_id' => $data->companyId,
         ];
 
-        if ($data->password !== null && $data->password !== '') {
-            $fields['password'] = Hash::make($data->password);
+        if ($data->changesPassword()) {
+            $fields['password'] = Hash::make((string) $data->password);
         }
 
         $user->update($fields);
         $user->syncRoles([$data->role]);
 
         return $user->fresh(['roles', 'terminal', 'company']) ?? $user;
+    }
+
+    public function revokeTokens(User $user, ?int $exceptTokenId = null): void
+    {
+        $user->tokens()
+            ->when($exceptTokenId !== null, fn ($query) => $query->whereKeyNot($exceptTokenId))
+            ->delete();
     }
 
     public function delete(User $user, User $actor): void

@@ -13,6 +13,9 @@ final class UpdateUserController
 {
     public function __invoke(UpdateUserRequest $request, User $user, UpdateUserAction $action): AdminUserResource
     {
-        return AdminUserResource::make($action->execute($user, $request->toData()));
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return AdminUserResource::make($action->execute($user, $request->toData(), $actor));
     }
 }

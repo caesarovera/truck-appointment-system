@@ -19,5 +19,7 @@ interface UserRepositoryInterface
 
     public function update(User $user, UserData $data): User;
 
+    public function revokeTokens(User $user, ?int $exceptTokenId = null): void;
+
     public function delete(User $user, User $actor): void;
 }

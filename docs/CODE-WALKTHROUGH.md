@@ -1717,6 +1717,14 @@ return $user->fresh(['roles', 'terminal', 'company']) ?? $user;
 - **`syncRoles`** (Spatie) mengganti role lama dengan yang baru.
 - **`fresh([...])`** memuat ulang relasi setelah `syncRoles` supaya Resource tak lazy-load.
 - Hapus user → cabut semua token dulu (`$user->tokens()->delete()`), lalu hapus.
+- **Ganti password → cabut semua token user itu** (`UpdateUserAction`, satu transaksi). Tanpa ini,
+  reset password untuk akun yang dicuri tak berguna: token pencuri tetap hidup sampai
+  `SANCTUM_EXPIRATION` (12 jam). Pengecualian: admin yang mengganti password **akunnya sendiri**
+  mempertahankan token sesi yang sedang dipakai (pola `logoutOtherDevices`) supaya tak terlempar
+  keluar. Aturan ada di Action, bukan hanya di repository. Ganti role/company **tidak** mencabut
+  token — Spatie mengecek permission langsung tiap request, jadi berlaku seketika.
+  Dijaga 3 test di `UserCrudTest`; mutasi "cabut semua tanpa pengecualian" terbukti membuat test
+  ke-3 merah.
 
 ### V.4 PHPStan level 8 — jebakan route binding & relasi nullable
 CRUD ini memunculkan pola PHPStan yang berulang (semua diperbaiki tanpa `@phpstan-ignore`):

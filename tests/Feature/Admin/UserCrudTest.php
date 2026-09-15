@@ -124,6 +124,62 @@ it('updates user without changing password when omitted', function (): void {
     expect($user->fresh()->password)->toBe($oldHash);
 });
 
+it('revokes every token of a user when admin changes their password', function (): void {
+    $driver = User::factory()->create()->assignRole('driver');
+    $stolen = $driver->createToken('phone')->plainTextToken;
+    $driver->createToken('tablet');
+    $adminToken = $this->admin->createToken('admin')->plainTextToken;
+
+    $this->withToken($adminToken)
+        ->putJson("/api/v1/admin/users/{$driver->id}", [
+            'name' => $driver->name,
+            'email' => $driver->email,
+            'role' => 'driver',
+            'password' => 'password-baru-123',
+        ])
+        ->assertOk();
+
+    expect($driver->tokens()->count())->toBe(0);
+
+    app('auth')->forgetGuards();
+    $this->withToken($stolen)->getJson('/api/v1/me')->assertUnauthorized();
+});
+
+it('keeps tokens when the password is not changed', function (): void {
+    $driver = User::factory()->create()->assignRole('driver');
+    $driver->createToken('phone');
+
+    $this->withToken($this->admin->createToken('admin')->plainTextToken)
+        ->putJson("/api/v1/admin/users/{$driver->id}", [
+            'name' => 'Nama Baru',
+            'email' => $driver->email,
+            'role' => 'driver',
+        ])
+        ->assertOk();
+
+    expect($driver->tokens()->count())->toBe(1);
+});
+
+it('keeps the current token but revokes others when admin changes own password', function (): void {
+    $current = $this->admin->createToken('laptop');
+    $other = $this->admin->createToken('old-phone');
+
+    $this->withToken($current->plainTextToken)
+        ->putJson("/api/v1/admin/users/{$this->admin->id}", [
+            'name' => $this->admin->name,
+            'email' => $this->admin->email,
+            'role' => 'admin',
+            'password' => 'password-baru-123',
+        ])
+        ->assertOk();
+
+    expect($this->admin->tokens()->pluck('id')->all())->toBe([$current->accessToken->id])
+        ->and($other->accessToken->fresh())->toBeNull();
+
+    app('auth')->forgetGuards();
+    $this->withToken($current->plainTextToken)->getJson('/api/v1/me')->assertOk();
+});
+
 it('deletes a user', function (): void {
     $user = User::factory()->create()->assignRole('planner');
 
