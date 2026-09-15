@@ -24,7 +24,10 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing"/>
+        <!-- force="true" (audit 2026-09-16): docker-compose.yml menyetel APP_ENV=local; tanpa force
+             suite di container berjalan sebagai `local` dan menulis ke storage/logs dev berlabel
+             `local.` (terbukti: 1 file test = 244 baris). Ini "apakah", bukan "di mana". -->
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <!-- force="true" pada baris ISOLASI di bawah (D3').
