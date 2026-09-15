@@ -609,6 +609,14 @@ sejak `ConfirmButton`). **Wajib `workers: 1`** — backend 1 proses `artisan ser
   perlu; satu saja tidak cukup.
 - **`MAIL_MAILER=array`** di `.env.e2e`: dengan `QUEUE_CONNECTION=sync`, reminder dirender inline di
   request booking; `log` cukup lambat untuk melewati timeout Playwright.
+- **Run pertama setelah mesin menyala bisa lambat → `expect.timeout` 15 dtk** (`playwright.config.ts`).
+  2026-09-15: run pertama 1 dari 5 gagal — tombol masih "Memproses…" setelah 5 dtk di booking
+  pertama; spec itu lulus 2× sendirian dan suite penuh 5/5 setelahnya. Diukur dengan curl ke server
+  e2e baru: booking pertama 2,75 dtk sekali, lalu **tak bisa direproduksi** (dingin maupun
+  `view:clear`: 0,45–0,50 dtk; booking kedua dst ±0,4 dtk). Jadi bukan kompilasi Blade — dugaan
+  tersisa: akses pertama file vendor rendering email (reminder dirender inline karena
+  `QUEUE_CONNECTION=sync`) sejak boot, cache file OS/antivirus. Timeout 15 dtk = margin, **bukan**
+  bukti akar masalah hilang. Kalau flaky muncul lagi, ukur dulu sebelum menaikkan angka.
 - **Jam di helper wajib UTC** (`toISOString`), sama dengan `APP_TIMEZONE=UTC` backend — jam lokal
   (UTC+7) membuat window "sekarang ±" meleset 7 jam.
 

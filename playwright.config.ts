@@ -22,6 +22,10 @@ export default defineConfig({
     // benar dulu, cepat belakangan (lihat SETUP-GUIDE §15).
     workers: 1,
     reporter: 'list',
+    // Default 5 dtk terbukti flaky: di run pertama setelah mesin menyala, booking pertama
+    // (reminder email dirender inline, QUEUE_CONNECTION=sync) melewati 5 dtk; run berikutnya
+    // ±0,5 dtk. E2E menguji alur, bukan kecepatan. Detail: SETUP-GUIDE §15d.
+    expect: { timeout: 15_000 },
     use: {
         baseURL: BASE_URL,
         trace: 'retain-on-failure',
