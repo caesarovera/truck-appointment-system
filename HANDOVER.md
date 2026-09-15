@@ -13,6 +13,40 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-16` (audit menyeluruh atas permintaan user) · **[SELESAI] 10 perbaikan, masing-masing commit
+  sendiri, CI hijau.** Audit memeriksa: runtime stack, gerbang di semua jalur (container 281, native
+  278+3, Vitest 111, vue-tsc, build, e2e 5/5), kontrak layer, keamanan (kode, dependensi, infra), dan
+  kemutakhiran dokumen & memori — tiap klaim ditandai dijalankan vs dibaca. Yang terbukti sehat: stack,
+  16 migrasi, 50 route terdokumentasi dua arah, tanpa secret ter-commit/raw SQL/XSS, QR ber-HMAC.
+  **Diperbaiki (user memilih "semua rekomendasi"):**
+  - `4c7e28b` **C1** `APP_ENV` di-force di `phpunit.xml` — suite container berjalan sebagai `local` &
+    menulis 244 baris per file test ke log dev (kelas bug D3′/D6′; hanya APP_ENV yang bocor).
+  - `037ba03` **S1** port compose → `127.0.0.1` — MySQL (password `secret`), Redis (tanpa password),
+    app, Reverb terbukti terjangkau lewat IP Wi-Fi; sesudahnya tertutup, localhost tetap jalan.
+  - `39f7af9` **S2** Guzzle 7.15.5 & league/commonmark 2.10.1 — 16 advisory (9 high), dependensi
+    produksi; live: broadcast via Horizon & render email markdown dengan versi baru.
+  - `7c716ad` **S3** channel `gate.queue.*` tak lagi mengizinkan `driver` — payload berisi
+    `booking_code`/status perusahaan lain; SPA tak pernah memakainya sebagai sopir.
+  - `907f983` **S4** npm audit 0 (dari 8, 6 high, semua alat dev). `npm audit fix` crash (bug arborist
+    `edgesOut`) → update per paket + `vitest@^4.1.11 --legacy-peer-deps`; lockfile 0 paket hilang.
+  - `a81e292` **C2** 12 exception domain ber-`render()` → `ShouldntReport` (penolakan 4xx tak lagi
+    ERROR + stack trace; log 29 MB) + log container harian. *(Pesan commit menulis "284 Pest" — yang
+    benar 285.)*
+  - `acd38e5` **K1** `strict_types` di 3 file; `Controller.php` scaffold yang tak dipakai dihapus.
+  - `b8f8b4d` + `9e2508d` **K2** Login/Logout/MyFleet/2 controller QR → Action/Repository/Resource.
+    Test karakterisasi bentuk respons dikunci DULU, `git diff b8f8b4d -- tests/` kosong; live login
+    flat 201, QR 200 + PNG. PHPStan menangkap docblock Sanctum yang terlalu sempit.
+  - `2e4f1e2` **K4** checkout v7 / setup-node v7 / cache v6 — anotasi Node 20 hilang (dicek via `gh`).
+  - `d9f3818` **D2** `docs/tas-claude-code-guide.html` (rencana build Juni, tak dirujuk) dihapus.
+  - `e065a6d` dokumen usang (angka test, "gh tak terpasang", skill `/slice`, agent `security-reviewer`
+    + cek otorisasi channel). Memori ditulis ulang: log build & angka lama dibuang.
+  **Tidak dikerjakan (dicatat ke B6):** selisih waktu login (enumerasi email, tertahan throttle),
+  password min 8 tanpa kebijakan lain, CORS default `*`. **Kesalahan proses yang tertangkap:**
+  memulihkan mutasi dengan `git checkout` pada file yang belum di-commit mengembalikan versi LAMA
+  (fix S3 hilang sesaat — terdeteksi pengecek skrip, dipasang ulang); sisipan import lewat awk/sed
+  membuang backslash dan Pint lalu menghapus import rusak itu — diselesaikan dengan skrip PHP +
+  verifikasi refleksi 12/12. **Gerbang akhir:** 285 Pest container, PHPStan lvl 8, Pint, CI hijau.
+
 - `2026-09-16` (CI mandiri + B8 + B7 + kesehatan Claude Code) · **[SELESAI] B8, B7; CI merah diperbaiki.**
   **(1) `gh` CLI terpasang & login** (winget v2.101.0, akun `caesarovera`, scope `repo`) — **pertama kali
   agen bisa membaca CI repo privat ini sendiri**, tanpa menunggu user membuka tab Actions.
@@ -901,9 +935,10 @@ membaca kode. **Semua FIXED 2026-09-14** (detail & bukti merah→hijau di entri 
   sementara sistemnya salah.
 
 ## Sedang dikerjakan
-- (kosong) — **sesi 2026-09-16 selesai** (CI merah diperbaiki, B8, B7, `settings.local.json` dirapikan),
-  semua di-commit & di-push. Gerbang: **281 Pest / 730 assert** di container, PHPStan lvl 8, Pint bersih,
-  **CI hijau di `d0a380c`** (dicek agen via `gh`). Native Windows tak dijalankan ulang sejak 2026-09-14.
+- (kosong) — **sesi 2026-09-16 selesai** (CI merah diperbaiki, B8, B7, `settings.local.json` dirapikan,
+  lalu audit menyeluruh + 10 perbaikan), semua di-commit & di-push. Gerbang: **285 Pest / 761 assert** di
+  container, native 282 + 3 skip, Vitest 111, e2e 5/5, PHPStan lvl 8, Pint, `composer audit` & `npm audit`
+  bersih, **CI hijau** (lihat MULAI SESI butir 2).
 
 ### ▶️ MULAI SESI BERIKUTNYA DARI SINI
 
@@ -917,7 +952,8 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 "setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
 `reverb:start` native bersamaan stack.
 
-**2. CI `d0a380c` — hijau, dicek agen sendiri via `gh` 2026-09-16** (kedua job). Sejak hari itu `gh`
+**2. CI `2e4f1e2` — hijau tanpa anotasi, dicek agen sendiri via `gh` 2026-09-16** (kedua job; commit
+dokumen sesudahnya dipantau dengan cara yang sama). Sejak hari itu `gh`
 terpasang & login (akun `caesarovera`, scope `repo`) — **setelah push, pantau sendiri**, jangan minta
 user membuka tab Actions: `gh run list --branch main --limit 3`, `gh run watch <id> --exit-status`,
 `gh run view <id> --log-failed`. Shell yang dibuka sebelum instalasi belum mengenal PATH-nya → pakai
@@ -936,7 +972,8 @@ B7. Sisa Backlog (B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6 ima
   sarankan "always allow" dengan wildcard lebar. Cadangan versi lama:
   `~/.claude/truck-appointment-system.settings.local.json.bak-2026-09-16`.
 - Alarm job gagal: di dev `TAS_ALERT_MAIL` kosong → cari `CRITICAL` "Queue job gagal permanen" di
-  `storage/logs/laravel.log`.
+  log harian `storage/logs/laravel-YYYY-MM-DD.log` (sejak 2026-09-16; `laravel.log` lama ±30 MB berisi
+  sisa pra-audit, aman dihapus).
 
 
 ## Langkah berikutnya (urut)
@@ -979,7 +1016,11 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    nginx+php-fpm (atau FrankenPHP), `validate_timestamps=0`, `config/route/event/view:cache`, kunci
    Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
    Baru relevan saat ada target deploy. Prasyarat B7 (alarm job gagal) sudah selesai 2026-09-16; di
-   produksi isi `TAS_ALERT_MAIL` + SMTP sungguhan.
+   produksi isi `TAS_ALERT_MAIL` + SMTP sungguhan. **Temuan audit 2026-09-16 yang sengaja ditunda ke
+   sini:** (a) login bisa menebak email terdaftar lewat selisih waktu (`Hash::check` dilewati bila user
+   tak ada; tertahan throttle 5/mnt) — samakan jalur dengan hash dummy; (b) password admin-created hanya
+   `min:8` — pakai `Password::defaults()`; (c) CORS masih default framework (`allowed_origins *`) —
+   batasi ke domain SPA; (d) header keamanan (CSP, HSTS) belum ada.
 **~~B7~~ — SELESAI 2026-09-16.** Keadaan sebelum [dijalankan]: job gagal permanen hanya meninggalkan
    1 baris `ERROR` (tak bisa dibedakan dari percobaan ulang) + baris `failed_jobs` + `FAIL` di konsol
    Horizon. Dipilih **satu listener global `JobFailed`** (bukan isi `failed()` per job, karena kegagalan
@@ -1040,6 +1081,15 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-16` (audit menyeluruh): **Tak ada perubahan `CLAUDE.md`; kontrak justru ditegakkan ulang di
+  kode.** Infra/test: `docker-compose.yml` (port `127.0.0.1`, `LOG_STACK=daily`), `phpunit.xml`
+  (`APP_ENV` force), `.github/workflows/ci.yml` (checkout v7/setup-node v7/cache v6), lockfile composer &
+  npm. Docs: `docs/SETUP-GUIDE.md` (§1/§2/§3/§9/§10/§11/§14: angka test, port lokal, `gh`, log harian,
+  gejala CI Vite, aturan exception), `docs/BUSINESS-FLOW.md` §3.4 (driver tanpa channel gate.queue),
+  `docs/CODE-WALKTHROUGH.md` (§K login/logout Action, §P.3 channel, §AA QR), `.claude/skills/slice`,
+  `.claude/agents/security-reviewer` (+ cek channel broadcast); `docs/tas-claude-code-guide.html`
+  DIHAPUS. Seeder: **tak ada**. Alasan: audit menemukan klaim dokumen usang dan kode yang menyimpang
+  dari kontrak yang sudah benar tertulis.
 - `2026-09-16` (B7 + B8 + fix CI): **Kontrak alarm job gagal permanen ditambahkan.** Kode:
   `app/Listeners/AlertOnPermanentJobFailure.php`, `app/Notifications/PermanentJobFailureNotification.php`
   (baru), `config/tas.php` (`alerts.mail_to` ← `TAS_ALERT_MAIL`, `alerts.throttle_minutes` ←
@@ -1161,6 +1211,19 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
   (pola `SlotAvailabilityFreshnessTest`).
 - **Satu pengukuran = anekdot.** Dugaan penyebab e2e lambat (kompilasi Blade) gugur saat diulang; bila
   penyebab tak bisa direproduksi, pasang margin berlabel — jangan klaim akar masalah hilang.
+- **Memulihkan mutasi: salin file dulu, jangan `git checkout`.** Pada file yang perbaikannya belum
+  di-commit, `git checkout -- file` mengembalikan versi LAMA yang justru sedang diperbaiki (terjadi di
+  audit 2026-09-16; tertangkap karena skrip memeriksa hasil pemulihan).
+- **Jangan menyunting kode PHP ber-backslash lewat sed/awk di Git Bash.** Namespace kehilangan
+  backslash tanpa error; Pint lalu menghapus import rusak sebagai "unused". Pakai Edit tool atau skrip
+  PHP, lalu verifikasi dengan refleksi/PHPStan — `php -l` tak menangkap interface yang tak ter-import.
+- **`npm audit fix` bisa crash `Cannot read properties of null (reading 'edgesOut')`** (bug arborist
+  npm 11 saat menyusun peer set vitest). Jalan: `npm update <paket>` per paket; untuk vitest
+  `npm install vitest@^X --save-dev --legacy-peer-deps`, lalu bandingkan lockfile (paket hilang = 0).
+- **Exception domain baru yang punya `render()` wajib `implements ShouldntReport`** — kalau lupa,
+  `DomainExceptionReportingTest` merah. Tanpa itu tiap penolakan 4xx menulis ERROR + stack trace.
+- **Port container hanya `127.0.0.1`.** App tak bisa dibuka dari perangkat lain di jaringan; jangan
+  "perbaiki" dengan membuka ulang `mysql`/`redis` ke semua antarmuka (`SETUP-GUIDE §2`).
 - **`DemoSeeder` relatif ke tanggal seed** dan **scheduler menyapu data demo lampau jadi `NO_SHOW`**
   — "slot kosong / status berubah sendiri" biasanya bukan bug; seed ulang dulu (`DUMMY-DATA.md`).
 - **Mematikan proses di Windows: pakai PID, bukan nama.** `taskkill /IM php.exe` pernah mematikan
