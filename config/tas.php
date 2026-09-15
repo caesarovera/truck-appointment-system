@@ -85,4 +85,18 @@ return [
         'ttl_hours' => (int) env('TAS_IDEMPOTENCY_TTL_HOURS', 24),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Alarm job gagal permanen (listener AlertOnPermanentJobFailure)
+    |--------------------------------------------------------------------------
+    | Setiap job yang menyerah — termasuk job broadcast milik framework — selalu
+    | dicatat CRITICAL. mail_to: alamat penerima email alarm; kosong = log saja.
+    | throttle_minutes: maksimal 1 email per jenis job dalam jendela ini, supaya
+    |   NoShowSweepJob yang rusak (tiap 5 menit) tak membanjiri inbox. Log tak dibatasi.
+    */
+    'alerts' => [
+        'mail_to' => env('TAS_ALERT_MAIL') ?: null,
+        'throttle_minutes' => (int) env('TAS_ALERT_THROTTLE_MINUTES', 15),
+    ],
+
 ];

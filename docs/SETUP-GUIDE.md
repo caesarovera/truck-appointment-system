@@ -126,7 +126,7 @@ docker compose down                       # matikan (data TETAP di volume)
 | Yang berubah | Yang harus dilakukan | Kenapa |
 |---|---|---|
 | Kode PHP (`app/`, `routes/`, `config/`…) | **tidak ada** — terlihat ≤2 dtk | OPcache `validate_timestamps=1` (§17) |
-| Kode job/listener yang dijalankan Horizon | `docker compose exec app php artisan horizon:terminate` | worker proses panjang memegang kode lama di memori |
+| Kode job/listener yang dijalankan Horizon | `docker compose exec app php artisan horizon:terminate` | worker proses panjang memegang kode lama di memori. Output **"No processes to terminate" itu normal**: master Horizon ada di container lain, tapi perintah ini tetap menyetel sinyal restart di Redis yang membuat worker memuat kode baru (terbukti 2026-09-16). Ubah `config/horizon.php` → `docker compose restart horizon` |
 | `composer.lock` (`composer require`, `git pull`) | `docker compose run --rm --no-deps app composer install` **dan** (bila memakai §4) `composer install` di Windows | ada **dua** `vendor/` (§17); lupa yang container → error keras `Class not found` |
 | `.env` | `docker compose up -d --force-recreate app horizon scheduler reverb` | server web jalan dengan `--no-reload` (§17) |
 | `docker/php/Dockerfile` | `docker compose build && docker compose up -d` | image dibangun ulang |
@@ -394,6 +394,10 @@ header `Idempotent-Replayed: true`, dan **tidak** ada appointment baru:
 >
 > **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email+ip), `api` 60/mnt, `booking` 10/mnt per
 > user. Nilai via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`).
+>
+> **Alarm job gagal permanen:** selalu log `CRITICAL` "Queue job gagal permanen" di `laravel.log`.
+> Email hanya bila `TAS_ALERT_MAIL` diisi (maks. 1 per jenis job per `TAS_ALERT_THROTTLE_MINUTES`,
+> default 15). Di dev `MAIL_MAILER=log`, jadi emailnya pun mendarat di `laravel.log`.
 
 ### 10e. Test konkurensi (`tests/Concurrency/`)
 

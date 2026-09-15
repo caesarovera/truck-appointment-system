@@ -53,6 +53,6 @@ final class NoShowSweepJob implements ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        // Hook alerting saat sweep gagal permanen (di-wire saat observability slice).
+        // Alarm umum (log CRITICAL + email) sudah ditangani AlertOnPermanentJobFailure untuk semua job.
     }
 }

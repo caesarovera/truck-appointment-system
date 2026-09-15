@@ -900,8 +900,8 @@ juga dikonfirmasi user. **Sejak 2026-09-16 `gh` terpasang & login (akun `caesaro
 
 **3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (`ad620e0`…
 `ee99cac`, sudah di-push; CI merah di `ee99cac` lalu diperbaiki — lihat entri Status teratas).
-B8 selesai 2026-09-16. Kandidat berikutnya: **B7** (alerting job gagal). Sisanya di *Backlog* menunggu
-keputusan. Status CI terbaru: `gh run list --branch main --limit 1`.
+B8 & B7 selesai 2026-09-16. Sisa Backlog (B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6
+image produksi) semuanya menunggu keputusan user. Status CI terbaru: `gh run list --branch main --limit 1`.
 
 **4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
 
@@ -946,7 +946,18 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    nginx+php-fpm (atau FrankenPHP), `validate_timestamps=0`, `config/route/event/view:cache`, kunci
    Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
    Baru relevan saat ada target deploy. B7 sebaiknya beres lebih dulu.
-**B7. Alerting job gagal permanen** (temuan N3, 2026-09-15, dibaca) — `failed()` di
+**~~B7~~ — SELESAI 2026-09-16.** Keadaan sebelum [dijalankan]: job gagal permanen hanya meninggalkan
+   1 baris `ERROR` (tak bisa dibedakan dari percobaan ulang) + baris `failed_jobs` + `FAIL` di konsol
+   Horizon. Dipilih **satu listener global `JobFailed`** (bukan isi `failed()` per job, karena kegagalan
+   nyata pertama proyek ini adalah job broadcast milik framework): log CRITICAL selalu + email ke
+   `TAS_ALERT_MAIL` bila diisi, dibatasi per jenis job; listener & notifikasi sengaja tak di-queue dan
+   pengiriman dibungkus try/catch (listener jalan di `finally` `Job::fail()`). 4 test + 4 mutasi menggigit.
+   Live: Reverb dimatikan → broadcast gagal di Horizon → CRITICAL dengan nama event & UUID. Temuan
+   sampingan: `horizon:terminate` dari container `app` mencetak "No processes to terminate" (master di
+   container lain) tapi **tetap** memuat ulang worker lewat sinyal `illuminate:queue:restart` di Redis —
+   dicatat di SETUP-GUIDE §3. Email live tak diuji (`TAS_ALERT_MAIL` kosong di dev); jalurnya dijaga test.
+   Catatan asal:
+**B7 (asal). Alerting job gagal permanen** (temuan N3, 2026-09-15, dibaca) — `failed()` di
    `ProcessGateEventJob`, `NoShowSweepJob`, `AppointmentReminderJob` kosong ("di-wire saat observability
    slice" — slice itu tak pernah dijadwalkan). Kegagalan tetap tercatat di `failed_jobs`/Horizon, tapi
    tak ada yang diberi tahu. Belum mendesak tanpa produksi.

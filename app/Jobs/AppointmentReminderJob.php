@@ -81,6 +81,6 @@ final class AppointmentReminderJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        // Hook alerting saat reminder gagal permanen (di-wire saat observability slice).
+        // Alarm umum (log CRITICAL + email) sudah ditangani AlertOnPermanentJobFailure untuk semua job.
     }
 }

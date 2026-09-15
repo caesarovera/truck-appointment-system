@@ -83,6 +83,7 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 
 ### Queue
 * Job: `implements ShouldQueue, ShouldBeUnique`. Set `$tries`, `$backoff`, `uniqueId()`, `failed()`.
+* Alarm job gagal permanen = **satu listener global** `AlertOnPermanentJobFailure` (event `JobFailed`, mencakup job broadcast framework): log CRITICAL + email ke `TAS_ALERT_MAIL` (dibatasi per jenis job). Jangan tambah alerting per job di `failed()`; listener & notifikasinya sengaja **tidak** di-queue. Dijaga `PermanentJobFailureAlertTest`.
 * ✅ **`ShouldBeUnique` dijaga `tests/Feature/Hardening/RedisUniqueJobTest.php`** (D3′) — menguji **perilaku** di atas Redis nyata: duplikat ditahan selama job pending, reminder hasil reschedule tetap lolos. Sebelumnya mustahil karena `QUEUE_CONNECTION=sync` melepas lock seketika, jadi yang dijaga cuma string `uniqueId()`. Test ini **skip** tanpa ekstensi `redis` (native Windows) atau tanpa Redis terjangkau → service `redis` **wajib** ada di CI.
 * `AppointmentReminderJob` (H-2 jam) → `uniqueId()` = **`{appointmentId}:{slotWindowId}`**, BUKAN appointment id saja. Window ikut karena lock `ShouldBeUnique` bertahan selama job masih pending: dengan appointment id saja, reminder baru hasil reschedule dibuang diam-diam dan sopir tak pernah diingatkan (temuan ronde 4). Dijaga `RedisUniqueJobTest`.
 * `NoShowSweepJob` (cron tiap 5 menit) → `WithoutOverlapping`, tandai appointment lewat grace period jadi `NO_SHOW` + balikin kuota.

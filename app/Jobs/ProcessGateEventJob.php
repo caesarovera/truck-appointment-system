@@ -74,6 +74,6 @@ final class ProcessGateEventJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        // Hook untuk alerting saat push TOS gagal permanen (di-wire saat observability slice).
+        // Alarm umum (log CRITICAL + email) sudah ditangani AlertOnPermanentJobFailure untuk semua job.
     }
 }

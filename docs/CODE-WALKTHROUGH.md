@@ -1323,6 +1323,27 @@ dengan tak ada. Di container ketiganya jalan.
 > menjaganya menguji **bentuk**, bukan **akibat**. Kalau menemukan catatan "tak bisa dites karena
 > lingkungan", perlakukan sebagai utang yang jatuh tempo begitu lingkungannya berubah.
 
+### O.4 Alarm job gagal permanen — satu listener untuk semua job
+
+`app/Listeners/AlertOnPermanentJobFailure.php` mendengarkan `Illuminate\Queue\Events\JobFailed`.
+Event itu dipicu di `Job::fail()` — **hanya** saat job menyerah (percobaan habis), bukan tiap
+percobaan yang akan diulang — dan untuk **semua** job, termasuk job broadcast framework.
+
+- **Kenapa bukan isi `failed()` di tiap job:** kegagalan nyata pertama di proyek ini adalah job
+  broadcast (kunci Reverb kosong di clone baru) — kelas milik framework, tak punya `failed()` kita.
+- **Selalu `Log::critical`** dengan `job` (untuk broadcast: nama event, mis. `SlotAvailabilityChanged`),
+  `queue`, `uuid`, kelas & pesan exception. Worker memang sudah mencatat tiap percobaan sebagai
+  `ERROR`, tapi tak bisa dibedakan dari percobaan yang masih akan diulang.
+- **Email opsional** ke `tas.alerts.mail_to`, dibatasi `Cache::add` per jenis job
+  (`throttle_minutes`) — `NoShowSweepJob` jalan tiap 5 menit; tanpa batas, satu kerusakan = ±300 email/hari.
+- **Tak di-queue & dibungkus `try/catch`:** alarm tak boleh bergantung pada queue yang sedang rusak,
+  dan listener jalan di blok `finally` `Job::fail()` — exception dari pengiriman email akan menutupi
+  error asli job.
+
+Dijaga `tests/Feature/Jobs/PermanentJobFailureAlertTest.php` (4 test); mutasi membuang log / throttle /
+`try-catch` / guard alamat masing-masing membuat test yang tepat merah. Bukti live 2026-09-16: Reverb
+dimatikan → job broadcast gagal di Horizon → satu baris `CRITICAL` dengan nama event & UUID.
+
 ---
 
 ## P. Slice Realtime (broadcast Reverb + seam TOS)
