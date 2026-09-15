@@ -789,9 +789,18 @@
 > hijau", tapi **"apakah test ini merah kalau fitur yang dijaganya saya rusak?"**. Terapkan ke test
 > mana pun yang menjaga sesuatu yang mahal: konkurensi, otorisasi, audit, idempotency.
 
-## Temuan D2′ 2026-09-12 — endpoint API balas 500 (bukan 401) tanpa header JSON (P3, TERBUKA)
+## Temuan D2′ 2026-09-12 — endpoint API balas 500 (bukan 401) tanpa header JSON (P3, FIXED 2026-09-15)
 
-- **[TERBUKA — P3] `Route [login] not defined` → 500.** Request **tak terautentikasi** ke endpoint
+- **[FIXED 2026-09-15 — B4]** Analisis ulang menemukan cakupannya lebih lebar dari catatan di bawah:
+  tanpa header, **422 jadi redirect 302** ke `/`, **404 jadi halaman HTML**, dan `/broadcasting/auth`
+  juga 500. Perbaikan butuh **dua** baris di `bootstrap/app.php`, bukan satu:
+  `shouldRenderJsonWhen(api/*, broadcasting/*)` (untuk 422/404) **dan**
+  `redirectGuestsTo(fn () => null)` — `shouldRenderJsonWhen` saja **tidak** menutup 401, karena
+  middleware `Authenticate` mengevaluasi `route('login')` bawaan framework *sebelum* exception
+  dilempar (terbukti: setelah baris pertama saja, 2 test 401 tetap merah). Dijaga
+  `tests/Feature/Hardening/ApiJsonErrorsTest.php` (5 test, termasuk SPA tetap HTML); mutasi membuang
+  `shouldRenderJsonWhen` → 4 merah. Catatan asli dipertahankan di bawah.
+- **[asal — P3] `Route [login] not defined` → 500.** Request **tak terautentikasi** ke endpoint
   ber-`auth:sanctum` **tanpa** header `Accept: application/json` membuat Laravel mencoba
   me-*redirect* ke route bernama `login`, yang **tidak ada** di app API-only ini
   (`routes/api.php:60` mendaftarkan `Route::post('login', …)` **tanpa** `->name('login')`).

@@ -4,6 +4,7 @@ use App\Http\Middleware\IdempotencyKey;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,10 +26,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'idempotency' => IdempotencyKey::class,
         ]);
+        // Default framework `route('login')` dievaluasi di middleware SEBELUM exception dilempar,
+        // dan route bernama `login` tak ada (API-only) → 500. Tak ada halaman web ber-login
+        // (SPA catch-all publik), jadi tamu tak pernah di-redirect; handler membalas 401 JSON.
+        $middleware->redirectGuestsTo(fn (): ?string => null);
     })
-    // Wajib dipanggil walau kosong: registrasi binding exception handler framework
-    // terjadi di sini — menghapusnya bikin BindingResolutionException saat request.
-    // (Param $exceptions sengaja tak dipakai; extension point utk kustom error nanti.)
+    // Wajib dipanggil: registrasi binding exception handler framework terjadi di sini.
+    // API selalu JSON walau tanpa `Accept: application/json` — kalau tidak, 401 jadi 500
+    // (`Route [login] not defined`), 422 jadi redirect 302, 404 jadi halaman HTML.
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request): bool => $request->is('api/*', 'broadcasting/*') || $request->expectsJson(),
+        );
     })->create();

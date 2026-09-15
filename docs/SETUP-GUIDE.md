@@ -388,9 +388,9 @@ header `Idempotent-Replayed: true`, dan **tidak** ada appointment baru:
 - Tanpa token → `401` · role tanpa `appointment.write` → `403`
 - Terlalu sering → `429 Too Many Requests` (+ `Retry-After`)
 
-> **Selalu kirim `Accept: application/json`.** Tanpa header itu, request tanpa token ke endpoint
-> ber-auth menghasilkan **500** (`Route [login] not defined`), bukan 401 — bug P3 yang tercatat
-> terbuka di `HANDOVER.md` §Temuan D2′. SPA selalu mengirimnya.
+> **Header `Accept: application/json` tak wajib lagi** untuk `api/*` & `broadcasting/*` — error
+> selalu JSON (401/422/404) sejak B4 (`bootstrap/app.php`, dijaga `ApiJsonErrorsTest`). Tetap
+> dianjurkan; SPA selalu mengirimnya.
 >
 > **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email+ip), `api` 60/mnt, `booking` 10/mnt per
 > user. Nilai via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`).
