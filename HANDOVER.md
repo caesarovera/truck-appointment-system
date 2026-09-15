@@ -13,6 +13,26 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-15` (analisis ulang backlog + eksekusi prioritas) · **[SELESAI] N1, B4, N2, B5.** Backlog
+  B1–B6 dianalisis ulang terhadap kode & stack hidup (bukan catatan) → 3 temuan baru yang tak tercatat,
+  lalu dikerjakan sesuai urutan yang disetujui user.
+  **(1) `ad620e0` N1 — ganti password tak mencabut token (P2).** Dibuktikan via tinker dalam transaksi
+  yang di-rollback: token `budi@majulog.test` tetap valid setelah password diganti admin → reset
+  password untuk akun dicuri tak menghentikan pencuri s/d 12 jam. Fix di `UpdateUserAction`; admin
+  yang ganti password sendiri mempertahankan token sesinya. 3 test, mutasi menggigit.
+  **(2) `a496193` B4 — error API selalu JSON.** Lebih lebar dari catatan: tanpa `Accept` juga 422→302
+  redirect, 404→HTML, `/broadcasting/auth`→500. Dugaan "sebaris cukup" **salah**: butuh
+  `shouldRenderJsonWhen` **dan** `redirectGuestsTo(null)` (detail §Temuan D2′).
+  **(3) `f1fc1e2` N2 — e2e flaky.** Run pertama 1/5 gagal (booking pertama >5 dtk); ulang 5/5. Dugaan
+  "kompilasi Blade, obat `view:cache`" **gugur saat diulang** (dingin pun 0,45–0,50 dtk). Dipasang
+  `expect.timeout` 15 dtk sebagai margin, bukan klaim akar hilang (`SETUP-GUIDE §15d`).
+  **(4) B5 ditutup — `Cache::tags` tidak dipakai** (`CLAUDE.md §Cache`). Mutasi saat verifikasi
+  menemukan celah gerbang baru → **B8** di Backlog.
+  **Terbaca, belum dikerjakan:** N3 `failed()` kosong di 3 job → **B7**; B1 dapat alasan tunda baru;
+  B3 dapat catatan desain push ganda. **Sekali terjadi:** satu `composer test` di container macet
+  >300 dtk (dibunuh batas proses Composer, output kosong); kode yang sama lulus 33 dtk saat diulang —
+  penyebab tak diketahui, catat bila terulang. **CI untuk commit sesi ini: belum dicek** (belum di-push).
+
 - `2026-09-14` (kecepatan + clone kosong + D5′) · **[SELESAI] ADR-0007 tuntas.** Atas permintaan user:
   push D6′, perbaiki kecepatan, lalu perbarui **semua** dokumen (perbaiki yang salah, hapus yang usang).
   **(1) `98bf375` perf — request API 3,4 → 0,12 dtk.** Dugaan awal (OPcache CLI mati) **salah
@@ -867,7 +887,9 @@ dan komentar `ci.yml` — keduanya terbukti tak merusak CI. (Run terpisah di `8c
 sendiri; isinya teruji lewat keturunannya.) Repo privat + `gh` tak terpasang → status CI selalu lewat
 konfirmasi user. Riwayat: D1 (`4ea097b`), D2′ (`3e1f0c2`), D3′ (`8319cf6`) juga dikonfirmasi user.
 
-**3. Pekerjaan tersisa:** tak ada slice aktif — lihat *Backlog* (B1–B6), semuanya menunggu keputusan.
+**3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (commit
+`ad620e0`…, **belum di-push, CI belum dicek**). Kandidat berikutnya: **B8** (kecil, gerbang test) →
+B7. Sisanya di *Backlog* menunggu keputusan.
 
 **4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
 
@@ -895,18 +917,34 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
 
 **B1. Token abilities sempit** (ADR-0003) — tegakkan saat ada token ber-scope sempit. Belum ada
    konsumen nyata; mengerjakannya sekarang = menambah permukaan sebelum ada yang memakainya.
+   **Alasan tambahan (2026-09-15):** login menyalin *semua permission* ke token. Menegakkan abilities
+   dalam bentuk itu justru **memburuk** — permission yang dicabut admin tetap hidup di token s/d 12 jam,
+   padahal kini Spatie mengecek langsung tiap request. Kalau dikerjakan: scope kasar, bukan salinan.
 **B2. Perluasan e2e** — belum ada spec untuk admin, utilisasi planner, no-show, QR. E2E juga masih
    lokal-only & jalur native (belum di CI). Keputusan biaya, bukan kelupaan (`SETUP-GUIDE §15`).
 **B3. Swap gateway TOS** (`LoggingGateEventGateway` → integrasi TOS sungguhan) — terikat spek API
-   eksternal yang belum ada di tangan.
-**B4. [P3] Bug 500-vs-401** — request tanpa token **dan** tanpa `Accept: application/json` → 500
-   (`Route [login] not defined`). Perbaikan sebaris; detail §Temuan D2′.
-**B5. Refaktor `Cache::forget` → `Cache::tags`** — kini mungkin di semua jalur yang dipakai (Redis
-   untuk app, `array` untuk test; `CLAUDE.md` §Cache). Commit sendiri, butuh keputusan.
+   eksternal yang belum ada di tangan. **Catatan desain (2026-09-15, dibaca):** gate-in/out yang no-op
+   tak memicu event ulang (aman hari ini), tapi tak ada penanda "sudah di-push" — bila TOS timeout
+   setelah sebenarnya menerima, retry `ProcessGateEventJob` mengirim dua kali. Integrasi nyata butuh
+   kunci idempotensi ke TOS (mis. `booking_code`+`type`) atau kolom penanda push.
+**~~B4. Bug 500-vs-401~~ — SELESAI 2026-09-15 (`a496193`)**, cakupan ternyata lebih lebar; §Temuan D2′.
+**~~B5. `Cache::tags`~~ — DITUTUP 2026-09-15, tidak dikerjakan.** Satu keluarga kunci, invalidasi
+   eksplisit sudah lengkap; alasan & pemicu tinjau ulang di `CLAUDE.md §Cache`.
 **B6. Image produksi** — Dockerfile multi-stage terpisah: kode + `vendor --no-dev` di image,
    nginx+php-fpm (atau FrankenPHP), `validate_timestamps=0`, `config/route/event/view:cache`, kunci
    Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
-   Baru relevan saat ada target deploy.
+   Baru relevan saat ada target deploy. B7 sebaiknya beres lebih dulu.
+**B7. Alerting job gagal permanen** (temuan N3, 2026-09-15, dibaca) — `failed()` di
+   `ProcessGateEventJob`, `NoShowSweepJob`, `AppointmentReminderJob` kosong ("di-wire saat observability
+   slice" — slice itu tak pernah dijadwalkan). Kegagalan tetap tercatat di `failed_jobs`/Horizon, tapi
+   tak ada yang diberi tahu. Belum mendesak tanpa produksi.
+**B8. [kecil] Gerbang invalidasi cache/broadcast per event** (2026-09-15, **dijalankan**) — mutasi:
+   lepas `implements AffectsSlotAvailability` dari `AppointmentCancelled` → **273 test tetap hijau**.
+   Yang terjaga hanya: listener itu sendiri (via test buka/tutup window) dan event booking (tak langsung,
+   via `SlotAvailabilityBroadcastTest`). Cancel/reschedule/no-show tak punya gerbang → sisa kuota basi
+   (≤30 dtk, batas `Cache::flexible`) dan tanpa broadcast realtime, tanpa test merah. Usul: satu test
+   ber-dataset yang memastikan keempat event tsb `instanceof AffectsSlotAvailability`, atau test perilaku
+   (prime cache → cancel → availability segar).
 
 ### ✅ Riwayat item yang sudah selesai (arsip, jangan dikerjakan ulang)
 

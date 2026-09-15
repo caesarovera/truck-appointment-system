@@ -690,8 +690,9 @@ return Cache::flexible($key, [10, 30], fn () => $this->queryAvailability($gateId
 **`Cache::flexible($key, [segar, basi], $cb)`:** data dianggap *segar* 10 detik; antara
 10–30 detik masih disajikan (stale) sambil di-refresh di belakang. Jadi saat banyak
 transporter poll bersamaan, DB tidak diserbu (cuma satu yang refresh).
-> Catatan implementasi: kita pakai key eksplisit + `Cache::forget`, bukan `Cache::tags`,
-> karena cache dev (`database`) tak mendukung tag. Lihat changelog `HANDOVER.md`.
+> Catatan implementasi: kita pakai key eksplisit + `Cache::forget`, bukan `Cache::tags`. Alasan
+> awalnya store `database` tak mendukung tag; setelah Redis hidup, B5 (2026-09-15) memutuskan tetap
+> tanpa tag karena hanya ada satu keluarga kunci — lihat `CLAUDE.md §Cache`.
 
 ### J.2 DTO — `BookAppointmentData`
 

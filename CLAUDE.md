@@ -78,7 +78,7 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 
 ### Cache
 * Invalidasi selektif saat booking/cancel: **explicit-key `Cache::forget`** (lihat `SlotRepository`). Jangan `Cache::flush()`.
-* **Status `Cache::tags`:** secara teknis kini mungkin di semua jalur yang dipakai — app pakai Redis, test pakai store `array` (keduanya mendukung tag); satu-satunya store yang tak mendukung (`database`) hanya milik `composer dev` native yang tak lagi jadi jalur jalan. Refaktornya **sengaja BELUM dikerjakan** dan butuh keputusan terpisah (commit sendiri, supaya perubahan perilaku cache bisa di-*revert* sendirian). Sampai diputuskan: tetap `Cache::forget` eksplisit, jangan pakai `Cache::tags`.
+* **`Cache::tags` — DIPUTUSKAN TIDAK dipakai (2026-09-15, B5).** Hanya ada satu keluarga kunci (`slots:availability:gate:{id}:date:{d}`) dan listener `InvalidateSlotAvailabilityCache` sudah menghapus kunci yang tepat (termasuk 2 window saat reschedule); keempat mutator slot hanya dipanggil 6 Action yang semuanya memicu `AffectsSlotAvailability`. Tag baru berguna bila banyak kunci harus dibuang sekaligus — tak terjadi di sini. Tinjau ulang hanya bila muncul keluarga kunci cache kedua yang harus dibuang bersama.
 * Endpoint publik ketersediaan slot (`GET /api/v1/slots/availability`) di-poll banyak transporter → `Cache::flexible($key, [10, 30], $cb)` (anti-stampede).
 
 ### Queue

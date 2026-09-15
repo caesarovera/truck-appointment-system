@@ -288,7 +288,7 @@ Junior hampir pasti kena ini; semua sudah pernah terjadi & dicatat:
 | PHPStan `property.notFound` pada `$this->route('x')->id` | Bertipe `object\|string` → `$m instanceof X ? $m->id : null` | §V.4 |
 | PHPStan "Strict comparison always false" (enum) | Tambah `@property AppointmentStatus $status` di model | SETUP §11 |
 | PHPStan `method.childReturnType` di factory `definition()` | Hapus docblock `@return array<...>` (warisi tipe induk) | SETUP §11 |
-| `Cache::tags() does not support tagging` | Store `database`/`file` tak mendukung tag. Proyek **sengaja** tetap key eksplisit + `Cache::forget` (refaktor ke tags belum diputuskan) | CLAUDE.md §Cache |
+| `Cache::tags() does not support tagging` | Store `database`/`file` tak mendukung tag. Proyek **sengaja** tetap key eksplisit + `Cache::forget` (tags diputuskan tidak dipakai, B5 2026-09-15) | CLAUDE.md §Cache |
 | `Declaration ...::data() must be compatible` | Form Request sudah punya `data()`/`date()` → ganti nama (`toData()`) | SETUP §11 |
 | Test menghapus/mengubah data dev | Pengaman isolasi bocor — `phpunit.xml` `force` **dan** `tests/TestCase.php` wajib ada | SETUP §6 |
 | `Class "..." not found` di container setelah `git pull` | `composer.lock` berubah; `vendor/` container terpisah → `docker compose run --rm --no-deps app composer install` | SETUP §3 |

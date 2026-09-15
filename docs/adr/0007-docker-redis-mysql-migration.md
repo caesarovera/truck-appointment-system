@@ -261,7 +261,7 @@ Detail & kandidat fix: `HANDOVER` §Temuan D6′.
    diberi penanda koreksi, bukan dihapus diam-diam.
 
 *Status butir "Kapan ditinjau ulang" di bawah per 2026-09-14:* `Cache::tags` — kini mungkin di semua
-jalur yang dipakai (Redis & `array`), masih menunggu keputusan terpisah · Reverb — **dikerjakan**
+jalur yang dipakai (Redis & `array`); **diputuskan tidak dipakai 2026-09-15** (B5, `CLAUDE.md §Cache`) · Reverb — **dikerjakan**
 (D6′), bukan opsional: di container ia putus tanpa service sendiri · WSL2 — ditinjau dengan angka,
 **tidak** diperlukan setelah volume vendor.
 
