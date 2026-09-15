@@ -96,6 +96,17 @@ it('authorizes a gate officer on their own terminal gate-queue channel', functio
         ->assertJsonStructure(['auth']);
 });
 
+it('denies a driver on any gate-queue channel (payload holds other companies\' booking codes)', function (): void {
+    usePusherBroadcaster();
+
+    $terminal = Terminal::factory()->create();
+    $driver = User::factory()->driver()->create();
+
+    actingAs($driver, 'sanctum');
+
+    authChannel("private-gate.queue.{$terminal->id}")->assertForbidden();
+});
+
 it('denies a gate officer on a terminal that is not theirs', function (): void {
     usePusherBroadcaster();
 

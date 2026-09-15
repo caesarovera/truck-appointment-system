@@ -1385,10 +1385,14 @@ tanpa perubahan. `BroadcastGateQueue` serupa untuk `RecordsGateEvent`.
 // routes/channels.php
 Broadcast::channel('slot.{gateId}', fn (User $user, int $gateId) => $user->can('slot.read'));
 Broadcast::channel('gate.queue.{terminalId}', function (User $user, int $terminalId): bool {
-    if ($user->hasAnyRole(['admin','planner','driver'])) return true;
+    if ($user->hasAnyRole(['admin','planner'])) return true;
     return $user->hasRole('gate-officer') && $user->terminal_id === $terminalId;
 });
 ```
+> **Isolasi channel = isolasi REST.** `driver` dulu ikut diizinkan di `gate.queue.*` untuk terminal
+> mana pun; payload-nya (`booking_code`, `status`) milik semua perusahaan, padahal lewat REST sopir
+> hanya melihat appointment-nya sendiri — dan SPA tak pernah berlangganan sebagai sopir. Dicabut
+> 2026-09-16 (audit), dijaga test "denies a driver on any gate-queue channel" di `BroadcastAuthTest`.
 
 ### P.4 Seam TOS (efek eksternal yang bisa di-swap)
 ```php

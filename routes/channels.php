@@ -13,10 +13,10 @@ Broadcast::channel('slot.{gateId}', function (User $user, int $gateId): bool {
     return $user->can('slot.read');
 });
 
-// Antrian gate per terminal: admin/planner & driver boleh pantau; gate officer
-// hanya terminal tempat ia ditugaskan.
+// Antrian gate per terminal: admin/planner semua terminal; gate officer hanya terminalnya.
+// Sopir SENGAJA tidak: payload memuat booking_code & status appointment perusahaan lain.
 Broadcast::channel('gate.queue.{terminalId}', function (User $user, int $terminalId): bool {
-    if ($user->hasAnyRole(['admin', 'planner', 'driver'])) {
+    if ($user->hasAnyRole(['admin', 'planner'])) {
         return true;
     }
 

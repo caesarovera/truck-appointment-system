@@ -125,7 +125,7 @@ Aturan transisi (tegakkan di Action, bukan di Controller):
 
 ### 3.4 Driver di hari-H
 1. Driver buka app → `GET /api/v1/me/appointments/today` (scope `appointment.read.self`).
-2. Lihat kode booking + QR (berisi appointment id ter-sign), window, gate, status realtime via Echo `gate.queue.{terminalId}`.
+2. Lihat kode booking + QR (berisi appointment id ter-sign), window, gate, status. **Tanpa** channel realtime `gate.queue.{terminalId}` — channel itu khusus admin/planner/gate-officer karena payload-nya memuat `booking_code` & status appointment perusahaan lain (dicabut untuk driver 2026-09-16).
 3. Tiba di gate, tunjukkan QR.
 
 > **QR = token ter-sign (bukan booking_code polos), 2026-08-14.** `AppointmentResource.qr_token`
