@@ -103,6 +103,12 @@ docker compose exec app php artisan horizon:status   # Horizon is running
 Port kiri bisa digeser lewat `.env` (`DB_PORT_HOST`, `REDIS_PORT_HOST`, `APP_PORT`,
 `REVERB_PORT_HOST`). **3307, bukan 3306**: laragon di mesin dev memegang 3306.
 
+**Semua port hanya terikat ke `127.0.0.1`** (sejak 2026-09-16). Sebelumnya terbuka di semua
+antarmuka — terbukti MySQL (password dev `secret`) dan Redis (tanpa password) terjangkau lewat IP
+Wi-Fi mesin. Akibatnya app **tak bisa** dibuka dari HP/laptop lain di jaringan yang sama; kalau suatu
+saat perlu, buat `docker-compose.override.yml` lokal untuk service `app` saja, jangan untuk
+`mysql`/`redis`.
+
 > **Kenapa Reverb punya dua alamat:** di dalam container, `localhost` = container itu sendiri.
 > PHP mem-publish ke `reverb:8080` (env compose), browser tersambung ke `localhost:8080`
 > (`VITE_REVERB_*` di `.env`). Nilai `localhost` untuk PHP pernah membuat realtime putus di

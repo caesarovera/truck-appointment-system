@@ -120,7 +120,9 @@ services:
       # 3307, BUKAN 3306: laragon sudah memakai 3306 di mesin dev ini. Kalau dipaksa
       # 3306, container gagal bind dan errornya ("port is already allocated") sering
       # disalahartikan sebagai MySQL-nya yang rusak.
-      - '${DB_PORT_HOST:-3307}:3306'
+      # 127.0.0.1 di depan (semua service): tanpa itu port terbuka di SEMUA antarmuka — terbukti
+      # MySQL (password dev `secret`) & Redis (tanpa password) terjangkau lewat IP Wi-Fi.
+      - '127.0.0.1:${DB_PORT_HOST:-3307}:3306'
     volumes:
       - mysql-data:/var/lib/mysql
       # Skrip init HANYA jalan saat volume masih kosong (container pertama kali dibuat).
@@ -149,7 +151,7 @@ services:
     ports:
       # 6379 di mesin dev ini bebas (sudah dicek). Tetap lewat variabel supaya mudah
       # digeser kalau kelak bentrok, pola sama dengan MySQL.
-      - '${REDIS_PORT_HOST:-6379}:6379'
+      - '127.0.0.1:${REDIS_PORT_HOST:-6379}:6379'
     volumes:
       - redis-data:/data
     healthcheck:
@@ -164,7 +166,7 @@ services:
     container_name: tas-app
     # Perintah default dari Dockerfile: `php artisan serve --host=0.0.0.0 --port=8000`.
     ports:
-      - '${APP_PORT:-8000}:8000'
+      - '127.0.0.1:${APP_PORT:-8000}:8000'
 
   horizon:
     <<: *php
@@ -201,7 +203,7 @@ services:
       # KANAN wajib 8080 (= REVERB_PORT di x-php-env). KIRI = port yang dibuka ke browser, dan
       # HARUS sama dengan VITE_REVERB_PORT di .env host — Echo di browser membaca nilai itu saat
       # Vite build/dev, bukan dari container.
-      - '${REVERB_PORT_HOST:-8080}:8080'
+      - '127.0.0.1:${REVERB_PORT_HOST:-8080}:8080'
 
 volumes:
   mysql-data:
