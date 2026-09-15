@@ -13,6 +13,38 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-09-16` (CI mandiri + B8 + B7 + kesehatan Claude Code) · **[SELESAI] B8, B7; CI merah diperbaiki.**
+  **(1) `gh` CLI terpasang & login** (winget v2.101.0, akun `caesarovera`, scope `repo`) — **pertama kali
+  agen bisa membaca CI repo privat ini sendiri**, tanpa menunggu user membuka tab Actions.
+  **(2) CI merah di `ee99cac` → hijau di `a631d80`.** Push 4 commit sesi 2026-09-15 langsung ketahuan
+  merah: 1 dari 273 — test baru "SPA tetap HTML" (`ApiJsonErrorsTest`) gagal `Vite manifest not found`,
+  karena job Backend tak menjalankan `npm run build`; lokal lolos hanya karena `public/build/`
+  (gitignored) kebetulan ada. Direproduksi lokal dengan memindahkan manifest → merah persis; fix
+  `withoutVite()`. **Koreksi klaim sendiri:** mutasi callback `shouldRenderJsonWhen` jadi selalu `true`
+  tak membuat test itu merah (hanya memengaruhi exception; SPA 200 tak melempar) → ia smoke test
+  catch-all, bukan penjaga B4; 4 test lain tetap penjaga (§Temuan D2′ dibetulkan).
+  **(3) `103c363` B8 — gerbang perilaku** `SlotAvailabilityFreshnessTest`: booking/cancel/no-show/
+  reschedule lewat Action sungguhan → sisa kuota dibaca lewat cache segar + ter-broadcast. 7 mutasi,
+  semua menggigit tepat. Temuan sampingan: `SlotAvailabilityBroadcastTest` memicu event **manual**, jadi
+  tak pernah membuktikan Action memicu event. Tanpa kode produksi.
+  **(4) `d0a380c` B7 — alarm job gagal permanen.** Keadaan sebelum [dijalankan]: hanya 1 baris `ERROR`
+  (tak bisa dibedakan dari percobaan ulang) + `failed_jobs` + `FAIL` di konsol Horizon. Satu listener
+  global `JobFailed` (mencakup job broadcast framework): log CRITICAL + email `TAS_ALERT_MAIL`
+  ter-throttle, tak di-queue, try/catch. 4 test + 4 mutasi. **Live:** Reverb dimatikan → broadcast gagal
+  di Horizon → CRITICAL dengan nama event & UUID. Sampingan: `horizon:terminate` dari container `app`
+  mencetak "No processes to terminate" tapi **tetap** memuat ulang worker (`SETUP-GUIDE §3`).
+  **(5) Kesehatan Claude Code (`/doctor`, di luar repo).** Instalasi sehat (npm global di bawah nvm Node
+  v22.14.0, versi 2.1.272 = terbaru), tanpa hook/plugin/CLAUDE.md lokal; `CLAUDE.md` dinilai tak perlu
+  dipangkas (isinya jebakan & larangan, bukan hal yang bisa diturunkan dari kode). User menolak auto mode
+  sebagai default. **`.claude/settings.local.json` dirapikan 105 → 39 aturan** atas pilihan user: ±63
+  aturan sekali pakai + ±20 wildcard berisiko dibuang (`php *`, `php artisan *`, `npm install *`,
+  `git push/reset/checkout/stash/rm/fetch *`, `filter-branch`, `taskkill /IM php.exe`, `composer dev *`),
+  `docker compose *` dipersempit. File lokal (gitignored); cadangan
+  `~/.claude/truck-appointment-system.settings.local.json.bak-2026-09-16`.
+  **Gerbang akhir sesi:** 281 Pest / 730 assert di container, PHPStan lvl 8 & Pint bersih, **CI hijau di
+  `d0a380c` (kedua job, dicek agen via `gh`)**. Vitest & e2e tak dijalankan ulang lokal (frontend tak
+  disentuh; job Frontend CI hijau; e2e 5/5 pada 2026-09-15).
+
 - `2026-09-15` (analisis ulang backlog + eksekusi prioritas) · **[SELESAI] N1, B4, N2, B5.** Backlog
   B1–B6 dianalisis ulang terhadap kode & stack hidup (bukan catatan) → 3 temuan baru yang tak tercatat,
   lalu dikerjakan sesuai urutan yang disetujui user.
@@ -31,12 +63,8 @@
   **Terbaca, belum dikerjakan:** N3 `failed()` kosong di 3 job → **B7**; B1 dapat alasan tunda baru;
   B3 dapat catatan desain push ganda. **Sekali terjadi:** satu `composer test` di container macet
   >300 dtk (dibunuh batas proses Composer, output kosong); kode yang sama lulus 33 dtk saat diulang —
-  penyebab tak diketahui, catat bila terulang.
-  **CI (dicek sendiri via `gh`, 2026-09-16): MERAH di `ee99cac`** — 1 dari 273: test baru "SPA tetap
-  HTML" di `ApiJsonErrorsTest` gagal `Vite manifest not found`, karena job Backend tak menjalankan
-  `npm run build`; lokal lolos hanya karena `public/build/` (gitignored) kebetulan ada. Direproduksi
-  lokal dengan memindahkan manifest, diperbaiki dengan `withoutVite()`. **Pelajaran: test yang merender
-  view ber-`@vite` harus lulus tanpa `public/build/`** — cara cek: pindahkan manifest, jalankan test.
+  penyebab tak diketahui, catat bila terulang. Commit sesi ini di-push 2026-09-16 dan CI-nya **merah**
+  di `ee99cac` — penyebab & perbaikan di entri 2026-09-16 di atas.
 
 - `2026-09-14` (kecepatan + clone kosong + D5′) · **[SELESAI] ADR-0007 tuntas.** Atas permintaan user:
   push D6′, perbaiki kecepatan, lalu perbarui **semua** dokumen (perbaiki yang salah, hapus yang usang).
@@ -873,9 +901,9 @@ membaca kode. **Semua FIXED 2026-09-14** (detail & bukti merah→hijau di entri 
   sementara sistemnya salah.
 
 ## Sedang dikerjakan
-- (kosong) — **sesi 2026-09-14 selesai: ADR-0007 tuntas** (D6′ + perbaikan kecepatan + `.env.example`
-  + D5′ dokumen), semua di-commit & di-push. Gerbang: **265 Pest** di container (±30 dtk),
-  **262 + 3 skip** native, PHPStan lvl 8, Pint bersih; clone kosong → app jalan ±1 menit.
+- (kosong) — **sesi 2026-09-16 selesai** (CI merah diperbaiki, B8, B7, `settings.local.json` dirapikan),
+  semua di-commit & di-push. Gerbang: **281 Pest / 730 assert** di container, PHPStan lvl 8, Pint bersih,
+  **CI hijau di `d0a380c`** (dicek agen via `gh`). Native Windows tak dijalankan ulang sejak 2026-09-14.
 
 ### ▶️ MULAI SESI BERIKUTNYA DARI SINI
 
@@ -889,21 +917,26 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 "setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
 `reverb:start` native bersamaan stack.
 
-**2. CI `4f5d6ad` — CONFIRMED hijau oleh user 2026-09-14.** Run di commit teratas itu mencakup
-seluruh perubahan sesi 2026-09-14 (`d186c4a`…`4f5d6ad`), termasuk `tests/TestCase.php` baru di runner
-dan komentar `ci.yml` — keduanya terbukti tak merusak CI. (Run terpisah di `8c39bcc` tak dicek
-sendiri; isinya teruji lewat keturunannya.) Riwayat: D1 (`4ea097b`), D2′ (`3e1f0c2`), D3′ (`8319cf6`)
-juga dikonfirmasi user. **Sejak 2026-09-16 `gh` terpasang & login (akun `caesarovera`, scope `repo`)
-→ agen cek CI sendiri:** `gh run list --branch main`, `gh run watch <id> --exit-status`,
+**2. CI `d0a380c` — hijau, dicek agen sendiri via `gh` 2026-09-16** (kedua job). Sejak hari itu `gh`
+terpasang & login (akun `caesarovera`, scope `repo`) — **setelah push, pantau sendiri**, jangan minta
+user membuka tab Actions: `gh run list --branch main --limit 3`, `gh run watch <id> --exit-status`,
 `gh run view <id> --log-failed`. Shell yang dibuka sebelum instalasi belum mengenal PATH-nya → pakai
-`"C:\Program Files\GitHub CLI\gh.exe"` atau buka terminal baru.
+`"C:\Program Files\GitHub CLI\gh.exe"` atau buka terminal baru. (Riwayat sebelum `gh`: D1 `4ea097b`,
+D2′ `3e1f0c2`, D3′ `8319cf6`, `4f5d6ad` — dikonfirmasi user lewat tab Actions.)
 
-**3. Pekerjaan tersisa:** tak ada slice aktif. Sesi 2026-09-15 menutup N1/B4/N2/B5 (`ad620e0`…
-`ee99cac`, sudah di-push; CI merah di `ee99cac` lalu diperbaiki — lihat entri Status teratas).
-B8 & B7 selesai 2026-09-16. Sisa Backlog (B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6
-image produksi) semuanya menunggu keputusan user. Status CI terbaru: `gh run list --branch main --limit 1`.
+**3. Pekerjaan tersisa:** tak ada slice aktif. 2026-09-15 menutup N1/B4/N2/B5; 2026-09-16 menutup B8 &
+B7. Sisa Backlog (B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6 image produksi) semuanya
+**menunggu keputusan user** — tak ada kandidat yang diusulkan agen.
 
-**4. Catatan mesin:** berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
+**4. Catatan mesin:**
+- Berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
+- **`.claude/settings.local.json` sengaja dipersempit (2026-09-16, 105 → 39 aturan).** `git push`,
+  `docker compose stop/down/restart`, `php artisan migrate:fresh`/`tinker`, `npm install`, `git reset` dll.
+  kini **ditanyakan dulu** (atau diputuskan classifier di auto mode) — itu disengaja, bukan rusak; jangan
+  sarankan "always allow" dengan wildcard lebar. Cadangan versi lama:
+  `~/.claude/truck-appointment-system.settings.local.json.bak-2026-09-16`.
+- Alarm job gagal: di dev `TAS_ALERT_MAIL` kosong → cari `CRITICAL` "Queue job gagal permanen" di
+  `storage/logs/laravel.log`.
 
 
 ## Langkah berikutnya (urut)
@@ -945,7 +978,8 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
 **B6. Image produksi** — Dockerfile multi-stage terpisah: kode + `vendor --no-dev` di image,
    nginx+php-fpm (atau FrankenPHP), `validate_timestamps=0`, `config/route/event/view:cache`, kunci
    Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
-   Baru relevan saat ada target deploy. B7 sebaiknya beres lebih dulu.
+   Baru relevan saat ada target deploy. Prasyarat B7 (alarm job gagal) sudah selesai 2026-09-16; di
+   produksi isi `TAS_ALERT_MAIL` + SMTP sungguhan.
 **~~B7~~ — SELESAI 2026-09-16.** Keadaan sebelum [dijalankan]: job gagal permanen hanya meninggalkan
    1 baris `ERROR` (tak bisa dibedakan dari percobaan ulang) + baris `failed_jobs` + `FAIL` di konsol
    Horizon. Dipilih **satu listener global `JobFailed`** (bukan isi `failed()` per job, karena kegagalan
@@ -1006,6 +1040,22 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
 ## Changelog kontrak / dokumen / seeder
 > Catat tiap perubahan yang menyentuh CLAUDE.md, docs/*, atau seeder.
 > Format: `tanggal: APA yang berubah → file mana yang ikut diupdate. Alasan.`
+- `2026-09-16` (B7 + B8 + fix CI): **Kontrak alarm job gagal permanen ditambahkan.** Kode:
+  `app/Listeners/AlertOnPermanentJobFailure.php`, `app/Notifications/PermanentJobFailureNotification.php`
+  (baru), `config/tas.php` (`alerts.mail_to` ← `TAS_ALERT_MAIL`, `alerts.throttle_minutes` ←
+  `TAS_ALERT_THROTTLE_MINUTES`), komentar `failed()` di 3 job. Test baru: `PermanentJobFailureAlertTest`,
+  `SlotAvailabilityFreshnessTest`; `ApiJsonErrorsTest` (+`withoutVite()`). Docs: `CLAUDE.md` §Queue
+  (1 baris: alarm = listener global, jangan per job), `docs/CODE-WALKTHROUGH.md` §J (gerbang cache) &
+  §O.4 (baru), `docs/SETUP-GUIDE.md` §3 (`horizon:terminate` dari `app`) & §10 (env alarm), `HANDOVER`.
+  Seeder: **tak ada**. Alasan: kegagalan permanen sebelumnya tak memberi tahu siapa pun; kontrak ditulis
+  supaya sesi berikutnya tak menambah alerting per job di `failed()`.
+- `2026-09-15` (N1/B4/N2/B5): **`CLAUDE.md` §Cache — `Cache::tags` diputuskan tidak dipakai** (sebelumnya
+  "belum diputuskan"). Kode: `UpdateUserAction` (cabut token saat ganti password), `bootstrap/app.php`
+  (error API selalu JSON), `playwright.config.ts` (`expect.timeout` 15 dtk). Docs: `CLAUDE.md` §Cache,
+  `docs/CODE-WALKTHROUGH.md` (§V ganti password, catatan cache), `docs/SETUP-GUIDE.md` §10 (header
+  `Accept` tak wajib) & §15d (margin e2e), `docs/ONBOARDING.md` & `docs/adr/0007` (rujukan tags),
+  `HANDOVER` (§Temuan D2′ FIXED, Backlog B1–B8). Seeder: **tak ada**. Alasan: keputusan yang menggantung
+  di kontrak membuat tiap sesi menimbang ulang hal yang sama.
 - `2026-09-14` (D5′): **Semua dokumen disinkronkan ke Docker sebagai jalur utama; yang usang dihapus.**
   Kode/infra sesi ini: `docker-compose.yml` + `docker/php/Dockerfile` (volume `vendor`, OPcache CLI),
   `.env.example` (kunci Reverb dev). Docs: `docs/SETUP-GUIDE.md` (ditulis ulang), `README.md`,
@@ -1100,8 +1150,17 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
   isolasi test (cuma `force="true"`) terlihat meyakinkan dan tidak menggigit.
 - **Git:** 1 slice = 1 commit; atribusi `Co-Authored-By: Overa Caesar` (bukan Claude) — lihat
   `docs/GIT-HISTORY-REWRITE.md`. GitHub membuat **1 run CI per PUSH, bukan per commit**.
-- **Repo privat, `gh` tak terpasang** → status CI hanya bisa dilihat user di tab Actions (REST API
-  tanpa token → 404). Jangan menulis "CI hijau" tanpa konfirmasi user.
+- **Repo privat → CI dibaca lewat `gh`** (terpasang & login sejak 2026-09-16; REST API tanpa token
+  tetap 404). Jangan menulis "CI hijau" sebelum `gh run watch <id> --exit-status` benar-benar selesai
+  sukses — sesi 2026-09-15 menutup pekerjaan "hijau lokal" yang ternyata merah di CI.
+- **CI job Backend tak membangun frontend.** Test Pest yang merender view ber-`@vite` lulus di lokal
+  (karena `public/build/` gitignored kebetulan ada) tapi gagal di CI. Pakai `withoutVite()`; cek dengan
+  memindahkan `public/build/manifest.json` lalu jalankan test-nya.
+- **Test yang memicu event manual bukan gerbang wiring Action.** `event(new X)` membuktikan listener,
+  bukan bahwa Action memanggil `X::dispatch`. Untuk efek samping penting, panggil Action sungguhan
+  (pola `SlotAvailabilityFreshnessTest`).
+- **Satu pengukuran = anekdot.** Dugaan penyebab e2e lambat (kompilasi Blade) gugur saat diulang; bila
+  penyebab tak bisa direproduksi, pasang margin berlabel — jangan klaim akar masalah hilang.
 - **`DemoSeeder` relatif ke tanggal seed** dan **scheduler menyapu data demo lampau jadi `NO_SHOW`**
   — "slot kosong / status berubah sendiri" biasanya bukan bug; seed ulang dulu (`DUMMY-DATA.md`).
 - **Mematikan proses di Windows: pakai PID, bukan nama.** `taskkill /IM php.exe` pernah mematikan
@@ -1136,4 +1195,7 @@ npm run build             # bundel produksi → public/build
 - [ ] `RolePermissionSeeder` & Policy cocok dengan matriks RBAC (BUSINESS-FLOW §1).
 - [ ] `DemoSeeder` menyentuh semua status (BUSINESS-FLOW §2) & semua entitas (§4).
 - [ ] `composer test / analyse / fix` bersih.
+- [ ] Test baru yang merender view `@vite` lulus **tanpa** `public/build/` (CI Backend tak build frontend).
+- [ ] Test penjaga dibuktikan menggigit: rusak kodenya, pastikan test yang tepat merah, pulihkan.
+- [ ] Setelah push: `gh run watch <id> --exit-status` sampai hijau sebelum menyebut pekerjaan selesai.
 - [ ] Dokumen + kode + seeder + HANDOVER dalam **satu** PR.
