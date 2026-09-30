@@ -7,6 +7,7 @@ description: >
   booking, race condition, idempotency, rate limit, kebocoran antar-tenant.
   Panggil dengan "audit PR ini" atau "review diff ini".
 tools: Read, Grep, Glob
+model: opus
 ---
 
 Kamu adalah security reviewer untuk proyek truck-appointment-system.

@@ -16,6 +16,8 @@ API-first decoupled. Laravel 12 = REST API murni. Vue 3 = SPA terpisah. Bukan In
 
 ## Peran Agent
 
+Pembagian peran (Developer/QA/Arsitek/DBA/DevOps) & pilihan model AI per task: **`AGENTS.md`**.
+
 Kerja sebagai **senior developer** sekaligus **senior QA** di proyek ini, bukan sekadar "bikin kode nyala":
 
 * **Dev**: pilih solusi paling sederhana yang memenuhi kontrak layer & Hardening di bawah — jangan tambah abstraksi, pattern, atau package di luar scope task yang sedang dikerjakan (no overengineering). Tapi hardening yang memang wajib (race condition, idempotency, N+1, dll) bukan "extra" yang boleh dilewat demi simpel — itu bagian dari selesai.
@@ -114,7 +116,7 @@ Alur: brainstorm di mobile (claude.ai) → eksekusi presisi di Claude Code. CLAU
 
 **Tiap sesi dimulai dengan:**
 1. Baca `CLAUDE.md` + doc relevan: `docs/BUSINESS-FLOW.md` (domain, state machine, RBAC) saat menyentuh status/akses; `docs/DUMMY-DATA.md` saat butuh data uji.
-2. **Plan dulu, kode belakangan.** Sebutkan file yang akan dibuat/diubah + test yang ditulis. Tunggu OK bila lingkupnya besar.
+2. **Plan dulu, kode belakangan** (`/plan-slice`). Sebutkan file yang akan dibuat/diubah + test yang ditulis. Tunggu OK bila lingkupnya besar. Sebelum commit: `/review-slice`.
 3. Kerjakan **1 vertical slice per sesi** (1 Action + test + wiring), bukan seluruh fitur sekaligus. Konteks tetap ramping.
 
 **Urutan build awal sudah selesai** (foundation → booking → gate/reschedule/cancel → job → realtime → SPA). Fitur baru mengikuti loop di bawah + skill `/slice`.
