@@ -13,6 +13,21 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-08` (kunci throttle login) · **[SELESAI] backlog (1) dari review 2026-10-07.** Limiter `login`
+  kini dua bucket: `email:<huruf-kecil>|ip` 5/mnt dan `ip:` 30/mnt (env `TAS_RL_LOGIN_IP`, baru);
+  `email` non-string → `''` (sebelumnya array → 500). **Review keamanan (Opus) menemukan lowercase
+  SAJA belum menutup bypass**, dan saya buktikan di MySQL: `utf8mb4_unicode_ci` menyamakan `plánner@`,
+  `ｐlanner@` (fullwidth), dan `ß`/`ss` dengan padanan ASCII-nya → 6× kuota per-email. Penutup: aturan
+  `ascii` di `LoginRequest` + `Create/UpdateUserRequest` (email non-ASCII berhenti di 422, tak sampai
+  `findByEmail`). **Regresi yang tertangkap test:** `ascii` Laravel melempar `Array to string
+  conversion` untuk input array (→ 500) dan tak berhenti walau `email` sudah gagal → ketiganya
+  `['bail','required','string','email','ascii',…]`. Bucket per-ip memakai `->after()` (hanya upaya
+  GAGAL dihitung) agar petugas di satu NAT tak saling mengunci saat pergantian shift. 5 test baru + 3
+  mutasi merah (tanpa lowercase, tanpa bucket ip, tanpa `ascii`, tanpa `after`). **Catatan produksi:**
+  tanpa `trustProxies` di belakang LB semua klien berbagi satu IP → bucket per-ip jadi kuota global
+  (dicatat di `SETUP-GUIDE §17f`; sekarang aman karena `$request->ip()` = REMOTE_ADDR, tak bisa
+  dipalsukan). **Tidak dikerjakan:** urutan Limit (bucket email tetap terpakai saat IP penuh — minor).
+
 - `2026-10-07` (hardening login & CORS, temuan audit 2026-09-16 a–c) · **[SELESAI] B6 (a)(b)(c).**
   **(a)** `LoginAction`: email tak terdaftar kini membayar satu `Hash::check` ke hash tiruan ber-cost sama
   (di-cache per konfigurasi hashing; dibuat per request malah membuat jalur itu lebih LAMBAT).
@@ -31,7 +46,7 @@
   konfigurasi + test "cost berubah → dummy dibuat ulang"; 3 mutasi (`''`, cost dikunci 4, kunci cache
   konstan) kini merah. Pelajaran sama dengan klaim "3 mutasi menggigit" di atas: mutasi harus merusak
   **nilai yang dijaga**, bukan hanya menghapus panggilan.
-  **Backlog baru dari review (belum dikerjakan, butuh keputusan):** (1) kunci throttle login
+  **Backlog baru dari review:** (1) ~~kunci throttle login — SELESAI 2026-10-08~~ (asal: kunci throttle login
   `AppServiceProvider.php:72-73` tak dinormalisasi — kolasi `utf8mb4_unicode_ci` menyamakan `Planner@`
   dan `planner@`, jadi tiap variasi kapital dapat kuota 5/mnt sendiri; tak ada limit per-IP (password
   spraying); `email` berupa array → 500. Melemahkan perlindungan brute-force; sudah ada sebelum slice

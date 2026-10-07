@@ -61,12 +61,15 @@ return [
     |--------------------------------------------------------------------------
     | Pertahanan abuse (CLAUDE.md → Hardening §rate limit). Didaftarkan sebagai
     | named limiter di AppServiceProvider::boot(), dipasang di routes/api.php.
-    |  - login   : anti brute-force, dikunci per email+ip.
+    |  - login   : anti brute-force, dikunci per email+ip (email huruf kecil).
+    |  - login_ip: batas per ip saja (password spraying lintas email); longgar karena
+    |              satu NAT/terminal bisa dipakai banyak petugas.
     |  - api     : batas umum endpoint ber-auth, dikunci per user id (fallback ip).
     |  - booking : lebih ketat dari `api` (anti bot borong slot), per user id.
     */
     'rate_limits' => [
         'login' => (int) env('TAS_RL_LOGIN', 5),
+        'login_ip' => (int) env('TAS_RL_LOGIN_IP', 30),
         'api' => (int) env('TAS_RL_API', 60),
         'booking' => (int) env('TAS_RL_BOOKING', 10),
     ],

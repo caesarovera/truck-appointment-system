@@ -399,8 +399,10 @@ header `Idempotent-Replayed: true`, dan **tidak** ada appointment baru:
 > selalu JSON (401/422/404) sejak B4 (`bootstrap/app.php`, dijaga `ApiJsonErrorsTest`). Tetap
 > dianjurkan; SPA selalu mengirimnya.
 >
-> **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email+ip), `api` 60/mnt, `booking` 10/mnt per
-> user. Nilai via env `TAS_RL_LOGIN` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`).
+> **Rate limit** (`AppServiceProvider`): `login` 5/mnt (email huruf-kecil+ip) **dan** 30/mnt per ip saja
+> (anti password spraying; hanya upaya GAGAL yang dihitung), `api` 60/mnt, `booking` 10/mnt per user. Nilai via env `TAS_RL_LOGIN` /
+> `TAS_RL_LOGIN_IP` / `TAS_RL_API` / `TAS_RL_BOOKING` (`config/tas.php`). Bucket per-ip memengaruhi
+> script yang login berulang dari satu mesin (mis. e2e): tunggu semenit atau naikkan `TAS_RL_LOGIN_IP`.
 >
 > **Alarm job gagal permanen:** selalu log `CRITICAL` "Queue job gagal permanen" di log harian
 > `storage/logs/laravel-YYYY-MM-DD.log` (container; tanggal UTC).
@@ -734,6 +736,7 @@ UID 1000 (juga pemilik `vendor/` agar volume kosong tak jadi milik root).
 | `.env` | berkas bind mount | env var / secret platform |
 | Kunci Reverb | nilai dev di `.env.example` | acak, dari secret |
 | `CORS_ALLOWED_ORIGINS` | kosong (same-origin) | domain SPA bila terpisah; jangan `*` |
+| IP klien (`$request->ip()`) | langsung dari koneksi (tak ada `trustProxies`) | di belakang LB/CDN WAJIB `$middleware->trustProxies(at: [IP LB])` — tanpa itu semua klien berbagi satu IP: bucket throttle login per-ip (30/mnt) jadi satu kuota global dan akun mana pun bisa dikunci. Jangan `*` kecuali LB menimpa X-Forwarded-For |
 
 Volume di produksi hanya untuk data yang harus bertahan (MySQL, Redis), bukan kode. Belum ada
 produksi di proyek ini — backlog di `HANDOVER.md`.

@@ -25,7 +25,7 @@ final class UpdateUserRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($userId)],
+            'email' => ['bail', 'required', 'string', 'email', 'ascii', Rule::unique('users', 'email')->ignore($userId)],
             'password' => ['nullable', 'string', Password::defaults()],
             'role' => ['required', 'string', 'in:admin,planner,gate-officer,transporter,driver'],
             'terminal_id' => ['nullable', 'integer', 'exists:terminals,id'],

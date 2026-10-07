@@ -20,7 +20,7 @@ final class CreateUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'email' => ['bail', 'required', 'string', 'email', 'ascii', 'unique:users,email'],
             'password' => ['required', 'string', Password::defaults()],
             'role' => ['required', 'string', 'in:admin,planner,gate-officer,transporter,driver'],
             'terminal_id' => ['nullable', 'integer', 'exists:terminals,id'],

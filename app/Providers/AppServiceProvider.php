@@ -29,7 +29,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\Response;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -73,8 +75,25 @@ class AppServiceProvider extends ServiceProvider
     {
         $limits = config('tas.rate_limits');
 
-        RateLimiter::for('login', fn (Request $request): Limit => Limit::perMinute($limits['login'])
-            ->by($request->input('email').'|'.$request->ip()));
+        // Dua bucket: per email+ip (brute-force satu akun) dan per ip (password spraying lintas email).
+        // Email dinormalisasi: kolasi MySQL menyamakan `Planner@` dan `planner@`, jadi variasi kapital
+        // harus berbagi satu kuota. Aksen/fullwidth/ß juga disamakan kolasi, tapi TIDAK ditangani di
+        // sini: email non-ASCII ditolak aturan `ascii` (LoginRequest) sebelum mencapai pencarian user.
+        // Bukan string (mis. array) → '' agar validasi yang menjawab 422, bukan 500.
+        // Bucket per-ip hanya menghitung upaya GAGAL (`after`), supaya banyak petugas di satu NAT yang
+        // login bersamaan tak saling mengunci. Kunci per-email sengaja memuat ip: akun tak bisa dikunci
+        // dari luar oleh orang yang menebak emailnya.
+        RateLimiter::for('login', function (Request $request): array {
+            $email = $request->input('email');
+            $email = is_string($email) ? Str::lower(trim($email)) : '';
+
+            return [
+                Limit::perMinute((int) config('tas.rate_limits.login'))->by('email:'.$email.'|'.$request->ip()),
+                Limit::perMinute((int) config('tas.rate_limits.login_ip'))
+                    ->by('ip:'.$request->ip())
+                    ->after(fn (Response $response): bool => $response->getStatusCode() !== 201),
+            ];
+        });
 
         RateLimiter::for('api', fn (Request $request): Limit => Limit::perMinute($limits['api'])
             ->by((string) ($request->user()?->getAuthIdentifier() ?? $request->ip())));

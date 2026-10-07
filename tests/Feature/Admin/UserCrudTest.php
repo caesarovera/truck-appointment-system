@@ -246,3 +246,40 @@ it('accepts a password that meets the policy exactly', function (): void {
         ])
         ->assertCreated();
 });
+
+// Email non-ASCII ditolak di login (kolasi MySQL menyamakannya dengan padanan ASCII → bypass throttle),
+// jadi akun ber-email non-ASCII tak boleh dibuat — kalau tidak, ia tak akan pernah bisa login.
+it('rejects a non-ascii email on create and update', function (): void {
+    $this->actingAs($this->admin)
+        ->postJson('/api/v1/admin/users', [
+            'name' => 'Aksen',
+            'email' => 'plánner@tas.test',
+            'password' => 'Abcdefghi1',
+            'role' => 'planner',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('email');
+
+    $user = User::factory()->create()->assignRole('planner');
+
+    $this->actingAs($this->admin)
+        ->putJson("/api/v1/admin/users/{$user->id}", [
+            'name' => $user->name,
+            'email' => 'plánner@tas.test',
+            'role' => 'planner',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('email');
+});
+
+it('answers 422, not 500, when the admin sends a non-string email', function (): void {
+    $user = User::factory()->create()->assignRole('planner');
+
+    $this->actingAs($this->admin)
+        ->postJson('/api/v1/admin/users', ['name' => 'X', 'email' => ['a@tas.test'], 'password' => 'Abcdefghi1', 'role' => 'planner'])
+        ->assertUnprocessable()->assertJsonValidationErrorFor('email');
+
+    $this->actingAs($this->admin)
+        ->putJson("/api/v1/admin/users/{$user->id}", ['name' => 'X', 'email' => ['a@tas.test'], 'role' => 'planner'])
+        ->assertUnprocessable()->assertJsonValidationErrorFor('email');
+});
