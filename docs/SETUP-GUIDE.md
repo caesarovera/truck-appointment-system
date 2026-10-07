@@ -217,6 +217,7 @@ Satu berkas `.env` dibaca kedua jalur, dengan pembagian tegas:
 | `APP_KEY`, `APP_*`, `MAIL_*`, `SANCTUM_EXPIRATION`, `TAS_*` | keduanya | dipakai apa adanya |
 | `REVERB_APP_ID/KEY/SECRET` | keduanya | dipakai apa adanya |
 | `REVERB_HOST/PORT/SCHEME` → `VITE_REVERB_*` | **browser** (dibaca Vite saat dev/build) | PHP memakai `reverb:8080` dari compose |
+| `CORS_ALLOWED_ORIGINS` | keduanya (`config/cors.php`) | dipakai apa adanya. **Kosong = tanpa akses lintas-origin** (SPA same-origin). Isi hanya bila SPA di domain terpisah, dipisah koma; jangan `*` |
 
 - **Kunci Reverb dev terisi di `.env.example`** (`100001` / `tas-local-dev-key` / `tas-local-dev-secret`).
   `php artisan reverb:install` **bukan** penggantinya: ia tak mengisi kunci yang sudah ada walau
@@ -732,6 +733,7 @@ UID 1000 (juga pemilik `vendor/` agar volume kosong tak jadi milik root).
 | Cache Laravel | tidak | `config:cache` · `route:cache` · `event:cache` · `view:cache` |
 | `.env` | berkas bind mount | env var / secret platform |
 | Kunci Reverb | nilai dev di `.env.example` | acak, dari secret |
+| `CORS_ALLOWED_ORIGINS` | kosong (same-origin) | domain SPA bila terpisah; jangan `*` |
 
 Volume di produksi hanya untuk data yang harus bertahan (MySQL, Redis), bukan kode. Belum ada
 produksi di proyek ini — backlog di `HANDOVER.md`.

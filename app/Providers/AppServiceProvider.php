@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -57,6 +58,9 @@ class AppServiceProvider extends ServiceProvider
         // Kolom guarded (status/version/booked_count, ADR-0004) yang di-mass-assign
         // harus MELEDAK di dev/test, bukan dibuang diam-diam → bug ketahuan dini.
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
+
+        // Tanpa ini Password::defaults() == min(8) saja. Dipakai Create/UpdateUserRequest.
+        Password::defaults(fn (): Password => Password::min(10)->mixedCase()->numbers());
 
         $this->configureRateLimiters();
     }

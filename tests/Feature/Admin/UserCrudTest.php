@@ -44,7 +44,7 @@ it('creates a user with role', function (): void {
         ->postJson('/api/v1/admin/users', [
             'name' => 'New Planner',
             'email' => 'newplanner@tas.test',
-            'password' => 'password123',
+            'password' => 'Password123x',
             'role' => 'planner',
         ])
         ->assertCreated()
@@ -60,7 +60,7 @@ it('creates gate-officer with terminal assignment', function (): void {
         ->postJson('/api/v1/admin/users', [
             'name' => 'Gate Officer',
             'email' => 'officer@tas.test',
-            'password' => 'password123',
+            'password' => 'Password123x',
             'role' => 'gate-officer',
             'terminal_id' => $terminal->id,
         ])
@@ -75,7 +75,7 @@ it('creates transporter with company assignment', function (): void {
         ->postJson('/api/v1/admin/users', [
             'name' => 'Dispatcher',
             'email' => 'dispatcher@company.test',
-            'password' => 'password123',
+            'password' => 'Password123x',
             'role' => 'transporter',
             'company_id' => $company->id,
         ])
@@ -90,7 +90,7 @@ it('rejects duplicate email on create', function (): void {
         ->postJson('/api/v1/admin/users', [
             'name' => 'X',
             'email' => 'taken@tas.test',
-            'password' => 'password123',
+            'password' => 'Password123x',
             'role' => 'planner',
         ])
         ->assertUnprocessable();
@@ -135,7 +135,7 @@ it('revokes every token of a user when admin changes their password', function (
             'name' => $driver->name,
             'email' => $driver->email,
             'role' => 'driver',
-            'password' => 'password-baru-123',
+            'password' => 'Password-baru-123',
         ])
         ->assertOk();
 
@@ -169,7 +169,7 @@ it('keeps the current token but revokes others when admin changes own password',
             'name' => $this->admin->name,
             'email' => $this->admin->email,
             'role' => 'admin',
-            'password' => 'password-baru-123',
+            'password' => 'Password-baru-123',
         ])
         ->assertOk();
 
@@ -194,4 +194,55 @@ it('refuses to delete own account', function (): void {
     $this->actingAs($this->admin)
         ->deleteJson("/api/v1/admin/users/{$this->admin->id}")
         ->assertUnprocessable();
+});
+
+// Kebijakan password (Password::defaults() di AppServiceProvider): min 10, huruf besar+kecil, angka.
+// Tanpa konfigurasi, Password::defaults() == min:8 → tanpa test ini penggantian `min:8` tak berarti apa-apa.
+dataset('weak passwords', [
+    'terlalu pendek (9)' => 'Abcdefg12',
+    'tanpa huruf besar' => 'abcdefghij12',
+    'tanpa huruf kecil' => 'ABCDEFGHIJ12',
+    'tanpa angka' => 'Abcdefghijkl',
+]);
+
+it('rejects a weak password on create', function (string $password): void {
+    $this->actingAs($this->admin)
+        ->postJson('/api/v1/admin/users', [
+            'name' => 'Weak',
+            'email' => 'weak@tas.test',
+            'password' => $password,
+            'role' => 'planner',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('password');
+
+    $this->assertDatabaseMissing('users', ['email' => 'weak@tas.test']);
+})->with('weak passwords');
+
+it('rejects a weak password on update and keeps the old hash', function (string $password): void {
+    $user = User::factory()->create()->assignRole('planner');
+    $oldHash = $user->password;
+
+    $this->actingAs($this->admin)
+        ->putJson("/api/v1/admin/users/{$user->id}", [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => 'planner',
+            'password' => $password,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('password');
+
+    expect($user->fresh()->password)->toBe($oldHash);
+})->with('weak passwords');
+
+it('accepts a password that meets the policy exactly', function (): void {
+    $this->actingAs($this->admin)
+        ->postJson('/api/v1/admin/users', [
+            'name' => 'Strong',
+            'email' => 'strong@tas.test',
+            'password' => 'Abcdefghi1',
+            'role' => 'planner',
+        ])
+        ->assertCreated();
 });

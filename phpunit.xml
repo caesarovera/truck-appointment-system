@@ -49,6 +49,8 @@
              Lihat komentar di baris DB_DATABASE. -->
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
+        <!-- Nilai `.env` dev (CORS_ALLOWED_ORIGINS boleh diisi) tak boleh mengubah hasil CorsTest. -->
+        <env name="CORS_ALLOWED_ORIGINS" value="" force="true"/>
         <!-- SLICE D1 (ADR-0007): test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
              Alasannya BUKAN kerapian: sqlite tak menerbitkan `SELECT ... FOR UPDATE`, jadi
              test konkurensi (jantung proyek ini) mustahil jujur di atasnya. Lihat

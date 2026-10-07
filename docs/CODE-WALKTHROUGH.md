@@ -873,7 +873,8 @@ Tiga endpoint: `POST /login`, `POST /logout`, `GET /me`.
 ```php
 // app/Actions/Auth/LoginAction.php
 $user = $this->users->findByEmail($data->email);                 // UserRepository, bukan query di controller
-if ($user === null || ! Hash::check($data->password, $user->password)) {
+$hash = $user === null ? $this->dummyHash() : $user->password;   // email tak ada tetap bayar 1 Hash::check
+if (! Hash::check($data->password, $hash) || $user === null) {
     throw ValidationException::withMessages(['email' => [__('auth.failed')]]);  // 422 generik
 }
 $abilities = $user->getAllPermissions()->pluck('name')->all();
@@ -884,6 +885,13 @@ return new IssuedToken($user, $user->createToken($data->deviceName, $abilities)-
   (Sampai 2026-09-16 logika ini ada di controller — dipindah saat audit kontrak layer.)
 - **Pesan error generik** (`auth.failed` di field `email`) — jangan beri tahu apakah
   email terdaftar atau password salah (cegah enumerasi akun).
+- **Hash tiruan (anti timing-oracle, 2026-10-07).** Kalau `Hash::check` dilewati untuk email yang tak
+  ada, respons ±200× lebih cepat (live: 1,5 ms vs 323 ms) dan email terdaftar bisa ditebak lewat waktu.
+  `dummyHash()` = `Hash::make` acak, di-cache `rememberForever` dengan kunci dari `config('hashing')`
+  — dibuat per request malah membuat jalur itu LEBIH LAMBAT. `|| $user === null` tetap ada sebagai
+  pertahanan berlapis. **Batas:** hash user lama tidak di-rehash (login memakai `Hash::check` manual),
+  jadi bila `BCRYPT_ROUNDS` dinaikkan, hash tiruan ber-cost baru sementara user lama masih cost lama
+  (backlog, `HANDOVER.md`). Test memeriksa ARGUMEN hash (bcrypt, cost = konfigurasi), bukan jumlah panggilan.
 - **`Hash::check(plain, $user->password)`** membandingkan password polos dengan hash
   di DB. Tidak pernah mendekripsi (hash satu arah).
 - **`createToken($name, $abilities)`** menerbitkan token Sanctum. `$abilities` =

@@ -6,6 +6,7 @@ namespace App\Http\Requests\V1\Admin;
 
 use App\DataTransferObjects\Admin\UserData;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Password;
 
 final class CreateUserRequest extends FormRequest
 {
@@ -20,7 +21,7 @@ final class CreateUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', Password::defaults()],
             'role' => ['required', 'string', 'in:admin,planner,gate-officer,transporter,driver'],
             'terminal_id' => ['nullable', 'integer', 'exists:terminals,id'],
             'company_id' => ['nullable', 'integer', 'exists:transport_companies,id'],

@@ -13,6 +13,40 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-07` (hardening login & CORS, temuan audit 2026-09-16 a–c) · **[SELESAI] B6 (a)(b)(c).**
+  **(a)** `LoginAction`: email tak terdaftar kini membayar satu `Hash::check` ke hash tiruan ber-cost sama
+  (di-cache per konfigurasi hashing; dibuat per request malah membuat jalur itu lebih LAMBAT).
+  **Live (rounds 12, median 15×):** sebelum known 322,9 ms vs unknown **1,5 ms**; sesudah 181,1 vs 180,4 ms.
+  **(b)** `Password::defaults()` tanpa konfigurasi **sama dengan `min:8`** — mengganti string saja tak
+  menguatkan apa pun; kini didefinisikan di `AppServiceProvider` = min 10 + huruf besar/kecil + angka
+  (tanpa `uncompromised()`: panggilan API luar, gagal tertutup bila jaringan mati). Hanya berlaku saat
+  admin membuat/mengubah password; password lama tak dipaksa ganti. **(c)** `config/cors.php` baru:
+  `allowed_origins` dari env `CORS_ALLOWED_ORIGINS`, default kosong (SPA same-origin, `baseURL '/api/v1'`).
+  Live: origin asing tak menerima `Access-Control-Allow-Origin`. **Jebakan:** dengan SATU origin terdaftar,
+  library CORS memantulkan origin itu di semua respons — test memakai dua origin. 16 test baru (301 Pest),
+  3 mutasi menggigit (M3 pertama salah: sed merusak kurung → "0 assertion" = parse error, bukan bukti).
+  **Review (`qa-reviewer` + `security-reviewer`, Opus) menemukan test (a) LEMAH:** versi pertama hanya
+  menghitung panggilan `Hash::check` (mock `Hash`) — hash tiruan `''` (bcrypt langsung `false`, 1,5 ms)
+  tetap hijau 7/7, terbukti lewat mutasi. Diganti spy hash sungguhan: argumen harus bcrypt ber-cost =
+  konfigurasi + test "cost berubah → dummy dibuat ulang"; 3 mutasi (`''`, cost dikunci 4, kunci cache
+  konstan) kini merah. Pelajaran sama dengan klaim "3 mutasi menggigit" di atas: mutasi harus merusak
+  **nilai yang dijaga**, bukan hanya menghapus panggilan.
+  **Backlog baru dari review (belum dikerjakan, butuh keputusan):** (1) kunci throttle login
+  `AppServiceProvider.php:72-73` tak dinormalisasi — kolasi `utf8mb4_unicode_ci` menyamakan `Planner@`
+  dan `planner@`, jadi tiap variasi kapital dapat kuota 5/mnt sendiri; tak ada limit per-IP (password
+  spraying); `email` berupa array → 500. Melemahkan perlindungan brute-force; sudah ada sebelum slice
+  ini. (2) tak ada rehash saat login (`Hash::needsRehash`): naikkan `BCRYPT_ROUNDS` → hash tiruan cost
+  baru vs user lama cost lama → oracle kembali (terbalik). (3) `DemoSeeder` membuat `admin@tas.test` /
+  `password` tanpa cek environment — `db:seed --force` di produksi = akun admin berpassword lemah
+  (masuk B6). (4) SPA di domain terpisah butuh lebih dari env: `baseURL`, `echo.ts authEndpoint`,
+  `paths` + `broadcasting/*`.
+  **Belum:** (d) CSP/HSTS; `config/reverb.php:85` `allowed_origins ['*']` (WebSocket) — **temuan baru**;
+  form admin `AdminPage.vue` tak menampilkan error validasi 422 (simpan gagal diam-diam) dan tak ada
+  petunjuk aturan password — makin terasa sekarang. **Lingkungan:** stack Docker mati sejak ±2 minggu;
+  `composer test` kena timeout 300 dtk Composer saat 12 worker migrasi bersamaan setelah run terputus
+  (sisa DB `tas_testing_test_N` setengah jadi → "migrations already exists"); pest langsung
+  `--parallel --processes=4` 33 dtk.
+
 - `2026-09-16` (image Docker menumpuk) · **[SELESAI] A + B, pelajaran dicatat di `SETUP-GUIDE §17g`.**
   User melihat 17 baris image PHP @671 MB di Docker Desktop. **Diagnosis [dijalankan]:** `docker system
   df -v` → ke-17 image UNIQUE **0 B** (layer sama, dipakai sekali di disk); asalnya tag per service
@@ -1031,10 +1065,9 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    Reverb acak dari secret. Setup dev **tidak** boleh dibawa ke produksi (`SETUP-GUIDE §17f`).
    Baru relevan saat ada target deploy. Prasyarat B7 (alarm job gagal) sudah selesai 2026-09-16; di
    produksi isi `TAS_ALERT_MAIL` + SMTP sungguhan. **Temuan audit 2026-09-16 yang sengaja ditunda ke
-   sini:** (a) login bisa menebak email terdaftar lewat selisih waktu (`Hash::check` dilewati bila user
-   tak ada; tertahan throttle 5/mnt) — samakan jalur dengan hash dummy; (b) password admin-created hanya
-   `min:8` — pakai `Password::defaults()`; (c) CORS masih default framework (`allowed_origins *`) —
-   batasi ke domain SPA; (d) header keamanan (CSP, HSTS) belum ada.
+   sini:** ~~(a) selisih waktu login~~ ~~(b) password `min:8`~~ ~~(c) CORS `*`~~ — **SELESAI 2026-10-07**
+   (entri Status teratas); tersisa (d) header keamanan (CSP, HSTS) dan `config/reverb.php`
+   `allowed_origins ['*']`.
 **~~B7~~ — SELESAI 2026-09-16.** Keadaan sebelum [dijalankan]: job gagal permanen hanya meninggalkan
    1 baris `ERROR` (tak bisa dibedakan dari percobaan ulang) + baris `failed_jobs` + `FAIL` di konsol
    Horizon. Dipilih **satu listener global `JobFailed`** (bukan isi `failed()` per job, karena kegagalan

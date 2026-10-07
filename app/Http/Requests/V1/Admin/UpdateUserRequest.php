@@ -8,6 +8,7 @@ use App\DataTransferObjects\Admin\UserData;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 final class UpdateUserRequest extends FormRequest
 {
@@ -25,7 +26,7 @@ final class UpdateUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($userId)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', Password::defaults()],
             'role' => ['required', 'string', 'in:admin,planner,gate-officer,transporter,driver'],
             'terminal_id' => ['nullable', 'integer', 'exists:terminals,id'],
             'company_id' => ['nullable', 'integer', 'exists:transport_companies,id'],
