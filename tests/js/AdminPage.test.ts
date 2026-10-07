@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { AxiosError } from 'axios';
 import { ref } from 'vue';
 import type { RoleWithPermissions } from '@/types/api';
 
@@ -14,6 +15,9 @@ const emptyCrud = () => ({
     remove: { mutateAsync: vi.fn(), isPending: ref(false) },
 });
 
+const terminalsCrud = emptyCrud();
+const usersCrud = emptyCrud();
+
 const rolesState = {
     data: ref<{ roles: RoleWithPermissions[]; allPermissions: string[] } | undefined>(undefined),
     isLoading: ref(false),
@@ -21,10 +25,10 @@ const rolesState = {
 const updatePermissions = { mutateAsync: vi.fn(), isPending: ref(false) };
 
 vi.mock('@/composables/useAdmin', () => ({
-    useTerminals: () => emptyCrud(),
+    useTerminals: () => terminalsCrud,
     useAdminGates: () => emptyCrud(),
     useCompanies: () => emptyCrud(),
-    useUsers: () => emptyCrud(),
+    useUsers: () => usersCrud,
     useAdminRefs: () => ({ terminals: emptyList(), companies: emptyList() }),
     useRoles: () => ({ ...rolesState, updatePermissions }),
 }));
@@ -50,6 +54,8 @@ beforeEach(() => {
     rolesState.isLoading.value = false;
     updatePermissions.isPending.value = false;
     vi.clearAllMocks();
+    terminalsCrud.create.mutateAsync.mockReset();
+    usersCrud.create.mutateAsync.mockReset();
 });
 
 describe('AdminPage — Role & Izin', () => {
@@ -107,5 +113,85 @@ describe('AdminPage — Role & Izin', () => {
         await openRolesTab(wrapper);
 
         expect(wrapper.find('[data-testid="role-list"]').exists()).toBe(false);
+    });
+});
+
+// Error simpan (422 dll.) sebelumnya TIDAK tampil: handler submit tak punya catch → rejection tak
+// tertangani, admin melihat form diam saja. Terbukti makin terasa setelah kebijakan password baru.
+function axiosError(status: number, data: unknown): AxiosError {
+    return new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+        status,
+        data,
+        statusText: '',
+        headers: {},
+        config: {} as never,
+    });
+}
+
+async function openTab(wrapper: ReturnType<typeof mountPage>, name: string) {
+    await wrapper.findAll('button').filter((b) => b.text() === name)[0]?.trigger('click');
+}
+
+describe('AdminPage — error simpan', () => {
+    it('shows the first validation message on 422 and keeps what the admin typed', async () => {
+        usersCrud.create.mutateAsync.mockRejectedValue(
+            axiosError(422, { message: 'x', errors: { password: ['The password field must contain at least one uppercase and one lowercase letter.'] } }),
+        );
+        const wrapper = mountPage();
+        await openTab(wrapper, 'users');
+
+        await wrapper.find('input[placeholder="Nama"]').setValue('Budi');
+        await wrapper.find('input[placeholder="Email"]').setValue('budi@tas.test');
+        await wrapper.find('input[placeholder="Password"]').setValue('lemah');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(wrapper.find('[role="alert"]').text()).toContain('uppercase and one lowercase');
+        expect((wrapper.find('input[placeholder="Nama"]').element as HTMLInputElement).value).toBe('Budi');
+    });
+
+    it('clears the form and shows no alert after a successful save', async () => {
+        usersCrud.create.mutateAsync.mockResolvedValue({});
+        const wrapper = mountPage();
+        await openTab(wrapper, 'users');
+
+        await wrapper.find('input[placeholder="Nama"]').setValue('Budi');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+        expect((wrapper.find('input[placeholder="Nama"]').element as HTMLInputElement).value).toBe('');
+    });
+
+    it('shows the API message for non-422 errors and a generic one for non-HTTP errors (other tabs too)', async () => {
+        terminalsCrud.create.mutateAsync.mockRejectedValueOnce(axiosError(409, { message: 'Kode terminal sudah dipakai.' }));
+        const wrapper = mountPage();
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+        expect(wrapper.find('[role="alert"]').text()).toContain('Kode terminal sudah dipakai.');
+
+        terminalsCrud.create.mutateAsync.mockRejectedValueOnce(new Error('network down'));
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+        expect(wrapper.find('[role="alert"]').text()).toContain('Terjadi kesalahan');
+    });
+
+    it('drops a stale error when switching tab', async () => {
+        terminalsCrud.create.mutateAsync.mockRejectedValue(axiosError(409, { message: 'Kode terminal sudah dipakai.' }));
+        const wrapper = mountPage();
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+
+        await openTab(wrapper, 'users');
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+
+    it('tells the admin the password policy on the create-user form', async () => {
+        const wrapper = mountPage();
+        await openTab(wrapper, 'users');
+
+        expect(wrapper.text()).toContain('minimal 10 karakter');
     });
 });

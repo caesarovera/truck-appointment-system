@@ -13,6 +13,18 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-08` (error simpan form admin) · **[SELESAI] backlog review 2026-10-07 butir "form admin diam".**
+  `AdminPage.vue`: keempat handler submit (terminal/gate/company/user) tak punya `catch` → 422 (password
+  lemah, email non-ASCII, kode duplikat) jadi rejection tak tertangani, admin melihat form diam. Kini
+  lewat `save(action, reset)`: sukses → reset form; gagal → `formError` (pola `formError`/`mapError`
+  seperti `MyTrucksPage`; 422 → pesan field pertama, lainnya → `message` API, non-HTTP → generik) di
+  `role="alert"` di bawah tab bar, isian admin dipertahankan, error dibuang saat ganti tab. Petunjuk
+  kebijakan password + email ASCII di form buat-user. **Lingkup sengaja:** hanya SIMPAN; hapus tetap
+  `alert()` lama. 5 Vitest baru (116), 3 mutasi merah (catch tak mengisi error, tanpa reset ganti tab,
+  422 abaikan pesan field), `type-check` + `build` bersih. **CI push sebelumnya (`0bed5ec`) hijau**,
+  dipantau via `gh`. **Pelajaran:** `sed` mengganti `&` di teks pengganti dengan teks yang cocok —
+  merusak sebuah komentar (ketahuan saat dibaca ulang); untuk teks bebas pakai Edit/perl, bukan sed.
+
 - `2026-10-08` (kunci throttle login) · **[SELESAI] backlog (1) dari review 2026-10-07.** Limiter `login`
   kini dua bucket: `email:<huruf-kecil>|ip` 5/mnt dan `ip:` 30/mnt (env `TAS_RL_LOGIN_IP`, baru);
   `email` non-string → `''` (sebelumnya array → 500). **Review keamanan (Opus) menemukan lowercase

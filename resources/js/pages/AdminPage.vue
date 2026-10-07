@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { isAxiosError } from 'axios'
 import { useTerminals, useAdminGates, useCompanies, useUsers, useAdminRefs, useRoles } from '@/composables/useAdmin'
 import type { AdminTerminal, AdminGate, AdminCompany, AdminUser, AdminRole } from '@/types/api'
 import SkeletonRows from '@/components/SkeletonRows.vue'
@@ -8,6 +9,35 @@ import Spinner from '@/components/Spinner.vue'
 
 type Tab = 'terminals' | 'gates' | 'companies' | 'users' | 'roles'
 const activeTab = ref<Tab>('terminals')
+
+// Satu pesan error simpan untuk semua tab form (kunci pola `formError`/`mapError` seperti MyTrucksPage).
+// Sebelumnya handler submit tak punya catch → 422 (mis. password lemah) jadi rejection tak tertangani
+// dan admin melihat form diam saja.
+const formError = ref<string | null>(null)
+watch(activeTab, () => { formError.value = null })
+
+function mapError(e: unknown): string {
+    if (isAxiosError(e)) {
+        const data = e.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined
+        if (e.response?.status === 422) {
+            const first = data?.errors ? Object.values(data.errors)[0]?.[0] : undefined
+            return first ?? data?.message ?? 'Data tidak valid. Periksa isian.'
+        }
+        return data?.message ?? 'Gagal menyimpan. Coba lagi.'
+    }
+    return 'Terjadi kesalahan. Coba lagi.'
+}
+
+// Sukses → reset form; gagal → tampilkan pesan dan pertahankan isian admin.
+async function save(action: () => Promise<unknown>, reset: () => void) {
+    formError.value = null
+    try {
+        await action()
+        reset()
+    } catch (e) {
+        formError.value = mapError(e)
+    }
+}
 
 // ─── Terminals ──────────────────────────────────────────────────────────────
 const { data: terminals, isLoading: loadingTerminals, create: createT, update: updateT, remove: removeT } = useTerminals()
@@ -19,10 +49,11 @@ function tEdit(item: AdminTerminal) {
     tForm.value = { code: item.code, name: item.name }
 }
 function tCancel() { tEditId.value = null; tForm.value = { code: '', name: '' } }
-async function tSubmit() {
-    if (tEditId.value) await updateT.mutateAsync({ id: tEditId.value, ...tForm.value })
-    else await createT.mutateAsync(tForm.value)
-    tCancel()
+function tSubmit() {
+    return save(
+        () => (tEditId.value ? updateT.mutateAsync({ id: tEditId.value, ...tForm.value }) : createT.mutateAsync(tForm.value)),
+        tCancel,
+    )
 }
 const tDeletingId = ref<number | null>(null)
 async function tDelete(id: number) {
@@ -41,10 +72,11 @@ function gEdit(item: AdminGate) {
     gForm.value = { terminal_id: item.terminal_id, code: item.code, name: item.name }
 }
 function gCancel() { gEditId.value = null; gForm.value = { terminal_id: 0, code: '', name: '' } }
-async function gSubmit() {
-    if (gEditId.value) await updateG.mutateAsync({ id: gEditId.value, ...gForm.value })
-    else await createG.mutateAsync(gForm.value)
-    gCancel()
+function gSubmit() {
+    return save(
+        () => (gEditId.value ? updateG.mutateAsync({ id: gEditId.value, ...gForm.value }) : createG.mutateAsync(gForm.value)),
+        gCancel,
+    )
 }
 const gDeletingId = ref<number | null>(null)
 async function gDelete(id: number) {
@@ -62,10 +94,11 @@ function cEdit(item: AdminCompany) {
     cForm.value = { code: item.code, name: item.name }
 }
 function cCancel() { cEditId.value = null; cForm.value = { code: '', name: '' } }
-async function cSubmit() {
-    if (cEditId.value) await updateC.mutateAsync({ id: cEditId.value, ...cForm.value })
-    else await createC.mutateAsync(cForm.value)
-    cCancel()
+function cSubmit() {
+    return save(
+        () => (cEditId.value ? updateC.mutateAsync({ id: cEditId.value, ...cForm.value }) : createC.mutateAsync(cForm.value)),
+        cCancel,
+    )
 }
 const cDeletingId = ref<number | null>(null)
 async function cDelete(id: number) {
@@ -100,12 +133,13 @@ function uCancel() {
     uEditId.value = null
     uForm.value = { name: '', email: '', password: '', role: '' as AdminRole, terminal_id: null, company_id: null }
 }
-async function uSubmit() {
+function uSubmit() {
     const payload = { ...uForm.value }
     if (!payload.password) delete (payload as { password?: string }).password
-    if (uEditId.value) await updateU.mutateAsync({ id: uEditId.value, ...payload })
-    else await createU.mutateAsync(payload as any)
-    uCancel()
+    return save(
+        () => (uEditId.value ? updateU.mutateAsync({ id: uEditId.value, ...payload }) : createU.mutateAsync(payload as any)),
+        uCancel,
+    )
 }
 const uDeletingId = ref<number | null>(null)
 async function uDelete(id: number) {
@@ -157,6 +191,8 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                 @click="activeTab = tab"
             >{{ tab }}</button>
         </div>
+
+        <p v-if="formError" role="alert" class="text-sm text-red-600 bg-red-50 rounded-md p-3 mb-4">{{ formError }}</p>
 
         <!-- ─── Terminals ─────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'terminals'">
@@ -332,6 +368,7 @@ async function saveRolePermissions(roleName: string): Promise<void> {
                     <option :value="null">-- Perusahaan --</option>
                     <option v-for="c in adminCompanies.data.value" :key="c.id" :value="c.id">{{ c.code }} — {{ c.name }}</option>
                 </select>
+                <p v-if="!uEditId" class="col-span-2 text-xs text-slate-500">Password minimal 10 karakter, mengandung huruf besar, huruf kecil, dan angka. Email hanya karakter ASCII.</p>
                 <div class="col-span-2 flex gap-2">
                     <button
                         type="submit"
