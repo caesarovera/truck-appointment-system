@@ -64,6 +64,12 @@ describe('DashboardPage', () => {
         expect(mountPage().text()).toContain('Jadwal Hari Ini');
     });
 
+    it('has a page heading greeting the user', () => {
+        user.value = { name: 'Budi', permissions: [], roles: ['driver'], company_id: null, terminal_id: null };
+
+        expect(mountPage().find('h1').text()).toBe('Selamat datang, Budi');
+    });
+
     it('shows Dashboard Gate only for a gate-officer with a terminal', () => {
         allowed = new Set(['gate.process']);
         user.value = { name: 'Petugas', permissions: [], roles: ['gate-officer'], company_id: null, terminal_id: 3 };

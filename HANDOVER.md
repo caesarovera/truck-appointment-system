@@ -13,6 +13,22 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-30` (akses & error SPA, temuan sweep Playwright) · **[SELESAI]** Sweep 5 persona × 11 rute ×
+  desktop/mobile menemukan: rute SPA tanpa guard role (sopir buka `/admin` → skeleton ±7 dtk lalu
+  "Belum ada terminal"), TanStack me-retry 403 (20 request/12 dtk), URL asing = layar putih. Perbaikan:
+  **`resources/js/router/access.ts`** = satu-satunya aturan akses (`canVisit`), dipakai guard
+  `beforeEach` (→ `/forbidden?from=…`), `AppNav` & kartu `DashboardPage` (dulu aturan sama ditulis 2×);
+  `StatusPage.vue` 403/404 (catch-all di dalam layout — tamu tetap ke login dulu); `shouldRetryQuery`
+  (`api/client.ts`) = 4xx tak di-retry, 5xx/jaringan tetap 3×; dashboard dapat `<h1>`. Guard FE = UX,
+  batas keamanan tetap API. Bukti live (Docker): tiap persona menu == halaman yang bisa dibuka, **0×
+  403** selama sweep; `/tidak-ada` → 404 dgn navbar. 408 tetap di-retry. Vitest 176 (termasuk:
+  tiap nama di `GUARDED_ROUTES` wajib ada di router, jalur `restore()` setelah reload), e2e 8/8
+  (baru `spa-access.spec.ts` — satu-satunya penjaga wiring `vueQueryOptions` di `app.ts`), 7 mutasi
+  menggigit (2 di antaranya lolos sebelum review QA).
+  **Sisa temuan sweep (belum dikerjakan):** (1) pesan auth/validasi masih Inggris (`APP_LOCALE=en`,
+  tak ada `lang/`); (2) `/admin` overflow 73 px di 390 px; (3) TTFB ±0,35 dtk vs 0,12 di §17a — belum
+  diukur ulang; (4) `AdminPage` tak punya state `isError` (5xx tampil "Belum ada …"). Data demo dev
+  di-reseed (`migrate:fresh --seed`) karena slot window tinggal 13–16 Sep.
 - `2026-10-30` (header keamanan + origin Reverb) · **[SELESAI] B6 (d) slice 1/2.** Middleware global
   `SecurityHeaders` (`bootstrap/app.php` **`prepend`**): nosniff, `X-Frame-Options: DENY`,
   `Referrer-Policy: strict-origin-when-cross-origin`, HSTS `max-age` (`TAS_HSTS_MAX_AGE`, default 1 thn,

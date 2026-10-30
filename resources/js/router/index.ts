@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { canVisit, isGuardedRoute } from '@/router/access';
 
 const routes: RouteRecordRaw[] = [
     {
@@ -65,6 +66,20 @@ const routes: RouteRecordRaw[] = [
                 name: 'admin',
                 component: () => import('@/pages/AdminPage.vue'),
             },
+            {
+                path: 'forbidden',
+                name: 'forbidden',
+                component: () => import('@/pages/StatusPage.vue'),
+                props: (route) => ({ code: 403, from: typeof route.query.from === 'string' ? route.query.from : undefined }),
+            },
+            {
+                // Catch-all DI DALAM layout: tamu tetap diarahkan ke login dulu
+                // (requiresAuth diwariskan), URL salah tetap terlihat di address bar.
+                path: ':pathMatch(.*)*',
+                name: 'not-found',
+                component: () => import('@/pages/StatusPage.vue'),
+                props: { code: 404 },
+            },
         ],
     },
 ];
@@ -88,6 +103,12 @@ router.beforeEach(async (to) => {
 
     if (to.meta.guestOnly === true && auth.isAuthenticated) {
         return { name: 'dashboard' };
+    }
+
+    // Halaman di luar hak role → pesan jelas, bukan skeleton lalu "data kosong"
+    // dari query yang 403 (temuan Playwright 2026-10-30).
+    if (isGuardedRoute(to.name) && !canVisit(to.name, auth)) {
+        return { name: 'forbidden', query: { from: to.fullPath } };
     }
 
     return true;

@@ -3,7 +3,7 @@ import { createPinia } from 'pinia';
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import App from '@/App.vue';
 import { router } from '@/router';
-import { setUnauthorizedHandler } from '@/api/client';
+import { setUnauthorizedHandler, vueQueryOptions } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { connectEcho, disconnectEcho } from '@/echo';
 
@@ -12,7 +12,8 @@ const pinia = createPinia();
 
 app.use(pinia);
 app.use(router);
-app.use(VueQueryPlugin);
+// Tanpa retry 4xx — wiring ini dijaga e2e spa-access.spec.ts (app.ts tak ter-impor Vitest).
+app.use(VueQueryPlugin, vueQueryOptions);
 
 // Token kedaluwarsa/dicabut (401) → bersihkan sesi & lempar ke login.
 setUnauthorizedHandler(() => {

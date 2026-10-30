@@ -6,6 +6,7 @@ export const ACCOUNTS = {
     transporter: { email: 'dispatcher@majulog.test', password: 'password' },
     planner: { email: 'planner@tas.test', password: 'password' },
     gateOfficer: { email: 'gate@tas.test', password: 'password' },
+    driver: { email: 'budi@majulog.test', password: 'password' },
 } as const;
 
 export async function login(page: Page, email: string, password: string): Promise<void> {

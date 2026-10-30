@@ -2,20 +2,12 @@
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import AppLogo from '@/components/AppLogo.vue';
+import { canVisit } from '@/router/access';
 
 /**
- * Navbar bersama semua halaman ber-auth. Satu-satunya sumber daftar link:
- * gating per link = permission (bukan nama role) supaya konsisten dengan
- * otorisasi server. Admin punya SEMUA permission (RolePermissionSeeder) tapi
- * TIDAK punya company_id/terminal_id — endpoint /reports, /bookings, /trucks,
- * /gate menolaknya 403 (lihat controller masing-masing: abort_if company_id/
- * terminal_id null). Link-link itu jadi butuh guard identitas tambahan, bukan
- * cuma permission, supaya tak menampilkan link yang pasti gagal saat diklik.
- *
- * /today (Jadwal Hari Ini) beda: backend TAK 403 admin (todayForDriver(admin.id,…)
- * cuma balikin list kosong — admin tak pernah jadi driver_id appointment mana pun),
- * jadi tak ada identitas company/terminal yang bisa dicek. Satu-satunya link yang
- * memang butuh hasRole('driver') di sini — sengaja, bukan pelanggaran aturan di atas.
+ * Navbar bersama semua halaman ber-auth. Link tampil = canVisit() — aturan yang
+ * SAMA dengan guard router (router/access.ts, alasan permission + identitas ada
+ * di sana), jadi link yang tampil pasti bisa dibuka & sebaliknya.
  */
 const auth = useAuthStore();
 const router = useRouter();
@@ -37,11 +29,11 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
         </RouterLink>
 
         <nav class="flex items-center gap-1 flex-wrap" data-testid="nav-links">
-            <RouterLink v-if="auth.can('slot.read')" to="/slots" :class="linkClass" :exact-active-class="activeClass">
+            <RouterLink v-if="canVisit('slots', auth)" to="/slots" :class="linkClass" :exact-active-class="activeClass">
                 Slot
             </RouterLink>
             <RouterLink
-                v-if="auth.can('appointment.write') && auth.user?.company_id != null"
+                v-if="canVisit('bookings', auth)"
                 to="/bookings"
                 :class="linkClass"
                 :exact-active-class="activeClass"
@@ -49,7 +41,7 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
                 Booking Saya
             </RouterLink>
             <RouterLink
-                v-if="auth.can('fleet.manage') && auth.user?.company_id != null"
+                v-if="canVisit('trucks', auth)"
                 to="/trucks"
                 :class="linkClass"
                 :exact-active-class="activeClass"
@@ -57,7 +49,7 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
                 Armada
             </RouterLink>
             <RouterLink
-                v-if="auth.can('report.read') && auth.user?.company_id != null"
+                v-if="canVisit('reports', auth)"
                 to="/reports"
                 :class="linkClass"
                 :exact-active-class="activeClass"
@@ -65,7 +57,7 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
                 Laporan
             </RouterLink>
             <RouterLink
-                v-if="auth.can('appointment.read.self') && auth.hasRole('driver')"
+                v-if="canVisit('today', auth)"
                 to="/today"
                 :class="linkClass"
                 :exact-active-class="activeClass"
@@ -73,25 +65,25 @@ const activeClass = '!text-white font-medium bg-white/10 ring-1 ring-inset ring-
                 Jadwal Hari Ini
             </RouterLink>
             <RouterLink
-                v-if="auth.can('gate.process') && auth.user?.terminal_id != null"
+                v-if="canVisit('gate', auth)"
                 to="/gate"
                 :class="linkClass"
                 :exact-active-class="activeClass"
             >
                 Gate
             </RouterLink>
-            <RouterLink v-if="auth.can('slot.manage')" to="/planner" :class="linkClass" :exact-active-class="activeClass">
+            <RouterLink v-if="canVisit('planner', auth)" to="/planner" :class="linkClass" :exact-active-class="activeClass">
                 Kelola Slot
             </RouterLink>
             <RouterLink
-                v-if="auth.can('slot.manage')"
+                v-if="canVisit('gate-history', auth)"
                 to="/planner/gate-history"
                 :class="linkClass"
                 :exact-active-class="activeClass"
             >
                 Riwayat Gate
             </RouterLink>
-            <RouterLink v-if="auth.can('terminal.manage')" to="/admin" :class="linkClass" :exact-active-class="activeClass">
+            <RouterLink v-if="canVisit('admin', auth)" to="/admin" :class="linkClass" :exact-active-class="activeClass">
                 Master Data
             </RouterLink>
         </nav>
