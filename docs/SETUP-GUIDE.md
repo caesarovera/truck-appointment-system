@@ -138,6 +138,7 @@ docker compose down                       # matikan (data TETAP di volume)
 | `docker/php/Dockerfile` | `docker compose build && docker compose up -d` | image `tas-php:dev` dibangun ulang (hanya lewat `app`, §17g); versi lama jadi `<none>` → `docker image prune -f --filter label=com.docker.compose.project=tas` |
 | `docker/mysql/init/` | `docker compose down -v && docker compose up -d` (**HAPUS DATA**) | skrip init hanya jalan saat volume kosong |
 | `package.json` / `package-lock.json` | `npm install` | frontend native |
+| Rilis keamanan PHP / MySQL / Redis (atau tiap ±bulan) | backup DB (`mysqldump`), `docker compose pull mysql redis` → `docker compose build --pull --no-cache app` → `docker compose up -d --wait --force-recreate` → cek versi (`php -v`, `mysqld --version`, `redis-server --version`) + `composer test` | tag image tak di-pin ke patch (`php:8.3-cli`, `mysql:8.4`, `redis:7-alpine`) — tapi image lokal **tak ikut naik sendiri**; tanpa ini container tetap di versi rentan (2026-10-30: PHP 8.3.33, Redis 7.4.5). MySQL naik patch di volume yang sama otomatis (`Server upgrade from …`). Audit dependensi: `docker compose exec app composer audit` · `npm audit` (tanpa `--omit=dev`) |
 
 > **`composer dev` = NATIVE ONLY.** Ia menjalankan `php artisan serve` + `queue:listen` di Windows
 > dengan SQLite. **Jangan** dinyalakan bersamaan container: port 8000 dipegang Docker, `serve`

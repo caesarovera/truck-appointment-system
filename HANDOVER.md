@@ -13,6 +13,25 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-30` (bump keamanan seluruh stack) · **[SELESAI]** dipicu rilis keamanan PHP 21 Okt + advisory
+  Laravel. **Runtime:** PHP 8.3.33 → **8.3.36** (CVE-2026-109618/109619, RCE), MySQL 8.4.11 → **8.4.13**
+  (CPU Okt; upgrade in-place volume sama, backup dulu), Redis 7.4.5 → **7.4.12** (7.4.9/7.4.10/7.4.12
+  terlewat; 7.4.10 = perbaikan RESTORE shared-NACK = CVE-2026-66373 — tetap seri 7, tak perlu Redis 8),
+  phpredis → 6.3.0 (pecl tak di-pin). Penyebab: tag image mengambang tapi image lokal tak di-pull ulang
+  6 minggu–16 bulan → langkah rutin ditambahkan di `SETUP-GUIDE §3`. **Composer** (update terarah ke paket
+  rentan `--with-dependencies`, 58 paket minor/patch, tanpa major & tanpa tool dev): laravel/framework
+  12.62 → **12.70.2** (CVE-2026-114509 TokenGuard bypass — **tak terjangkau di sini**, guard = session +
+  Sanctum; CVE-2026-114508; XSS debug page), symfony/* 7.4.22 (http-foundation ReDoS, yaml, mime header
+  injection), league/commonmark 2.10.6, flysystem 3.36 → `composer audit` bersih. **npm** (tetap major sama,
+  pin vite 6 dihormati): vue 3.5.44, vite 6.4.5, axios 1.21.0, vitest 4.1.12, concurrently 9.2.5 (+ transitif
+  follow-redirects/shell-quote/undici/source-map-js) → `npm audit` 0. **Jebakan:** `npm install vitest@4.1.12`
+  gagal `Cannot read properties of null (reading 'edgesOut')` (bug arborist npm 11 di optional peer vitest);
+  dipasang sekali dengan `--legacy-peer-deps`, lalu dibuktikan `npm ci` polos (jalur CI) sukses. Audit
+  awal `npm audit --omit=dev` menyembunyikan 4 temuan dev (axios ada di devDependencies). **Gerbang:**
+  container 310 lolos (0 skip, MySQL + Redis nyata), native 307 + 3 skip Redis, PHPStan 0, Pint bersih,
+  Vitest 116, type-check, build. Belum: CI setelah push; PHP laragon Windows (8.3.31, hanya CLI test/IDE)
+  belum dinaikkan — urusan mesin user.
+
 - `2026-10-08` (error simpan form admin) · **[SELESAI] backlog review 2026-10-07 butir "form admin diam".**
   `AdminPage.vue`: keempat handler submit (terminal/gate/company/user) tak punya `catch` → 422 (password
   lemah, email non-ASCII, kode duplikat) jadi rejection tak tertangani, admin melihat form diam. Kini
