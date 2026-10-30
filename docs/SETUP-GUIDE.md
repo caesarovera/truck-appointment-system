@@ -48,7 +48,8 @@
 | Node.js 22 + npm | **wajib** | Vite (SPA), Vitest, vue-tsc, build — frontend tetap native | `node -v` |
 | PHP 8.3 + Composer (Windows) | opsional | autocomplete IDE, PHPStan di host, `composer test` native, e2e — lihat §4 | `php -v` |
 
-Teruji di: Windows 11 + Docker Desktop (Compose v5.5), Node 22, PHP 8.3.31 (laragon).
+Teruji di: Windows 11 + Docker Desktop (Compose v5.5), Node 22, PHP 8.3.31 (laragon). Container
+(2026-10-30): PHP 8.3.36 · MySQL 8.4.13 · Redis 7.4.12 — cek ulang & naikkan lewat §3 "rilis keamanan".
 
 ---
 
@@ -451,6 +452,8 @@ Test #2-lah gerbang yang sesungguhnya. **Jangan hapus #2.**
 | `Unknown database 'tas_testing'` | volume MySQL dibuat sebelum skrip init | `docker compose down -v && docker compose up -d` (**hapus data**) |
 | `Access denied for user 'root'` | password tak cocok | samakan `DB_ROOT_PASSWORD` (default `secret`) |
 | Test konkurensi: 0 pemenang | anak proses gagal boot/konek, bukan bug lock | baca "Hasil mentah" di pesan gagalnya |
+| `npm install`/`npm audit fix` gagal `Cannot read properties of null (reading 'edgesOut')` | bug arborist npm 11 saat menyelesaikan optional peer (terjadi pada `vitest`, 2026-10-30) | pasang paket itu sendirian dengan `--legacy-peer-deps`, lalu buktikan `npm ci` polos sukses (jalur CI) |
+| Container masih versi PHP/MySQL/Redis lama padahal patch keamanan sudah rilis | image lokal tak di-pull ulang (tag tak di-pin ke patch) | langkah "rilis keamanan" di §3 |
 | Log membingungkan | container menulis log harian `laravel-YYYY-MM-DD.log` (`LOG_STACK=daily` di compose, 14 hari); jalur native tetap `laravel.log` (`.env`) — keduanya di folder bind mount yang sama | lihat file sesuai jalur, atau `docker compose logs` |
 
 ### PHP / PHPStan (masih berlaku, dari pembangunan foundation)
