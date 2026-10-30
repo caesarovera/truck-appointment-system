@@ -29,8 +29,10 @@
   dipasang sekali dengan `--legacy-peer-deps`, lalu dibuktikan `npm ci` polos (jalur CI) sukses. Audit
   awal `npm audit --omit=dev` menyembunyikan 4 temuan dev (axios ada di devDependencies). **Gerbang:**
   container 310 lolos (0 skip, MySQL + Redis nyata), native 307 + 3 skip Redis, PHPStan 0, Pint bersih,
-  Vitest 116, type-check, build. Belum: CI setelah push; PHP laragon Windows (8.3.31, hanya CLI test/IDE)
-  belum dinaikkan — urusan mesin user.
+  Vitest 116, type-check, build. **CI `98b14b3` hijau** (dipantau via `gh`; runner ikut PHP 8.3.36, Pest
+  310). Belum: PHP laragon Windows (8.3.31, hanya CLI test/IDE) — urusan mesin user. **Anotasi CI baru
+  (belum ditindak):** label `ubuntu-latest` bermigrasi ke Ubuntu 26 sejak 19 Okt 2026 (actions/runner-images#14748)
+  — bila suatu saat job merah tanpa perubahan kode, cek ini dulu.
 
 - `2026-10-08` (error simpan form admin) · **[SELESAI] backlog review 2026-10-07 butir "form admin diam".**
   `AdminPage.vue`: keempat handler submit (terminal/gate/company/user) tak punya `catch` → 422 (password
@@ -1046,8 +1048,8 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 "setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
 `reverb:start` native bersamaan stack.
 
-**2. CI `2e4f1e2` — hijau tanpa anotasi, dicek agen sendiri via `gh` 2026-09-16** (kedua job; commit
-dokumen sesudahnya dipantau dengan cara yang sama). Sejak hari itu `gh`
+**2. CI `98b14b3` — hijau, dicek agen sendiri via `gh` 2026-10-30** (kedua job, setelah bump keamanan
+stack; satu anotasi informatif migrasi `ubuntu-latest` → Ubuntu 26, lihat entri Status 2026-10-30). Sejak hari itu `gh`
 terpasang & login (akun `caesarovera`, scope `repo`) — **setelah push, pantau sendiri**, jangan minta
 user membuka tab Actions: `gh run list --branch main --limit 3`, `gh run watch <id> --exit-status`,
 `gh run view <id> --log-failed`. Shell yang dibuka sebelum instalasi belum mengenal PATH-nya → pakai
