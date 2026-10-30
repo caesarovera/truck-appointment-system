@@ -157,7 +157,7 @@ api/          fungsi fetch tipis (axios) — buka bungkus `data`
 composables/  state server via TanStack Query (useQuery/useMutation)
 pages/ + components/   render + panggil composable (tanpa axios langsung)
 stores/       Pinia (khusus state auth: token+user)
-router/       Vue Router + guard
+router/       Vue Router + guard (access.ts = satu sumber aturan akses rute, dipakai guard & navbar)
 ```
 
 Detail: `docs/FRONTEND.md`.

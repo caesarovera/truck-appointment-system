@@ -1069,10 +1069,10 @@ membaca kode. **Semua FIXED 2026-09-14** (detail & bukti merah→hijau di entri 
   sementara sistemnya salah.
 
 ## Sedang dikerjakan
-- (kosong) — **sesi 2026-09-16 selesai** (CI merah diperbaiki, B8, B7, `settings.local.json` dirapikan,
-  lalu audit menyeluruh + 10 perbaikan), semua di-commit & di-push. Gerbang: **285 Pest / 761 assert** di
-  container, native 282 + 3 skip, Vitest 111, e2e 5/5, PHPStan lvl 8, Pint, `composer audit` & `npm audit`
-  bersih, **CI hijau** (lihat MULAI SESI butir 2).
+- (kosong) — **sesi 2026-10-30 selesai** (bump keamanan stack, B6 d slice 1/2 header + origin Reverb,
+  sweep Playwright + slice akses & error SPA), semua di-commit & di-push. Gerbang: **320 Pest** di
+  container, native 317 + 3 skip, **Vitest 176**, **e2e 8/8**, PHPStan lvl 8, Pint, `composer audit` &
+  `npm audit` bersih (lihat MULAI SESI butir 2 untuk CI).
 
 ### ▶️ MULAI SESI BERIKUTNYA DARI SINI
 
@@ -1086,17 +1086,22 @@ berubah sejak sesi terakhir → `docker compose run --rm --no-deps app composer 
 "setelah mengubah X": `SETUP-GUIDE §3`. **Jangan** menyalakan `composer dev` / `artisan serve` /
 `reverb:start` native bersamaan stack.
 
-**2. CI `98b14b3` — hijau, dicek agen sendiri via `gh` 2026-10-30** (kedua job, setelah bump keamanan
-stack; satu anotasi informatif migrasi `ubuntu-latest` → Ubuntu 26, lihat entri Status 2026-10-30). Sejak hari itu `gh`
+**2. CI `d5eb68c` (slice akses & error SPA) — hijau, dicek agen sendiri via `gh` 2026-10-31** (kedua
+job). Run sempat tertahan `queued` ±6 mnt & API `gh` membalas HTTP 502 — gangguan GitHub, bukan
+proyek: bila `gh run watch` gagal 502, poll `gh run view <id> --json status,conclusion`. Anotasi
+informatif migrasi `ubuntu-latest` → Ubuntu 26 masih ada (entri Status 2026-10-30). Sejak 2026-09-16 `gh`
 terpasang & login (akun `caesarovera`, scope `repo`) — **setelah push, pantau sendiri**, jangan minta
 user membuka tab Actions: `gh run list --branch main --limit 3`, `gh run watch <id> --exit-status`,
 `gh run view <id> --log-failed`. Shell yang dibuka sebelum instalasi belum mengenal PATH-nya → pakai
 `"C:\Program Files\GitHub CLI\gh.exe"` atau buka terminal baru. (Riwayat sebelum `gh`: D1 `4ea097b`,
 D2′ `3e1f0c2`, D3′ `8319cf6`, `4f5d6ad` — dikonfirmasi user lewat tab Actions.)
 
-**3. Pekerjaan tersisa:** tak ada slice aktif. 2026-09-15 menutup N1/B4/N2/B5; 2026-09-16 menutup B8 &
-B7. Sisa Backlog (B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6 image produksi) semuanya
-**menunggu keputusan user** — tak ada kandidat yang diusulkan agen.
+**3. Pekerjaan tersisa:** tak ada slice aktif. Urutan yang disarankan agen (2026-10-30, disetujui user
+untuk butir pertama yang kini selesai): **(a) sisa temuan sweep Playwright** — pesan auth/validasi masih
+Inggris (`APP_LOCALE=en`, tak ada `lang/`; tulis `lang/id` sendiri, cek test yang meng-assert teks
+Inggris), `/admin` overflow 73 px di lebar 390 px, `AdminPage` tanpa state `isError` (5xx tampil "Belum
+ada …"), TTFB ±0,35 dtk vs 0,12 di §17a (ukur ulang dulu); **(b) B6 (d) slice 2: CSP**; lalu Backlog
+B1 token abilities, B2 perluasan e2e, B3 TOS sungguhan, B6 image produksi — **menunggu keputusan user**.
 
 **4. Catatan mesin:**
 - Berkas sisa `php.ini.bak-pre-redis-20260912` di folder PHP laragon aman dihapus.
@@ -1136,7 +1141,8 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    **Alasan tambahan (2026-09-15):** login menyalin *semua permission* ke token. Menegakkan abilities
    dalam bentuk itu justru **memburuk** — permission yang dicabut admin tetap hidup di token s/d 12 jam,
    padahal kini Spatie mengecek langsung tiap request. Kalau dikerjakan: scope kasar, bukan salinan.
-**B2. Perluasan e2e** — belum ada spec untuk admin, utilisasi planner, no-show, QR. E2E juga masih
+**B2. Perluasan e2e** — sejak 2026-10-30 ada `spa-access.spec.ts` (guard akses, 404, tanpa retry 4xx;
+   6 spec / 8 test). Masih belum ada spec untuk admin, utilisasi planner, no-show, QR. E2E juga masih
    lokal-only & jalur native (belum di CI). Keputusan biaya, bukan kelupaan (`SETUP-GUIDE §15`).
 **B3. Swap gateway TOS** (`LoggingGateEventGateway` → integrasi TOS sungguhan) — terikat spek API
    eksternal yang belum ada di tangan. **Catatan desain (2026-09-15, dibaca):** gate-in/out yang no-op

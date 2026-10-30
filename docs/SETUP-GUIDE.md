@@ -625,9 +625,11 @@ menyentuh data dev.
 
 ### 15c. Cakupan saat ini
 
-5 spec (`tests/e2e/*.spec.ts`): `booking-happy-path`, `booking-errors` (kontainer duplikat → 409
-tampil di UI), `gate-in-out` (planner buka window "sekarang ±" → booking → gate-in → gate-out),
-`reschedule-cancel` (2 test). Belum ada spec untuk admin/utilisasi planner/no-show/QR. `data-testid`
+6 spec / 8 test (`tests/e2e/*.spec.ts`): `booking-happy-path`, `booking-errors` (kontainer duplikat →
+409 tampil di UI), `gate-in-out` (planner buka window "sekarang ±" → booking → gate-in → gate-out),
+`reschedule-cancel` (2 test), `spa-access` (3 test: sopir buka `/admin` → halaman 403, URL asing → 404,
+query 403 tak di-retry — satu-satunya penjaga wiring `vueQueryOptions` di `app.ts`, lihat
+`docs/FRONTEND.md §2`). Belum ada spec untuk admin/utilisasi planner/no-show/QR. `data-testid`
 dipakai: `login-*` (`LoginPage.vue`), `booking-*` (`BookingForm.vue`),
 `slot-card`/`book-button`/`booking-success` (`SlotAvailabilityPage.vue`),
 `booking-row`/`reschedule-*`/`cancel-*`/`confirm-cancel` (`MyBookingsPage.vue`, `RescheduleDialog.vue`),

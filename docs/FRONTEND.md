@@ -58,6 +58,14 @@ response menangkap **401** → hapus token + panggil hook `onUnauthorized` (di-s
 > **Kenapa hook, bukan langsung router?** Sama alasan: hindari client mengimpor router/
 > store. `app.ts` yang menyuntik perilakunya → client tetap bebas dependensi.
 
+**Kebijakan retry query — `shouldRetryQuery` + `vueQueryOptions`** (2026-10-30). Default
+TanStack mengulang **semua** error 3× dengan backoff 1/2/4 dtk — termasuk 403 role, sehingga
+halaman terlarang tampil skeleton ±7 dtk (20 request 403/12 dtk di sweep). Kini 4xx **tak**
+diulang (jawabannya tak akan berubah), kecuali **408**; 5xx & jaringan putus tetap 3×.
+Mutation tak terpengaruh (default retry-nya memang 0). Opsi ada di `client.ts`, bukan
+inline di `app.ts`, supaya bisa diuji Vitest; wiring-nya di `app.ts` dijaga e2e
+`spa-access.spec.ts`.
+
 ### `stores/auth.ts` — Pinia
 `login` (POST /login → simpan token+user), `logout` (POST /logout lalu `clearSession`),
 `fetchMe`/`restore` (pulihkan sesi saat reload bila ada token tapi user kosong), serta
@@ -70,23 +78,31 @@ roles`. Bentuk respons berbeda ditangani: `/login` **datar** (`{token,user}`),
 > pengganti otorisasi server — server tetap menegakkan; UI hanya menyembunyikan yang
 > pasti ditolak (UX).
 
-### `router/index.ts` — guard + layout bersama
-`beforeEach`: bila ada token tapi user belum dimuat → `auth.restore()` (ambil /me);
-rute `requiresAuth` tanpa auth → lempar ke `/login?redirect=`; rute `guestOnly` saat
-sudah login → ke dashboard. Komponen halaman di-`import()` lazy (code-split per rute).
+### `router/index.ts` + `router/access.ts` — guard + layout bersama
+`beforeEach`, berurutan: (1) ada token tapi user belum dimuat → `auth.restore()` (ambil
+/me; gagal → sesi dibersihkan); (2) rute `requiresAuth` tanpa auth → `/login?redirect=`;
+(3) rute `guestOnly` saat sudah login → dashboard; (4) **rute di luar hak user →
+`/forbidden?from=<path>`** (`canVisit`, lihat bawah). Komponen halaman di-`import()` lazy
+(code-split per rute).
 
 Semua halaman ber-auth adalah **children** dari satu parent route `/` ber-komponen
 `components/AppLayout.vue` (= `AppNav` + `RouterView`). `requiresAuth` cukup ditaruh
 di parent — Vue Router **menggabungkan meta parent ke child**, jadi tiap halaman baru
-otomatis terlindungi tanpa mengulang meta. `AppNav` = satu-satunya sumber daftar link
-(gating per **permission**, bukan nama role — cermin otorisasi server). Beberapa link
-butuh guard identitas tambahan karena admin punya SEMUA permission tapi tak punya
-`company_id`/`terminal_id` — endpoint di baliknya 403 tanpa itu: `/reports`/`/bookings`/
-`/trucks` cek `company_id`, `/gate` cek `terminal_id`. `/today` beda lagi — backend-nya
-tak 403 admin (list kosong, bukan error), jadi satu-satunya link yang gating tambahannya
-`hasRole('driver')`, bukan cek identitas (2026-08-13, ditemukan lewat laporan user
-langsung: admin bisa buka 4 menu operasional itu dan semuanya gagal/membingungkan).
-Halaman tidak lagi punya link "← Dashboard" sendiri.
+otomatis terlindungi tanpa mengulang meta. Dua child khusus memakai
+`pages/StatusPage.vue` (prop `code`): `forbidden` (403) dan catch-all
+`:pathMatch(.*)*` → `not-found` (404, URL salah tetap di address bar). Catch-all sengaja
+**di dalam** layout: tamu yang membuka URL asing tetap diarahkan ke login dulu.
+
+**`router/access.ts` = satu-satunya sumber aturan akses** (`canVisit(route, auth)`),
+dipakai **guard router, `AppNav`, dan kartu `DashboardPage`** — link yang tampil pasti
+bisa dibuka & sebaliknya. Gating per **permission**, bukan nama role (cermin otorisasi
+server), plus guard identitas karena admin punya SEMUA permission tapi tak punya
+`company_id`/`terminal_id` (endpoint di baliknya 403 tanpa itu). `/today` satu-satunya
+yang memakai `hasRole('driver')` — backend-nya tak 403 admin, cuma list kosong. Tabel
+lengkap: §6. Guard ini **UX, bukan batas keamanan** — API tetap menolak sendiri.
+Rute baru ber-role → tambah ke `RULES` di `access.ts`; test memastikan tiap nama di
+`GUARDED_ROUTES` benar-benar ada di router (nama salah ketik = guard mati diam-diam).
+Halaman tidak punya link "← Dashboard" sendiri.
 
 **Logo brand — `components/AppLogo.vue`** (2026-08-14): glyph jangkar (anchor) dulu
 diduplikasi manual di `AppNav` + 2 tempat di `LoginPage` — kini 1 komponen dgn 3 varian
@@ -97,7 +113,7 @@ disamakan manual. `favicon.ico` sebelumnya **0 byte** (placeholder Laravel defau
 pernah diisi) — kini diisi via GD (`ext-gd`, sudah terpasang sejak slice QR).
 
 ### `app.ts` — bootstrap
-Pasang Pinia, Router, **VueQueryPlugin**, lalu wiring hook 401 (`setUnauthorizedHandler`
+Pasang Pinia, Router, **VueQueryPlugin** (dengan `vueQueryOptions` — tanpa retry 4xx), lalu wiring hook 401 (`setUnauthorizedHandler`
 → clearSession + push login). Shell HTML: `resources/views/app.blade.php` + catch-all
 `routes/web.php` (`^(?!api).*$`) → semua path non-API mengembalikan SPA. **Siklus Echo**:
 `watch(auth.isAuthenticated)` → `connectEcho()` saat login/restore, `disconnectEcho()` saat
@@ -296,6 +312,13 @@ vi.mock('@/composables/useSlotAvailability', () => ({ useSlotAvailability: () =>
 // mutation di-mock: { mutateAsync: vi.fn(), isPending: ref(false) }
 ```
 
+**Router guard** (`router.test.ts`) — lapis ketiga, sengaja **tanpa mock**: router & Pinia
+sungguhan, user diisi langsung ke store (`auth.token`/`auth.user`) supaya `restore()` tak
+memanggil jaringan; jalur reload diuji dengan `vi.spyOn(api, 'get')` (bukan spy
+`fetchMe` — `restore()` memanggil closure internal store, spy pada properti store tak
+kena). `app.ts` tak pernah di-impor Vitest (entry ber-efek samping) → wiring-nya dijaga
+e2e (`tests/e2e/spa-access.spec.ts`).
+
 Jebakan yang sudah ditemukan & dicatat:
 - **Stub komponen anak** lewat `global.stubs` (`{ RouterLink: true, BookingForm: true,
   RescheduleDialog: true }`) → uji halaman tanpa memuat anaknya. Stub muncul sebagai
@@ -316,27 +339,26 @@ Jebakan yang sudah ditemukan & dicatat:
 
 Rute (semua `requiresAuth` kecuali `/login`): `/login`, `/` (dashboard), `/slots`,
 `/bookings`, `/trucks`, `/today`, `/gate`, `/planner`, `/planner/gate-history`, `/reports`,
-`/admin`.
+`/admin`, plus `/forbidden` (403) dan catch-all (404) — §2.
 
-Navigasi lewat **dua tempat sekaligus**: kartu link di Dashboard (pintu masuk besar)
-**dan** `AppNav` (navbar lintas-halaman, §4). Keduanya harus gating identik — 2026-08-13
-ketahuan (dilaporkan user, dua kali di sesi yang sama) keduanya sempat **tak identik**:
-`AppNav` sudah dibetulkan duluan lalu `DashboardPage` menyusul dengan pola yang sama.
-Gating **bukan cuma** `auth.can(perm)` — admin punya SEMUA permission (`RolePermissionSeeder`)
-tapi tak punya `company_id`/`terminal_id`/role `driver`, jadi 4 link butuh guard identitas
-tambahan supaya tak tampil untuk admin walau endpoint di baliknya pasti 403/kosong:
+Navigasi lewat kartu link di Dashboard (pintu masuk besar) **dan** `AppNav` (navbar
+lintas-halaman); keduanya — dan guard router — membaca aturan yang sama dari
+`router/access.ts` (`RULES`). Gating **bukan cuma** `auth.can(perm)` — admin punya SEMUA
+permission (`RolePermissionSeeder`) tapi tak punya `company_id`/`terminal_id`/role
+`driver`, jadi 5 rute butuh guard tambahan supaya admin tak melihat/membuka halaman yang
+endpoint-nya pasti 403/kosong. Dijaga `tests/js/access.test.ts` (tabel 5 persona × 9 rute):
 
-| Link | Izin | Guard tambahan | Persona |
+| Rute · label | Izin | Guard tambahan | Persona |
 |------|------|-----------------|---------|
-| Ketersediaan Slot | `slot.read` | — | transporter/planner/gate-officer |
-| Booking Saya | `appointment.write` | `company_id != null` | transporter |
-| Armada Truk | `fleet.manage` | `company_id != null` | transporter |
-| Laporan Perusahaan | `report.read` | `company_id != null` | transporter |
-| Jadwal Hari Ini | `appointment.read.self` | `hasRole('driver')` | driver |
-| Dashboard Gate | `gate.process` | `terminal_id != null` | gate-officer |
-| Kelola Slot | `slot.manage` | — | planner |
-| Riwayat Gate | `slot.manage` | — | planner |
-| Master Data | `terminal.manage` | — | admin |
+| `/slots` · Ketersediaan Slot | `slot.read` | — | admin/planner/gate-officer/transporter |
+| `/bookings` · Booking Saya | `appointment.write` | `company_id != null` | transporter |
+| `/trucks` · Armada Truk | `fleet.manage` | `company_id != null` | transporter |
+| `/reports` · Laporan Perusahaan | `report.read` | `company_id != null` | transporter |
+| `/today` · Jadwal Hari Ini | `appointment.read.self` | `hasRole('driver')` | driver |
+| `/gate` · Dashboard Gate | `gate.process` | `terminal_id != null` | gate-officer |
+| `/planner` · Kelola Slot | `slot.manage` | — | admin/planner |
+| `/planner/gate-history` · Riwayat Gate | `slot.manage` | — | admin/planner |
+| `/admin` · Master Data | `terminal.manage` | — | admin |
 
 > **Layout/nav bersama sudah ada** (2026-07-08): `AppLayout` + `AppNav` sebagai parent
 > route — lihat §2 router. Kartu-kartu Dashboard tetap dipertahankan sebagai pintu masuk
