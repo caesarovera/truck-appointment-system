@@ -13,6 +13,28 @@
 
 ### 🐳 Era Docker (ADR-0007) — entri di bawah judul ini ada DI ATAS batas pra-Docker
 
+- `2026-10-30` (header keamanan + origin Reverb) · **[SELESAI] B6 (d) slice 1/2.** Middleware global
+  `SecurityHeaders` (`bootstrap/app.php` **`prepend`**): nosniff, `X-Frame-Options: DENY`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, HSTS `max-age` (`TAS_HSTS_MAX_AGE`, default 1 thn,
+  0 = mati) **hanya bila `isSecure()`**, tanpa includeSubDomains/preload. `config/reverb.php`
+  `allowed_origins`: `['*']` → `REVERB_ALLOWED_ORIGINS` (host dipisah koma) atau default **host `APP_URL`**
+  (opsi A dipilih user); tanpa host → `[]` (gagal tertutup); entri ber-`*` dibuang kecuali awalan `*.`
+  utuh. **Review keamanan (Opus) menemukan 2, diverifikasi live & diperbaiki sebelum commit:** (1) `append`
+  = paling dalam → `GET /%FF` 400 & preflight `OPTIONS` 204 lolos tanpa header (lahir di middleware
+  bawaan) → `prepend`; (2) `REVERB_ALLOWED_ORIGINS=*` membuka semua origin lagi (`in_array('*')` di
+  Reverb) dan `*example.com` cocok `evilexample.com` (`Str::is`) → difilter. Sisa (dicatat, tak
+  diperbaiki): file statis `/build/*` & respons HTTP Reverb :8080 tak lewat Laravel → nginx produksi wajib
+  memasang header setara (B6). Fakta yang menentukan bentuknya: Reverb
+  mencocokkan **host saja** (`parse_url` → `Str::is`, `Protocols/Pusher/Server::verifyOrigin`), jadi
+  `localhost:5173` & `:8000` sama-sama lolos. `SecurityHeadersTest` 10 test (header di 401, SPA shell,
+  400 path & preflight; HSTS hanya HTTPS / 0 mati; origin default/daftar/wildcard/gagal-tertutup) +
+  `phpunit.xml` force `REVERB_ALLOWED_ORIGINS=""`; 5 mutasi merah (tanpa middleware, `prepend`→`append`,
+  tanpa `isSecure`, kembali `*`, tanpa filter wildcard). Live: `curl -I` 401/400/204/SPA membawa header;
+  handshake WebSocket mentah Origin `localhost:8000` → `connection_established`, `evil.example` →
+  `4009 Origin not allowed`. Suite 320 (container). **Bukan dibuktikan:** realtime di browser sungguhan (handshake mentah memakai
+  Origin yang sama dengan browser). Catatan: cek Origin hanya menahan browser — isolasi data tetap
+  channel auth.
+
 - `2026-10-30` (bump keamanan seluruh stack) · **[SELESAI]** dipicu rilis keamanan PHP 21 Okt + advisory
   Laravel. **Runtime:** PHP 8.3.33 → **8.3.36** (CVE-2026-109618/109619, RCE), MySQL 8.4.11 → **8.4.13**
   (CPU Okt; upgrade in-place volume sama, backup dulu), Redis 7.4.5 → **7.4.12** (7.4.9/7.4.10/7.4.12
@@ -1114,8 +1136,9 @@ Tiga klaim D2′/D3′ gugur karena pertanyaan itu (§Temuan D6′).
    Baru relevan saat ada target deploy. Prasyarat B7 (alarm job gagal) sudah selesai 2026-09-16; di
    produksi isi `TAS_ALERT_MAIL` + SMTP sungguhan. **Temuan audit 2026-09-16 yang sengaja ditunda ke
    sini:** ~~(a) selisih waktu login~~ ~~(b) password `min:8`~~ ~~(c) CORS `*`~~ — **SELESAI 2026-10-07**
-   (entri Status teratas); tersisa (d) header keamanan (CSP, HSTS) dan `config/reverb.php`
-   `allowed_origins ['*']`.
+   (entri Status teratas); (d) ~~header dasar + HSTS~~ ~~Reverb `allowed_origins ['*']`~~ — **slice 1/2
+   SELESAI 2026-10-30**; tersisa **slice 2: CSP** (`Vite::useCspNonce()`, mulai `Report-Only`, cek
+   browser 4 persona — token di `localStorage` membuat CSP justru pertahanan XSS paling bernilai).
 **~~B7~~ — SELESAI 2026-09-16.** Keadaan sebelum [dijalankan]: job gagal permanen hanya meninggalkan
    1 baris `ERROR` (tak bisa dibedakan dari percobaan ulang) + baris `failed_jobs` + `FAIL` di konsol
    Horizon. Dipilih **satu listener global `JobFailed`** (bukan isi `failed()` per job, karena kegagalan

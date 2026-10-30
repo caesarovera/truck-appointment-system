@@ -102,4 +102,15 @@ return [
         'throttle_minutes' => (int) env('TAS_ALERT_THROTTLE_MINUTES', 15),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Header keamanan (middleware SecurityHeaders)
+    |--------------------------------------------------------------------------
+    | hsts_max_age: detik untuk Strict-Transport-Security, dikirim HANYA lewat HTTPS
+    |   (dev HTTP tak pernah menerimanya). 0 = matikan HSTS.
+    */
+    'security' => [
+        'hsts_max_age' => (int) env('TAS_HSTS_MAX_AGE', 31536000),
+    ],
+
 ];

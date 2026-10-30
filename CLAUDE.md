@@ -96,6 +96,9 @@ Data layer     → Repository (interface + Eloquent impl), Models, Jobs, Notific
 * Jangan dispatch job / HTTP call ke TOS di dalam `DB::transaction()` — commit dulu baru dispatch (lewat `AppointmentBooked` listener).
 * Rate limiter by `user()?->id ?: ip()`. Endpoint booking lebih ketat (anti bot borong slot).
 
+### Header & origin
+* Middleware global `SecurityHeaders` (nosniff · `X-Frame-Options: DENY` · Referrer-Policy · HSTS **hanya HTTPS**) — `prepend` (paling luar), **bukan** `append`: respons dari middleware bawaan (400 path, preflight CORS, 413, 503) juga kena. CSP menyusul (B6 d slice 2). Origin lintas-situs: `CORS_ALLOWED_ORIGINS` & `REVERB_ALLOWED_ORIGINS` (host; default host `APP_URL`) — **jangan pernah `*`**. Dijaga `SecurityHeadersTest` + `CorsTest`.
+
 ## Perintah
 
 ```bash

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\IdempotencyKey;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'idempotency' => IdempotencyKey::class,
         ]);
+        // Global & PALING LUAR (prepend, bukan append): respons yang lahir di middleware global
+        // bawaan — 400 ValidatePathEncoding, preflight HandleCors, 413, 503 — juga kena header.
+        $middleware->prepend(SecurityHeaders::class);
         // Default framework `route('login')` dievaluasi di middleware SEBELUM exception dilempar,
         // dan route bernama `login` tak ada (API-only) → 500. Tak ada halaman web ber-login
         // (SPA catch-all publik), jadi tamu tak pernah di-redirect; handler membalas 401 JSON.

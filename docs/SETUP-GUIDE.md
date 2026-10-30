@@ -220,6 +220,8 @@ Satu berkas `.env` dibaca kedua jalur, dengan pembagian tegas:
 | `REVERB_APP_ID/KEY/SECRET` | keduanya | dipakai apa adanya |
 | `REVERB_HOST/PORT/SCHEME` → `VITE_REVERB_*` | **browser** (dibaca Vite saat dev/build) | PHP memakai `reverb:8080` dari compose |
 | `CORS_ALLOWED_ORIGINS` | keduanya (`config/cors.php`) | dipakai apa adanya. **Kosong = tanpa akses lintas-origin** (SPA same-origin). Isi hanya bila SPA di domain terpisah, dipisah koma; jangan `*` |
+| `REVERB_ALLOWED_ORIGINS` | service `reverb` (`config/reverb.php`) | **host** (bukan URL) halaman yang boleh membuka WebSocket, dipisah koma, wildcard `*.x.com` boleh (entri `*` / `*x.com` **diabaikan**). Kosong / tak ada yang sah = host `APP_URL`. Ubah → `docker compose restart reverb` |
+| `TAS_HSTS_MAX_AGE` | middleware `SecurityHeaders` | detik HSTS, hanya terkirim lewat HTTPS; `0` = mati |
 
 - **Kunci Reverb dev terisi di `.env.example`** (`100001` / `tas-local-dev-key` / `tas-local-dev-secret`).
   `php artisan reverb:install` **bukan** penggantinya: ia tak mengisi kunci yang sudah ada walau
@@ -447,6 +449,7 @@ Test #2-lah gerbang yang sesungguhnya. **Jangan hapus #2.**
 | Edit `.env` tak berefek | server web jalan `--no-reload` | recreate service (§3) |
 | Halaman kosong / aset SPA gagal dimuat | `public/hot` basi atau Vite yatim | §9a |
 | Realtime diam, `failed_jobs` berisi `Pusher error: Not found` | `REVERB_APP_*` kosong di `.env` | isi dari `.env.example`, recreate service (§7) |
+| Realtime diam, WebSocket menerima `pusher:error` **4009 Origin not allowed** | host halaman SPA tak ada di `REVERB_ALLOWED_ORIGINS` / beda dari host `APP_URL` | isi host SPA di `REVERB_ALLOWED_ORIGINS`, `docker compose restart reverb` (§7) |
 | Realtime diam tanpa failed job | Vite jalan dengan `.env` lama (`VITE_REVERB_*`), atau `reverb` mati | restart `npm run dev`; `docker compose ps reverb` |
 | Login lewat `:8000` sukses tapi data "hilang"/beda | yang terbuka adalah `composer dev` native (8001, SQLite) | lihat peringatan di §3 |
 | `Unknown database 'tas_testing'` | volume MySQL dibuat sebelum skrip init | `docker compose down -v && docker compose up -d` (**hapus data**) |
@@ -740,6 +743,8 @@ UID 1000 (juga pemilik `vendor/` agar volume kosong tak jadi milik root).
 | `.env` | berkas bind mount | env var / secret platform |
 | Kunci Reverb | nilai dev di `.env.example` | acak, dari secret |
 | `CORS_ALLOWED_ORIGINS` | kosong (same-origin) | domain SPA bila terpisah; jangan `*` |
+| `REVERB_ALLOWED_ORIGINS` | kosong → host `APP_URL` (`localhost`) | kosong bila SPA = `APP_URL`; host SPA bila terpisah (host saja, bukan URL); jangan `*` |
+| HSTS (`TAS_HSTS_MAX_AGE`) | tak pernah terkirim (HTTP) | otomatis begitu request `isSecure()` — di belakang LB yang memutus TLS butuh `trustProxies` (baris bawah), kalau tidak HSTS tak pernah terkirim |
 | IP klien (`$request->ip()`) | langsung dari koneksi (tak ada `trustProxies`) | di belakang LB/CDN WAJIB `$middleware->trustProxies(at: [IP LB])` — tanpa itu semua klien berbagi satu IP: bucket throttle login per-ip (30/mnt) jadi satu kuota global dan akun mana pun bisa dikunci. Jangan `*` kecuali LB menimpa X-Forwarded-For |
 
 Volume di produksi hanya untuk data yang harus bertahan (MySQL, Redis), bukan kode. Belum ada

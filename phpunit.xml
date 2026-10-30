@@ -51,6 +51,8 @@
         <env name="CACHE_STORE" value="array" force="true"/>
         <!-- Nilai `.env` dev (CORS_ALLOWED_ORIGINS boleh diisi) tak boleh mengubah hasil CorsTest. -->
         <env name="CORS_ALLOWED_ORIGINS" value="" force="true"/>
+        <!-- Sama untuk SecurityHeadersTest: default origin Reverb (host APP_URL) yang diuji. -->
+        <env name="REVERB_ALLOWED_ORIGINS" value="" force="true"/>
         <!-- SLICE D1 (ADR-0007): test jalan di MySQL sungguhan, bukan lagi sqlite :memory:.
              Alasannya BUKAN kerapian: sqlite tak menerbitkan `SELECT ... FOR UPDATE`, jadi
              test konkurensi (jantung proyek ini) mustahil jujur di atasnya. Lihat

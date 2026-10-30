@@ -82,7 +82,23 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => ['*'],
+                // HOST Origin browser yang boleh membuka WebSocket (Reverb mencocokkan host saja,
+                // wildcard `*.example.com` boleh). REVERB_ALLOWED_ORIGINS dipisah koma; kosong →
+                // host APP_URL. Tak ada host → semua ditolak (gagal tertutup).
+                // Entri ber-`*` DIBUANG kecuali awalan `*.` utuh: `*` saja membuat Reverb meloloskan
+                // semua origin, dan `*example.com` (Str::is) juga cocok dengan `evilexample.com`.
+                // Ini hanya menahan browser; isolasi data tetap tugas channel auth (channels.php).
+                'allowed_origins' => (static function (): array {
+                    $hosts = array_values(array_filter(
+                        array_map('trim', explode(',', (string) env('REVERB_ALLOWED_ORIGINS', ''))),
+                        static fn (string $host): bool => $host !== ''
+                            && (! str_contains($host, '*') || preg_match('/^\*\.[^*]+$/', $host) === 1),
+                    ));
+
+                    return $hosts !== []
+                        ? $hosts
+                        : array_values(array_filter([parse_url((string) env('APP_URL', ''), PHP_URL_HOST)]));
+                })(),
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
                 'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),
